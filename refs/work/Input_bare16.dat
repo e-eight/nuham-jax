@@ -1,0 +1,11 @@
+&input
+  rank=2
+  hw=16
+  renorm= "bare"
+  lambda=2.0
+  emax=4
+  e2max=8
+  NNInt= "N3LO_EM500"
+  input_nn_file= "/root/NuHamil-public/input_nn_files/N3LO_EM500_kmax8_N100_Jmax8.bin"
+  file_name_nn= "TwBME-HO_NN-only_N3LO_EM500_bare2.0_hw16_emax4_e2max8.me2j.gz"
+&end

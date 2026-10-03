@@ -1,0 +1,53 @@
+
+############################################################
+#          NuHamil (Tokyo) code
+############################################################
+
+# Version is main:4d310c14970d9b47fa6f40dfde78d03b61afb526
+# OpenMP number of threads=  16
+
+################### Input Parameters #####################
+# hw =  20.00 MeV
+# renorm: srg, lambda =   2.00
+# Generator of SRG: kinetic
+# 
+# Parameters for two-body system
+# N2max = 100,  Jmax =  12, Jmax(NNint) =   8
+# NN interaction: N3LO_EM500
+# Maximum momentum =   8.00 fm-1,  Number of gauss-legendre mesh points 100
+# input_nn_file = /root/NuHamil-public/input_nn_files/N3LO_EM500_kmax8_N100_Jmax8.bin
+# 
+################### For Output Files #####################
+# emax =   4, e2max =   8
+# file name: TwBME-HO_NN-only_N3LO_EM500_srg2.0_hw20_emax4_e2max8.me2j.gz
+# Calculations will be done for Operators:
+# hamil, 
+# directory for temporary files: ./
+############################################################
+           Calculations for NN sector
+############################################################
+
+ NN calculations with isospin formalism is not supported.
+ pn_form is turned to .true.
+Estimated memory for two-body Tcoefs:     0.000342 GB
+Not found .//NNint_A2_rel_N3LO_EM500_bare_Nmax100_hw20.gz
+Calculating NN interaction in relative coordinate:
+NNint = N3LO_EM500, Nmax =  100, Jmax =   8, hw =  20.00 MeV
+
+############################################################
+    Doing transformaion to sp basis ...
+############################################################
+
+
+    summary of time, total =     0:00:16
+
+                                     time,    ncall, time/ncall,   ratio 
+         Storing 6-j couplings       0.000         1     0.00050   0.0000
+         Storing 9-j couplings       0.000         1     0.00048   0.0000
+Storing Talmi-Moshinsky bracke       0.002         1     0.00151   0.0001
+    Transformation coefficient       0.003         1     0.00315   0.0002
+                 Write to file       0.279         2     0.13928   0.0171
+                    SRG H flow      15.626        54     0.28936   0.9571
+                TMTransChannel       0.019        55     0.00034   0.0012
+                          misc       0.398                         0.0243
+

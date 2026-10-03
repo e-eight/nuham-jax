@@ -1,0 +1,46 @@
+[project]
+name = "nuham"
+version = "0.1.0"
+description = "JAX generator of NN (and later 3N) matrix elements, validated against NuHamil"
+authors = [
+    { name = "e-eight", email = "dssohampal@gmail.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "jax>=0.11.2",
+    "numpy>=2.5.3",
+]
+
+[build-system]
+requires = ["uv_build>=0.11.16,<0.12.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "mpmath>=1.3.0",
+    "pytest>=9.1.1",
+    "ruff>=0.16.10",
+    "scipy>=1.18.1",
+    "sympy>=1.14.0",
+    "ty>=0.0.84",
+]
+
+[tool.ruff]
+line-length = 100
+extend-exclude = ["refs"]  # throwaway oracle scripts, not the package
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "D", "ANN"]
+ignore = ["E741"]  # l is the physics symbol for orbital angular momentum
+
+[tool.ruff.lint.pydocstyle]
+convention = "numpy"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["D", "ANN"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ty.src]
+include = ["src", "tests"]
