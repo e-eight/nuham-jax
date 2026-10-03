@@ -75,7 +75,14 @@ Original description:
 HO radial functions; Gauss-Legendre momentum -> HO projection; Talmi-Moshinsky and
 Moshinsky brackets (orthonormality). Test against NuHamil intermediates and analytic identities.
 
-### Phase 2: relative-space NN
+### Phase 2: relative-space NN — DONE
+`kernels/coulomb.py`, `kernels/srg.py` (banded commutator, one matmul per RHS, Diffrax Dopri8, max-norm
+error control, hw-scaled units), `relative_nn.py` (driver, padded batching). Results: matches the numpy
+oracle to <= 1.6e-8 MeV on 16 golden channels (hw 16/24, lambda 2.0/1.8); spectrum invariant in all 54
+channels (1e-6 test bound); deuteron -2.2245754 MeV before and after; full flow for 54 channels in
+~2 s (scipy: ~40 CPU-s), peak RSS ~670 MB; rtol=atol 1e-10 kept (1e-7 would be only ~25% faster).
+Not done: unequal-mass pn (`pn_same_mass=false`), non-kinetic generators, explicit `n_flow` option.
+Original description:
 Read EM500 momentum-space input (`N3LO_EM500_kmax8_N100_Jmax8.bin`), project to HO,
 SRG flow (stiff; implicit solver or exact-unitary scheme; compare with VODE).
 Check deuteron energy and SRG eigenvalue invariance.
