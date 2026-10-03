@@ -84,3 +84,41 @@ def test_vectorized_format_is_byte_identical_to_python() -> None:
 def test_format_falls_back_for_non_finite_and_large_values() -> None:
     values = np.array([np.nan, np.inf, -np.inf, 1e5, -1e7, 123456.789, 0.0, 1.0, 2.0, 3.0])
     assert _format_lines(values) == _format_lines_python(values).encode("ascii")
+
+
+def _text(path: Path) -> bytes:
+    with gzip.open(path, "rb") as fh:
+        return fh.read()
+
+
+def test_isal_output_is_standard_gzip_with_the_same_text(tmp_path: Path) -> None:
+    pytest.importorskip("isal")
+    values = np.random.default_rng(2).normal(scale=4, size=1000)
+    for level in (0, 1, 3):
+        a, b = tmp_path / "a.me2j.gz", tmp_path / "b.me2j.gz"
+        write_me2j(a, iter([values]), compresslevel=level, compressor="gzip")
+        write_me2j(b, iter([values]), compresslevel=level, compressor="isal")
+        assert _text(a) == _text(b)  # read back through the standard library
+        np.testing.assert_allclose(read_me2j(b), values, atol=5e-9)
+
+
+def test_auto_falls_back_to_gzip_without_isal(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr("nuham.me2j._igzip", lambda: None)
+    values = np.linspace(-2.0, 2.0, 30)
+    write_me2j(tmp_path / "a.me2j.gz", iter([values]), compressor="auto")
+    np.testing.assert_allclose(read_me2j(tmp_path / "a.me2j.gz"), values, atol=5e-9)
+    with pytest.raises(ImportError, match="isal"):
+        write_me2j(tmp_path / "b.me2j.gz", iter([values]), compressor="isal")
+
+
+def test_compressor_argument_is_validated(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="unknown compressor"):
+        write_me2j(tmp_path / "a.me2j.gz", iter([np.ones(10)]), compressor="zstd")
+    pytest.importorskip("isal")
+    with pytest.raises(ValueError, match="levels 0-3"):
+        write_me2j(tmp_path / "b.me2j.gz", iter([np.ones(10)]), compresslevel=6, compressor="isal")
+    # auto with a level isal lacks quietly uses gzip
+    write_me2j(tmp_path / "c.me2j.gz", iter([np.ones(10)]), compresslevel=6, compressor="auto")
+    assert len(read_me2j(tmp_path / "c.me2j.gz")) == 10

@@ -53,6 +53,7 @@ def generate_scan(
     batch_size: int = 2,
     timer: StageTimer | None = None,
     flow_sets: int | None = None,
+    compressor: str = "auto",
 ) -> list[int]:
     """Generate one NN ``me2j`` file per scan point, sharing work between points.
 
@@ -70,7 +71,7 @@ def generate_scan(
         Momentum-space interaction.
     points
         The parameter sets and their output files.
-    emax, e2max, lmax, coulomb, mosh, compresslevel, n2max
+    emax, e2max, lmax, coulomb, mosh, compresslevel, n2max, compressor
         As in :func:`nuham.generate.generate_me2j`.
     batch_size
         Number of points processed together.
@@ -115,9 +116,15 @@ def generate_scan(
                 continue
             chunks = assemble(orb, e2max, chans)
             if timer is None:
-                counts.append(write_me2j(point.path, chunks, compresslevel=compresslevel))
+                counts.append(
+                    write_me2j(
+                        point.path, chunks, compresslevel=compresslevel, compressor=compressor
+                    )
+                )
             else:
-                counts.append(write_me2j_timed(point.path, chunks, timer, compresslevel))
+                counts.append(
+                    write_me2j_timed(point.path, chunks, timer, compresslevel, compressor)
+                )
     return counts
 
 
@@ -144,6 +151,7 @@ def main() -> None:
         help="points per SRG flow batch (default: by backend)",
     )
     p.add_argument("--gzip-level", type=int, default=1)
+    p.add_argument("--compressor", choices=["auto", "gzip", "isal"], default="auto")
     p.add_argument("--bracket-cache", default=None, help="directory for cached Moshinsky tables")
     p.add_argument("--no-compile-cache", action="store_true")
     args = p.parse_args()
@@ -157,6 +165,7 @@ def main() -> None:
         read_nn_mom(args.nn_file), points, args.emax, args.e2max, args.lmax, not args.no_coulomb,
         MoshinskyTable(args.bracket_cache), args.gzip_level, args.n2max, args.batch_size,
         flow_sets=args.flow_sets,
+        compressor=args.compressor,
     )  # fmt: skip
     for point, n in zip(points, counts, strict=True):
         print(f"wrote {n} values to {point.path}")

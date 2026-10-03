@@ -19,7 +19,7 @@ phase unless the user asks.
 
 ## Conventions (set by the user)
 
-- Dependencies: `uv` (`uv add`, `uv sync`, `uv run ...`). Do not use bare `pip`.
+- Dependencies: `uv` (`uv add`, `uv sync`, `uv run ...`). Do not use bare `pip`. Optional extra `fast` (`isal`, ISA-L's igzip): `uv sync --extra fast`. The `me2j` writer uses it when installed (`compressor="auto"`, CLI `--compressor`): standard gzip, but not byte-identical to the `gzip` module's output, and 3.5x shorter write stage on the GH200. On the clusters install it with `uv pip install isal` into the venv (a plain `uv sync` there would strip the CUDA packages).
 - Format and lint everything with `ruff` (`uv run ruff format`, `uv run ruff check`). Type checking and LSP: `ty` (`uv run ty check`).
 - Testing: `pytest` (run through `uv run pytest`).
 - Docstrings on every module, class and function. Type annotations everywhere.

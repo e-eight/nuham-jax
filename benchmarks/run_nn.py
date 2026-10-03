@@ -22,7 +22,6 @@ from pathlib import Path
 import jax
 
 import nuham  # noqa: F401  sets JAX allocation defaults before the first device use
-import nuham.me2j
 from nuham.angmom.moshinsky_table import MoshinskyTable
 from nuham.generate import generate_me2j
 from nuham.interactions.nn_file import read_nn_mom
@@ -74,17 +73,11 @@ def main() -> None:
     p.add_argument("--gzip-level", type=int, default=1)
     p.add_argument("--bracket-cache", default=None)
     p.add_argument("--no-compile-cache", action="store_true")
-    p.add_argument(
-        "--isal", action="store_true", help="experiment: compress with isal.igzip (needs isal)"
-    )
+    p.add_argument("--compressor", choices=["auto", "gzip", "isal"], default="auto")
     p.add_argument("--json", default=None, help="also write the record to this file")
     args = p.parse_args()
     if not args.no_compile_cache:
         enable_compilation_cache()
-    if args.isal:
-        from isal import igzip
-
-        nuham.me2j.gzip = igzip  # type: ignore[attr-defined]  benchmark-only swap
     nn = read_nn_mom(args.nn_file)
     mosh = MoshinskyTable(args.bracket_cache)
     runs = []
@@ -95,7 +88,7 @@ def main() -> None:
             start = time.perf_counter()
             n = generate_me2j(
                 nn, out, args.hw, args.lam, args.emax, args.e2max, mosh=mosh,
-                compresslevel=args.gzip_level, timer=timer,
+                compresslevel=args.gzip_level, timer=timer, compressor=args.compressor,
             )  # fmt: skip
             total = time.perf_counter() - start
             runs.append(
@@ -113,7 +106,11 @@ def main() -> None:
     record = {
         "env": environment(),
         "case": {k: getattr(args, k) for k in ("nn_file", "emax", "e2max", "hw", "lam")}
-        | {"compute_only": args.compute_only, "gzip_level": args.gzip_level, "isal": args.isal},
+        | {
+            "compute_only": args.compute_only,
+            "gzip_level": args.gzip_level,
+            "compressor": args.compressor,
+        },
         "runs": runs,
     }
     text = json.dumps(record, indent=2)

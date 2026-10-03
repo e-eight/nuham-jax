@@ -42,6 +42,7 @@ def main() -> None:
         default=None,
         help="points per SRG flow batch (default: by backend)",
     )
+    p.add_argument("--compressor", choices=["auto", "gzip", "isal"], default="auto")
     p.add_argument("--compute-only", action="store_true", help="skip assembly and file writing")
     p.add_argument("--bracket-cache", default=None)
     p.add_argument("--no-compile-cache", action="store_true")
@@ -68,7 +69,15 @@ def main() -> None:
                 if batch == 0:
                     for (hw, lam), path in zip(grid, out, strict=True):
                         generate_me2j(
-                            nn, path, hw, lam, args.emax, args.e2max, mosh=mosh, timer=timer
+                            nn,
+                            path,
+                            hw,
+                            lam,
+                            args.emax,
+                            args.e2max,
+                            mosh=mosh,
+                            timer=timer,
+                            compressor=args.compressor,
                         )
                 else:
                     points = [ScanPoint(hw, lam, o) for (hw, lam), o in zip(grid, out, strict=True)]
@@ -81,6 +90,7 @@ def main() -> None:
                         batch_size=batch,
                         timer=timer,
                         flow_sets=args.flow_sets,
+                        compressor=args.compressor,
                     )
                 total = time.perf_counter() - start
             runs.append(
@@ -97,7 +107,12 @@ def main() -> None:
     record = {
         "env": environment(),
         "case": {"nn_file": args.nn_file, "emax": args.emax, "e2max": args.e2max}
-        | {"grid": grid, "compute_only": args.compute_only, "flow_sets": args.flow_sets},
+        | {
+            "grid": grid,
+            "compute_only": args.compute_only,
+            "flow_sets": args.flow_sets,
+            "compressor": args.compressor,
+        },
         "runs": runs,
     }
     text = json.dumps(record, indent=2)

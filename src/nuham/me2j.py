@@ -7,6 +7,7 @@ from functools import cache
 from pathlib import Path
 from queue import Queue
 from threading import Thread
+from types import ModuleType
 
 import numpy as np
 
@@ -211,11 +212,41 @@ def _format_lines(values: np.ndarray) -> bytes:
     return lines.tobytes()
 
 
+@cache
+def _igzip() -> ModuleType | None:
+    """Return ``isal.igzip`` if the optional ``isal`` package is installed, else ``None``."""
+    try:
+        from isal import igzip
+    except ImportError:
+        return None
+    return igzip
+
+
+def _open_gzip(path: str | Path, compresslevel: int, compressor: str) -> gzip.GzipFile:
+    """Open ``path`` for binary gzip output with the compressor chosen by ``compressor``.
+
+    ``"gzip"`` is the standard library, ``"isal"`` is ISA-L's igzip (levels 0-3; needs the
+    optional ``isal`` package) and ``"auto"`` uses igzip when it is installed and the level allows,
+    else ``gzip``. Both write standard gzip streams, but not byte-identical ones.
+    """
+    if compressor not in ("auto", "gzip", "isal"):
+        raise ValueError(f"unknown compressor {compressor!r}; use 'auto', 'gzip' or 'isal'")
+    igzip = None if compressor == "gzip" else _igzip()
+    if compressor == "isal" and igzip is None:
+        raise ImportError("compressor='isal' needs the optional package: uv sync --extra fast")
+    if compressor == "isal" and compresslevel > 3:
+        raise ValueError("isal supports compression levels 0-3")
+    if igzip is not None and compresslevel <= 3:
+        return igzip.open(path, "wb", compresslevel=compresslevel)
+    return gzip.open(path, "wb", compresslevel=compresslevel)
+
+
 def write_me2j(
     path: str | Path,
     chunks: Iterator[np.ndarray],
     header: str = HEADER,
     compresslevel: int = 1,
+    compressor: str = "auto",
 ) -> int:
     """Write values as gzip text: one header line, then Fortran ``10f16.8`` (10 values per line).
 
@@ -230,6 +261,10 @@ def write_me2j(
         Arrays of values, flattened in order.
     header
         Free-text first line.
+    compressor
+        ``"auto"`` (ISA-L's igzip if the optional ``isal`` package is installed, else ``gzip``),
+        ``"gzip"`` or ``"isal"``; see :func:`_open_gzip`. On the GH200 igzip made the write stage
+        3.5x shorter at emax 12 (``docs/benchmarks.md``).
     compresslevel
         gzip level for ``.gz`` files. Level 1 compresses at about 150 MB/s and gives files about
         10% larger than level 4 (70 MB/s), so it is the default.
@@ -248,7 +283,7 @@ def write_me2j(
     def drain() -> None:
         try:
             fh = (
-                gzip.open(path, "wb", compresslevel=compresslevel)
+                _open_gzip(path, compresslevel, compressor)
                 if str(path).endswith(".gz")
                 else open(path, "wb")
             )
@@ -289,7 +324,11 @@ def write_me2j(
 
 
 def write_me2j_timed(
-    path: str | Path, chunks: Iterator[np.ndarray], timer: StageTimer, compresslevel: int = 1
+    path: str | Path,
+    chunks: Iterator[np.ndarray],
+    timer: StageTimer,
+    compresslevel: int = 1,
+    compressor: str = "auto",
 ) -> int:
     """Write like :func:`write_me2j` and record ``assemble`` and ``write`` on ``timer``.
 
@@ -299,7 +338,9 @@ def write_me2j_timed(
     """
     before = timer.seconds.get("assemble", 0.0)
     with timer.stage("write"):
-        n = write_me2j(path, timer.wrap("assemble", chunks), compresslevel=compresslevel)
+        n = write_me2j(
+            path, timer.wrap("assemble", chunks), compresslevel=compresslevel, compressor=compressor
+        )
     timer.seconds["write"] -= timer.seconds["assemble"] - before
     return n
 

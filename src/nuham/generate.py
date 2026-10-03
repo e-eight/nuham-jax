@@ -26,6 +26,7 @@ def generate_me2j(
     compresslevel: int = 1,
     n2max: int = 100,
     timer: StageTimer | None = None,
+    compressor: str = "auto",
 ) -> int:
     """Generate the NN interaction in the lab HO basis and write it as ``me2j``.
 
@@ -46,8 +47,8 @@ def generate_me2j(
         Whether to include the pp Coulomb interaction.
     mosh
         Optional bracket table to reuse between calls.
-    compresslevel
-        gzip level of the output (see :func:`nuham.me2j.write_me2j`).
+    compresslevel, compressor
+        Level and compressor of the gzip output (see :func:`nuham.me2j.write_me2j`).
     n2max
         Truncation ``2n + l <= n2max`` of the relative space in which the SRG flow runs.
     timer
@@ -74,8 +75,8 @@ def generate_me2j(
         return 0
     chunks = assemble(orb, e2max, channels)
     if timer is None:
-        return write_me2j(path, chunks, compresslevel=compresslevel)
-    return write_me2j_timed(path, chunks, timer, compresslevel)
+        return write_me2j(path, chunks, compresslevel=compresslevel, compressor=compressor)
+    return write_me2j_timed(path, chunks, timer, compresslevel, compressor)
 
 
 def main() -> None:
@@ -91,6 +92,10 @@ def main() -> None:
     p.add_argument("--no-coulomb", action="store_true")
     p.add_argument("--n2max", type=int, default=100, help="relative space of the SRG flow")
     p.add_argument("--gzip-level", type=int, default=1, help="gzip level of the output (1-9)")
+    p.add_argument(
+        "--compressor", choices=["auto", "gzip", "isal"], default="auto",
+        help="gzip implementation (auto: isal if installed, see --help of the isal extra)",
+    )  # fmt: skip
     p.add_argument("--bracket-cache", default=None, help="directory for cached Moshinsky tables")
     p.add_argument(
         "--compile-cache",
@@ -105,6 +110,7 @@ def main() -> None:
     n = generate_me2j(
         read_nn_mom(args.nn_file), args.output, args.hw, args.lam, args.emax, args.e2max,
         args.lmax, not args.no_coulomb, mosh, args.gzip_level, args.n2max,
+        compressor=args.compressor,
     )  # fmt: skip
     print(f"wrote {n} values to {args.output}")
 
