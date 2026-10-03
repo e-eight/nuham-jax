@@ -61,3 +61,33 @@ Five of the references (LO_EMN500, N4LO_EMN500, N2LO_opt, N2LO_sat, N3LO_texas) 
 | nuham | -79.6567067 | -23.8799959 | -4.09134416 | -28.221148 |
 
 Differences: 4e-7 (HF), 2e-8 (MP2), none visible in the IMSRG(2) energy at the printed precision.
+
+## Large files: emax 12 and 14 (2026-10-03)
+
+**imsrg++ stops reading early.** Given a file with `file2e1max=14, file2e2max=28` but a model space of `emax=4`, imsrg++ finished in 0.4 s: the tuples are in file order, so it has everything it needs after
+the first part and never reads or decompresses the rest (so the gzip trailer is never checked). Such a run says nothing about the big stream. Two tests replace it.
+
+**1. Boost decoding of whole emax 14 streams** (`refs/imsrg/boost_cat.cc`, built exactly like imsrg++'s reader: `ifstream` -> `gzip_decompressor` -> `filtering_istream`). One computation on this CPU (matrices 98 s),
+written three ways (emax 14, e2max 28, hw 16, lambda 2.0, 168 066 656 values, 2 705 873 196 bytes of text, which is above 2^31):
+
+| writer | write time | file | Boost decode | decoded SHA-256 |
+|---|---|---|---|---|
+| `gzip` level 1 | 54 s | 914 MB | 2 705 873 196 bytes, eof, no error | 4409e7d4... |
+| isal level 1, 4 threads | 13 s | 904 MB | same | same |
+| isal level 0, 4 threads | 13 s | 1.08 GB | same | same |
+
+All three are single gzip members (`gzip -t` passes, the size field is right) and decode to byte-identical text, each in 15 s. This covers the streams above 1 GB compressed and above 2^31 bytes decompressed.
+
+**2. imsrg++ consuming a whole file: emax 12, e2max 24, full model space** (4He, hw 16, lambda 2.0, `smax=0`: read, HF and MBPT only; 50 715 864 values). NuHamil needed 555 s and 5.9 GB for this file on this machine, `nuham` 36 s.
+Energies in MeV; each imsrg++ run took about 200 s and 8.9 GB:
+
+| file | e2hf | EHF | EMP2 |
+|---|---|---|---|
+| NuHamil (235 MB) | -73.8069259 | -21.9435394 | -6.77482643 |
+| nuham, gzip (278 MB) | -73.8069298 | -21.9435407 | -6.77482628 |
+| nuham, isal level 1, 4 threads (276 MB) | -73.8069298 | -21.9435407 | -6.77482628 |
+
+The two of ours are identical; the difference to NuHamil is 1.3e-6 (HF) and 1.5e-7 (MP2). Element-wise, all 50 715 864 values agree with NuHamil's to 2.4e-7 MeV (none above 5e-7).
+
+**Remaining gap:** imsrg++ itself consuming an emax 14 file. It used 8.9 GB at emax 12 and 2.9 GB at emax 10, so emax 14 would need roughly 25-30 GB, more than this machine's 19 GB. It would need a larger machine
+(imsrg++ built for aarch64 on DeltaAI or run elsewhere). The decoder test above covers the one risk that differs between emax 12 and 14 (stream size); the parsing is the same code that read emax 12.

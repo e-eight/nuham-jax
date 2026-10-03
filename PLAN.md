@@ -130,7 +130,7 @@ Agreed order (each phase needs a correctness gate and a benchmark gate; nothing 
 |---|---|---|---|
 | 5.0 | Spec and oracle in the style of Phase 0: Jacobi basis, cfp, local N2LO force, small NuHamil 3N references, numpy oracle. | Oracle reproduces the references. | NuHamil 3N time and memory as the baseline for any speedup claim. |
 | 5.1-5.4 | Jacobi basis and cfp; local N2LO force; Jacobi SRG; Jacobi-to-lab with e3max truncation and a streaming `me3j` writer. | Match the oracle at each step. | Stage times per step, CPU vs GPU (large dense products: where the GPU should dominate). |
-| 5.5 | imsrg++ validation on 4He and 16O: NN done for 4He (emax 4 and 8, docs/imsrg-check.md), 16O and converged larger emax still open; then NN+3N. | Energies match the NuHamil-based run. | none |
+| 5.5 | imsrg++ validation on 4He and 16O: NN done for 4He (emax 4, 8 and 12, plus Boost decoding of emax 14 streams, docs/imsrg-check.md), 16O and converged larger emax still open; then NN+3N. | Energies match the NuHamil-based run. | none |
 
 Why this order: fix the known confounders (4a) before taking baselines (4b); measure writer gains with the same harness (4c); a scan
 multiplies output, so the writer goes before scans (4d); benchmark at every feature step so the GPU question is answered where it matters.
