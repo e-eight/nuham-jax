@@ -5,6 +5,8 @@ description = "JAX generator of NN (and later 3N) matrix elements, validated aga
 authors = [
     { name = "e-eight", email = "dssohampal@gmail.com" }
 ]
+license = "GPL-3.0-only"
+license-files = ["LICENSE"]
 requires-python = ">=3.12"
 dependencies = [
     "diffrax>=0.7.2",
