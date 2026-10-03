@@ -282,3 +282,28 @@ matrices never visit the host: no host-device round trip, and about 4 GB less ho
 (`tests/test_assemble_device.py`). On the CPU this path is not useful: emax 12 end to end, `assemble` 3.0 -> 1.2 s but `write` 1.6 -> 2.8 s (the XLA-CPU kernel and the
 formatting share the same cores) and host RSS 2.7 -> 4.5 GB (matrices exist as device arrays and again as the flat copy), total unchanged. So `numpy` stays the default and
 the device assembly is meant for accelerators.
+
+## DeltaAI GH200: device assembly (job 3301528, 2026-10-03, commit 7007019, ~6 min, ~0.1 GPU-hours)
+
+All runs with `--compressor isal`, second (warm) pass of two for single runs, seconds. Raw records `benchmarks/baseline_gh200_dev_*.json`. The numpy rows repeat the
+isal rows of job 3301348 (same code, same numbers within 1%).
+
+| case | assembler | total | assemble | write | host RSS | GPU peak |
+|---|---|---|---|---|---|---|
+| emax 12 single | numpy | 6.7 | 2.59 | 1.14 | 3.7 GB | 0.6 GB |
+| emax 12 single | device | 6.2 | 0.66 | 2.66 | 2.7 GB | 3.1 GB |
+| emax 14 single | numpy | 17.7 | 8.45 | 3.59 | 6.2 GB | 1.3 GB |
+| emax 14 single | device | 15.9 | 1.98 | 8.35 | 3.7 GB | 10.3 GB |
+| emax 14 scan, per point | numpy (job 3301348) | 13.95 | 8.4 | 3.5 | 35.5 GB | 3.4 GB |
+| emax 14 scan, per point | device | 12.07 | 1.9 | 8.3 | 4.3 GB | 32.3 GB |
+
+- **The device assembly is 4x faster than the numpy one** (2.59 -> 0.66 s at emax 12, 8.45 -> 1.98 s at emax 14), and the files are equivalent (sizes differ by a few bytes
+  from the gzip streams; values equal in the CPU tests).
+- **The end-to-end gain is only 10-13%** (emax 14 single 17.7 -> 15.9 s, scan point 13.95 -> 12.07 s), because `write` grew by the time `assemble` saved: assemble and write
+  together went 12.0 -> 10.3 s per point. With assembly this fast, the writer is the floor. The main thread formats (about 6 s at emax 14, 27 M values/s per thread), and the
+  compression thread needs about 10 s of igzip at ~270 MB/s for 2.7 GB of text; the pipeline now waits for it. (Before, the compression thread was hidden behind the 8.4 s of assembly.)
+- **Host memory fell 8x in a scan** (35.5 -> 4.3 GB for 6 points at emax 14): the matrices stay on the GPU, which now holds 32 GB for 6 points (3.9 GB of matrices per point, plus a
+  transient flat copy while a point is assembled). The batch size at emax 14 is limited by GPU memory (~120 GB) instead of 64 GB of host memory, so about 15 points fit.
+- **Next floor: the writer.** Options, none started: isal's threaded compressor (`igzip_threaded`, 1.7x on this x86 machine at 8 threads with identical output size and valid gzip; not yet
+  measured on Grace); formatting on the device (the table-driven formatter is integer arithmetic) or in worker threads; releasing the per-channel device arrays once the flat copy exists
+  (halves the transient GPU memory); building the host index arrays once per scan instead of once per point.
