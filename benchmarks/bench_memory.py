@@ -1,5 +1,8 @@
 """Host memory held by the lab matrices of K scan points, against their real size.
 
+Run one point count per process (allocators keep freed memory, so a second count in the same
+process under-reports its growth). The page size is read from the system (64 KB on DeltaAI).
+
 Builds the relative potentials and then the lab matrices of every ``(J, parity)`` for K points, and
 reports the resident-set growth per point next to the bytes of the matrices themselves. A large
 ratio means memory is held by something other than the matrices (for instance pinned host buffers
@@ -11,6 +14,7 @@ on an accelerator; compare ``NUHAM_PINNED_COPY=0`` and ``=1``).
 import argparse
 import gc
 import json
+import resource
 
 import jax
 
@@ -28,7 +32,7 @@ from nuham.runtime import enable_compilation_cache
 def rss_gb() -> float:
     """Return the current resident set size of this process in GB."""
     with open("/proc/self/statm") as fh:
-        return int(fh.read().split()[1]) * 4096 / 1e9
+        return int(fh.read().split()[1]) * resource.getpagesize() / 1e9
 
 
 def main() -> None:
@@ -69,6 +73,7 @@ def main() -> None:
                 "rss_before_gb": before,
                 "rss_after_gb": after,
                 "rss_peak_gb": peak,
+                "maxrss_gb": resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 2**20,
                 "growth_per_point_gb": (after - before) / k,
                 "matrix_gb_per_point": nbytes / 1e9,
             }
