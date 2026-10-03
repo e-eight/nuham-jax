@@ -23,6 +23,7 @@ def generate_me2j(
     coulomb: bool = True,
     mosh: MoshinskyTable | None = None,
     compresslevel: int = 1,
+    n2max: int = 100,
 ) -> int:
     """Generate the NN interaction in the lab HO basis and write it as ``me2j``.
 
@@ -44,6 +45,8 @@ def generate_me2j(
         Optional bracket table to reuse between calls.
     compresslevel
         gzip level of the output (see :func:`nuham.me2j.write_me2j`).
+    n2max
+        Truncation ``2n + l <= n2max`` of the relative space in which the SRG flow runs.
 
     Returns
     -------
@@ -53,7 +56,7 @@ def generate_me2j(
     mosh = MoshinskyTable() if mosh is None else mosh
     relative = {
         (c.j, c.parity, c.s, c.tz): c
-        for c in evolve_relative_nn(nn, hw, lam, n2max=100, coulomb=coulomb)
+        for c in evolve_relative_nn(nn, hw, lam, n2max=n2max, coulomb=coulomb)
     }
     orb = make_orbits(emax, lmax)
     channels = {
@@ -74,6 +77,7 @@ def main() -> None:
     p.add_argument("--e2max", type=int, required=True)
     p.add_argument("--lmax", type=int, default=None)
     p.add_argument("--no-coulomb", action="store_true")
+    p.add_argument("--n2max", type=int, default=100, help="relative space of the SRG flow")
     p.add_argument("--gzip-level", type=int, default=1, help="gzip level of the output (1-9)")
     p.add_argument("--bracket-cache", default=None, help="directory for cached Moshinsky tables")
     p.add_argument(
@@ -88,7 +92,7 @@ def main() -> None:
     mosh = MoshinskyTable(args.bracket_cache)
     n = generate_me2j(
         read_nn_mom(args.nn_file), args.output, args.hw, args.lam, args.emax, args.e2max,
-        args.lmax, not args.no_coulomb, mosh, args.gzip_level,
+        args.lmax, not args.no_coulomb, mosh, args.gzip_level, args.n2max,
     )  # fmt: skip
     print(f"wrote {n} values to {args.output}")
 

@@ -25,7 +25,8 @@ phase unless the user asks.
 - Docstrings on every module, class and function. Type annotations everywhere.
 - Comment only to explain a design choice, not what the code does.
 - Commands: `uv sync`; `uv run pytest` (all), `uv run pytest tests/test_ho.py::test_name` (one); `uv run ruff format .`; `uv run ruff check .`; `uv run ty check`. `refs/` (throwaway oracle scripts) is excluded from ruff and ty.
-- Tests that need NuHamil input files look in `../NuHamil-public` (override with `NUHAMIL_PUBLIC`) and in `refs/work`, and skip if absent. `tests/data/moshinsky_golden.json` holds brackets generated from the oracle. The package and its tests must pass without `refs/` (tests that need it skip).
+- Test data: the only external input is NuHamil's EM500 momentum-space file (8 MB, data not code). The `nn_bin` fixture looks in `$NUHAMIL_PUBLIC/input_nn_files`, a sibling `../NuHamil-public`, then the cache `~/.cache/nuham/data`; set `NUHAM_FETCH=1` to download it into the cache during the test run, or run `uv run python -m nuham.fetch` (pinned NuHamil commit, SHA-256 checked). Tests needing it skip if it is absent (17 skip). Reference outputs are committed in `refs/work`.
+- `tests/synthetic.py` builds a synthetic charge-independent interaction in NuHamil's file format; `tests/test_synthetic_pipeline.py` runs the whole pipeline on it with no NuHamil data, using exact identities (V_rel = 1 transforms to the identity; charge-independent V gives equal nn, pn T=1 and pp me2j columns; projecting the kinetic energy gives the HO T_rel). Deliberately breaking the pair normalisation, the exchange sign or the kinetic phase makes these fail. `tests/data/moshinsky_golden.json` holds brackets generated from the oracle. The package and its tests must pass without `refs/` (tests that need it skip).
 
 ## Design rules
 

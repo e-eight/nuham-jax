@@ -54,6 +54,7 @@ Original description:
 - Check the imsrg++ `me2j` format against both NuHamil's writer and imsrg++'s reader.
 
 ### Decisions made after Phase 0
+- Tests are not tied to a NuHamil checkout: the one data file can be downloaded (`nuham.fetch`, pinned commit and checksum) and a synthetic charge-independent interaction tests the whole pipeline with exact identities. Without any NuHamil data 549 tests pass and 17 skip; without `refs/` as well, 545 pass and 19 skip.
 - Provenance: code that transcribes NuHamil's Fortran (the explicit Moshinsky bracket sum, the oracle) lives in `refs/`, not `src/`. The package only has the rotation-based Moshinsky tables, and its tests pass without `refs/` (reference-dependent tests skip).
 - Moshinsky brackets and 6j/9j coefficients: host NumPy with caching. Move to JAX only if
   profiling shows a bottleneck.
