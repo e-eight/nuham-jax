@@ -90,7 +90,7 @@ Read EM500 momentum-space input (`N3LO_EM500_kmax8_N100_Jmax8.bin`), project to 
 SRG flow (stiff; implicit solver or exact-unitary scheme; compare with VODE).
 Check deuteron energy and SRG eigenvalue invariance.
 
-### Phase 3: lab-frame me2j — DONE (imsrg++ run not done)
+### Phase 3: lab-frame me2j — DONE (imsrg++ check passed for 4He, docs/imsrg-check.md)
 `basis/lab.py`, `angmom/moshinsky_table.py` (cached (N, lam) matrices, optional disk cache),
 `lab_transform.py` (T-coefficients vectorized over rows/pairs, per-block contraction), `me2j.py`
 (tuple enumeration identical to the imsrg++ reader, 4-value assembly, writer/reader), `generate.py` (+CLI).
@@ -101,7 +101,7 @@ Cost: emax 4: 2.5 s; emax 6: 5 s; emax 8 (e2max 16): ~60-90 s cold, of which ~65
 and ~25% gzip. Brackets needed (entries incl. zeros): e2max 16: 4e5; 20: 1.8e6; 24: 6.2e6; 28: 1.8e7, at
 50-500 us each uncached -> a few CPU-hours at e2max 28 (one-time: hw-independent, disk-cacheable).
 Sizes at emax=14/e2max=28: 59 lab channels, largest pair basis 4234, 4.2e7 tuples (1.3 GB float64).
-Not done: running imsrg++ itself on a generated file; bracket generation at e2max > 16.
+Done later: imsrg++ reads our files and reproduces the NuHamil-based 4He energies to ~1e-6 MeV at emax 4 (full flow) and emax 8 (HF/MBPT), see docs/imsrg-check.md. Not done: bracket generation at e2max > 16 was done in Phase 4.
 Original description:
 Relative -> lab transform plus Trel/Hcm. Write `me2j`. Compare elementwise with NuHamil.
 End-to-end: imsrg++ on 4He with our file and with NuHamil's.
@@ -130,7 +130,7 @@ Agreed order (each phase needs a correctness gate and a benchmark gate; nothing 
 |---|---|---|---|
 | 5.0 | Spec and oracle in the style of Phase 0: Jacobi basis, cfp, local N2LO force, small NuHamil 3N references, numpy oracle. | Oracle reproduces the references. | NuHamil 3N time and memory as the baseline for any speedup claim. |
 | 5.1-5.4 | Jacobi basis and cfp; local N2LO force; Jacobi SRG; Jacobi-to-lab with e3max truncation and a streaming `me3j` writer. | Match the oracle at each step. | Stage times per step, CPU vs GPU (large dense products: where the GPU should dominate). |
-| 5.5 | imsrg++ validation on 4He and 16O, NN first (still open) and then NN+3N. | Energies match the NuHamil-based run. | none |
+| 5.5 | imsrg++ validation on 4He and 16O: NN done for 4He (emax 4 and 8, docs/imsrg-check.md), 16O and converged larger emax still open; then NN+3N. | Energies match the NuHamil-based run. | none |
 
 Why this order: fix the known confounders (4a) before taking baselines (4b); measure writer gains with the same harness (4c); a scan
 multiplies output, so the writer goes before scans (4d); benchmark at every feature step so the GPU question is answered where it matters.
