@@ -367,3 +367,12 @@ Scans, 6 points (hw 12/16/20 x lambda 1.8/2.0) at batch 6 and 12 points (hw 12..
 - A full emax 14 scan point costs 4.6-4.8 s, against 25 s for a separate gzip/numpy run at the start of this work (5x) and 8.1 s for the best single run.
 - Batch 12 fits easily (57 GB of the GPU, 5 GB of host memory) and is only 5% cheaper per point than batch 6: the per-point work is now dominated by `assemble` (host index preparation, not shared) and
   `lab_contract`; only `lab_coeffs` is shared.
+
+## Writer options (housekeeping, 2026-10-03)
+
+The five writer settings (`compresslevel`, `compressor`, `compress_threads`, `assembler`, `formatter`) are one frozen dataclass, `nuham.runtime.WriterOptions`, taken by
+`generate_me2j`, `generate_scan` and `write_channels` as `options=`. A field left `None` is filled by `resolve()` for the JAX backend: on the CPU the numpy assembler, the host
+formatter and 1 compression thread; on an accelerator the device assembler, the device formatter and 4 compression threads (4 matched 8 on the GH200, 16 cores). The CLIs
+(`python -m nuham.generate`, `python -m nuham.scan`) and the benchmark runners share the flags through `add_writer_arguments`; the runners store the resolved options
+under `case.writer` in their JSON, so a record states what ran. Explicit choices always win, and `formatter="device"` requires `assembler="device"`.
+Accelerator defaults were measured on the GH200 only (jobs 3301636 and 3301673); other devices are untested.

@@ -14,6 +14,7 @@ import json
 import resource
 import tempfile
 import time
+from dataclasses import asdict
 from pathlib import Path
 
 from run_nn import STAGES, environment, peak_device_bytes
@@ -22,7 +23,7 @@ import nuham  # noqa: F401  sets JAX allocation defaults before the first device
 from nuham.angmom.moshinsky_table import MoshinskyTable
 from nuham.generate import generate_me2j
 from nuham.interactions.nn_file import read_nn_mom
-from nuham.runtime import enable_compilation_cache
+from nuham.runtime import add_writer_arguments, enable_compilation_cache, writer_options_from_args
 from nuham.scan import ScanPoint, generate_scan
 from nuham.timing import StageTimer
 
@@ -42,12 +43,9 @@ def main() -> None:
         default=None,
         help="points per SRG flow batch (default: by backend)",
     )
-    p.add_argument("--compressor", choices=["auto", "gzip", "isal"], default="auto")
-    p.add_argument("--assembler", choices=["numpy", "device"], default="numpy")
-    p.add_argument("--formatter", choices=["host", "device"], default="host")
-    p.add_argument("--compress-threads", type=int, default=1)
     p.add_argument("--compute-only", action="store_true", help="skip assembly and file writing")
     p.add_argument("--bracket-cache", default=None)
+    add_writer_arguments(p)
     p.add_argument("--no-compile-cache", action="store_true")
     p.add_argument("--json", default=None, help="also write the record to this file")
     args = p.parse_args()
@@ -56,13 +54,7 @@ def main() -> None:
     nn = read_nn_mom(args.nn_file)
     mosh = MoshinskyTable(args.bracket_cache)
     grid = list(itertools.product(args.hw, args.lam))
-    # One dict for both call sites, so a new option cannot reach only one of them.
-    writer_options = {
-        "compressor": args.compressor,
-        "assembler": args.assembler,
-        "formatter": args.formatter,
-        "compress_threads": args.compress_threads,
-    }
+    options = writer_options_from_args(args).resolve()  # the record states what ran
     runs = []
     with tempfile.TemporaryDirectory() as tmp:
 
@@ -80,14 +72,14 @@ def main() -> None:
                     for (hw, lam), path in zip(grid, out, strict=True):
                         generate_me2j(
                             nn, path, hw, lam, args.emax, args.e2max,
-                            mosh=mosh, timer=timer, **writer_options,
+                            mosh=mosh, timer=timer, options=options,
                         )  # fmt: skip
                 else:
                     points = [ScanPoint(hw, lam, o) for (hw, lam), o in zip(grid, out, strict=True)]
                     generate_scan(
                         nn, points, args.emax, args.e2max,
                         mosh=mosh, batch_size=batch, timer=timer, flow_sets=args.flow_sets,
-                        **writer_options,
+                        options=options,
                     )  # fmt: skip
                 total = time.perf_counter() - start
             runs.append(
@@ -108,7 +100,7 @@ def main() -> None:
             "grid": grid,
             "compute_only": args.compute_only,
             "flow_sets": args.flow_sets,
-            **writer_options,
+            "writer": asdict(options),
         },
         "runs": runs,
     }

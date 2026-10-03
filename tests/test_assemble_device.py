@@ -10,6 +10,7 @@ from nuham.basis.lab import lab_channels, make_orbits
 from nuham.lab_transform import lab_channel_matrices
 from nuham.me2j import LabChannel, assemble, assemble_device
 from nuham.relative_nn import evolve_relative_nn
+from nuham.runtime import WriterOptions
 
 EMAX, E2MAX = 3, 6
 
@@ -51,7 +52,15 @@ def test_generate_with_device_assembler_writes_the_same_file(tmp_path) -> None:
     nn, mosh = synthetic_nn(), MoshinskyTable()
     generate_me2j(nn, tmp_path / "a.me2j", 16.0, 2.0, EMAX, E2MAX, mosh=mosh, n2max=24)
     generate_me2j(
-        nn, tmp_path / "b.me2j", 16.0, 2.0, EMAX, E2MAX, mosh=mosh, n2max=24, assembler="device"
+        nn,
+        tmp_path / "b.me2j",
+        16.0,
+        2.0,
+        EMAX,
+        E2MAX,
+        mosh=mosh,
+        n2max=24,
+        options=WriterOptions(assembler="device"),
     )
     np.testing.assert_array_equal(read_me2j(tmp_path / "a.me2j"), read_me2j(tmp_path / "b.me2j"))
 
@@ -62,9 +71,13 @@ def test_scan_with_device_assembler_matches(tmp_path) -> None:
 
     nn, mosh = synthetic_nn(), MoshinskyTable()
     pts = [ScanPoint(16.0, 2.0, tmp_path / "n.me2j"), ScanPoint(20.0, 1.8, tmp_path / "m.me2j")]
-    generate_scan(nn, pts, EMAX, E2MAX, mosh=mosh, n2max=24, assembler="numpy")
+    generate_scan(
+        nn, pts, EMAX, E2MAX, mosh=mosh, n2max=24, options=WriterOptions(assembler="numpy")
+    )
     pts2 = [ScanPoint(16.0, 2.0, tmp_path / "dn.me2j"), ScanPoint(20.0, 1.8, tmp_path / "dm.me2j")]
-    generate_scan(nn, pts2, EMAX, E2MAX, mosh=mosh, n2max=24, assembler="device")
+    generate_scan(
+        nn, pts2, EMAX, E2MAX, mosh=mosh, n2max=24, options=WriterOptions(assembler="device")
+    )
     for a, b in zip(("n", "m"), ("dn", "dm"), strict=True):
         np.testing.assert_array_equal(
             read_me2j(tmp_path / f"{a}.me2j"), read_me2j(tmp_path / f"{b}.me2j")

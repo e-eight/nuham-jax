@@ -20,6 +20,7 @@ from nuham.kernels.assemble import assemble_values
 from nuham.kernels.format import format_fields
 from nuham.kernels.format import tables as format_tables
 from nuham.lab_transform import LabMatrix
+from nuham.runtime import WriterOptions
 from nuham.timing import StageTimer
 
 HEADER = "NN int. calculated by nuham (JAX)"
@@ -623,11 +624,7 @@ def write_channels(
     orb: Orbits,
     e2max: int,
     channels: dict[tuple[int, int], LabChannel],
-    assembler: str = "numpy",
-    formatter: str = "host",
-    compresslevel: int = 1,
-    compressor: str = "auto",
-    compress_threads: int = 1,
+    options: WriterOptions | None = None,
     timer: StageTimer | None = None,
 ) -> int:
     """Assemble the values of ``channels`` and write them as ``me2j``, with the chosen machinery.
@@ -638,14 +635,12 @@ def write_channels(
         Output file.
     orb, e2max, channels
         As in :func:`assemble`.
-    assembler
-        ``"numpy"`` (:func:`assemble`) or ``"device"`` (:func:`assemble_device`, a JAX kernel; the
-        lab matrices may then stay on the device).
-    formatter
-        ``"host"`` (:func:`write_me2j`) or ``"device"`` (:func:`format_device` with
-        :func:`write_me2j_fields`; needs ``assembler="device"``).
-    compresslevel, compressor, compress_threads
-        See :func:`write_me2j`.
+    options
+        Assembler, formatter and compression settings; ``None`` takes the defaults of the
+        current backend (see :class:`nuham.runtime.WriterOptions`). The numpy assembler with the
+        host formatter is :func:`assemble` and :func:`write_me2j`; the device assembler is
+        :func:`assemble_device` (a JAX kernel, the lab matrices may stay on the device) and the
+        device formatter is :func:`format_device` with :func:`write_me2j_fields`.
     timer
         Optional stage timer; records ``assemble`` and ``write``.
 
@@ -654,29 +649,25 @@ def write_channels(
     int
         The number of values written.
     """
-    if assembler not in ("numpy", "device"):
-        raise ValueError(f"unknown assembler {assembler!r}; use 'numpy' or 'device'")
-    if formatter not in ("host", "device"):
-        raise ValueError(f"unknown formatter {formatter!r}; use 'host' or 'device'")
-    if formatter == "device" and assembler != "device":
-        raise ValueError("formatter='device' needs assembler='device'")
+    opts = (WriterOptions() if options is None else options).resolve()
     chunks: Iterator[np.ndarray]
-    if formatter == "device":
+    if opts.formatter == "device":
         chunks, writer = format_device(orb, e2max, channels), write_me2j_fields
-    elif assembler == "device":
+    elif opts.assembler == "device":
         chunks, writer = assemble_device(orb, e2max, channels), write_me2j
     else:
         chunks, writer = assemble(orb, e2max, channels), write_me2j
+    assert opts.compress_threads is not None
     if timer is None:
         return writer(
             path,
             chunks,
-            compresslevel=compresslevel,
-            compressor=compressor,
-            compress_threads=compress_threads,
+            compresslevel=opts.compresslevel,
+            compressor=opts.compressor,
+            compress_threads=opts.compress_threads,
         )
     return write_me2j_timed(
-        path, chunks, timer, compresslevel, compressor, compress_threads, writer
+        path, chunks, timer, opts.compresslevel, opts.compressor, opts.compress_threads, writer
     )
 
 

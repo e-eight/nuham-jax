@@ -25,6 +25,7 @@ from nuham.me2j import (
     write_me2j_fields,
 )
 from nuham.relative_nn import evolve_relative_nn
+from nuham.runtime import WriterOptions
 
 EMAX, E2MAX = 3, 6
 
@@ -142,12 +143,20 @@ def test_write_channels_option_combinations(tmp_path: Path, setup) -> None:
     write_channels(want, orb, E2MAX, channels)
     for assembler, formatter in [("device", "host"), ("device", "device")]:
         out = tmp_path / f"{assembler}_{formatter}.me2j"
-        write_channels(out, orb, E2MAX, channels, assembler, formatter)
+        write_channels(
+            out, orb, E2MAX, channels, WriterOptions(assembler=assembler, formatter=formatter)
+        )
         assert out.read_bytes() == want.read_bytes()
     with pytest.raises(ValueError, match="needs assembler"):
-        write_channels(tmp_path / "x.me2j", orb, E2MAX, channels, "numpy", "device")
-    with pytest.raises(ValueError, match="unknown"):
-        write_channels(tmp_path / "y.me2j", orb, E2MAX, channels, "gpu")
+        write_channels(
+            tmp_path / "x.me2j",
+            orb,
+            E2MAX,
+            channels,
+            WriterOptions(assembler="numpy", formatter="device"),
+        )
+    with pytest.raises(ValueError, match="unknown assembler"):
+        WriterOptions(assembler="gpu")
 
 
 def test_threaded_compression_gives_a_valid_stream_with_the_same_text(tmp_path: Path) -> None:

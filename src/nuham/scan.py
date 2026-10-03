@@ -17,7 +17,13 @@ from nuham.interactions.nn_file import MomentumNN, read_nn_mom
 from nuham.lab_transform import lab_channel_matrices_many
 from nuham.me2j import LabChannel, write_channels
 from nuham.relative_nn import evolve_relative_nn_many
-from nuham.runtime import default_flow_sets, enable_compilation_cache
+from nuham.runtime import (
+    WriterOptions,
+    add_writer_arguments,
+    default_flow_sets,
+    enable_compilation_cache,
+    writer_options_from_args,
+)
 from nuham.timing import StageTimer
 
 
@@ -48,15 +54,11 @@ def generate_scan(
     lmax: int | None = None,
     coulomb: bool = True,
     mosh: MoshinskyTable | None = None,
-    compresslevel: int = 1,
     n2max: int = 100,
     batch_size: int = 2,
     timer: StageTimer | None = None,
     flow_sets: int | None = None,
-    compressor: str = "auto",
-    assembler: str = "numpy",
-    formatter: str = "host",
-    compress_threads: int = 1,
+    options: WriterOptions | None = None,
 ) -> list[int]:
     """Generate one NN ``me2j`` file per scan point, sharing work between points.
 
@@ -74,8 +76,7 @@ def generate_scan(
         Momentum-space interaction.
     points
         The parameter sets and their output files.
-    emax, e2max, lmax, coulomb, mosh, compresslevel, n2max, compressor, assembler, formatter,
-    compress_threads
+    emax, e2max, lmax, coulomb, mosh, n2max, options
         As in :func:`nuham.generate.generate_me2j`.
     batch_size
         Number of points processed together.
@@ -93,6 +94,7 @@ def generate_scan(
     if batch_size < 1:
         raise ValueError("batch_size must be at least 1")
     mosh = MoshinskyTable() if mosh is None else mosh
+    opts = (WriterOptions() if options is None else options).resolve()
     flow_sets = default_flow_sets() if flow_sets is None else flow_sets
     orb = make_orbits(emax, lmax)
     counts: list[int] = []
@@ -112,7 +114,7 @@ def generate_scan(
         channels: list[dict[tuple[int, int], LabChannel]] = [{} for _ in batch]
         for jp in lab_channels(orb, e2max):
             matrices = lab_channel_matrices_many(
-                orb, e2max, *jp, relatives, mosh, timer, assembler == "device"
+                orb, e2max, *jp, relatives, mosh, timer, opts.on_device
             )
             for k, m in enumerate(matrices):
                 channels[k][jp] = LabChannel(m, len(orb))
@@ -120,12 +122,7 @@ def generate_scan(
             if point.path is None:
                 counts.append(0)
                 continue
-            counts.append(
-                write_channels(
-                    point.path, orb, e2max, chans, assembler, formatter, compresslevel, compressor,
-                    compress_threads, timer,
-                )
-            )  # fmt: skip
+            counts.append(write_channels(point.path, orb, e2max, chans, opts, timer))
     return counts
 
 
@@ -151,11 +148,7 @@ def main() -> None:
         default=None,
         help="points per SRG flow batch (default: by backend)",
     )
-    p.add_argument("--gzip-level", type=int, default=1)
-    p.add_argument("--compressor", choices=["auto", "gzip", "isal"], default="auto")
-    p.add_argument("--assembler", choices=["numpy", "device"], default="numpy")
-    p.add_argument("--formatter", choices=["host", "device"], default="host")
-    p.add_argument("--compress-threads", type=int, default=1)
+    add_writer_arguments(p)
     p.add_argument("--bracket-cache", default=None, help="directory for cached Moshinsky tables")
     p.add_argument("--no-compile-cache", action="store_true")
     args = p.parse_args()
@@ -167,12 +160,8 @@ def main() -> None:
     ]
     counts = generate_scan(
         read_nn_mom(args.nn_file), points, args.emax, args.e2max, args.lmax, not args.no_coulomb,
-        MoshinskyTable(args.bracket_cache), args.gzip_level, args.n2max, args.batch_size,
-        flow_sets=args.flow_sets,
-        compressor=args.compressor,
-        assembler=args.assembler,
-        formatter=args.formatter,
-        compress_threads=args.compress_threads,
+        MoshinskyTable(args.bracket_cache), args.n2max, args.batch_size, flow_sets=args.flow_sets,
+        options=writer_options_from_args(args),
     )  # fmt: skip
     for point, n in zip(points, counts, strict=True):
         print(f"wrote {n} values to {point.path}")

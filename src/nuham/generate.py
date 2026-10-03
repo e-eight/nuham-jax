@@ -9,7 +9,12 @@ from nuham.interactions.nn_file import MomentumNN, read_nn_mom
 from nuham.lab_transform import lab_channel_matrices
 from nuham.me2j import LabChannel, write_channels
 from nuham.relative_nn import evolve_relative_nn
-from nuham.runtime import enable_compilation_cache
+from nuham.runtime import (
+    WriterOptions,
+    add_writer_arguments,
+    enable_compilation_cache,
+    writer_options_from_args,
+)
 from nuham.timing import StageTimer
 
 
@@ -23,13 +28,9 @@ def generate_me2j(
     lmax: int | None = None,
     coulomb: bool = True,
     mosh: MoshinskyTable | None = None,
-    compresslevel: int = 1,
     n2max: int = 100,
     timer: StageTimer | None = None,
-    compressor: str = "auto",
-    assembler: str = "numpy",
-    formatter: str = "host",
-    compress_threads: int = 1,
+    options: WriterOptions | None = None,
 ) -> int:
     """Generate the NN interaction in the lab HO basis and write it as ``me2j``.
 
@@ -50,13 +51,11 @@ def generate_me2j(
         Whether to include the pp Coulomb interaction.
     mosh
         Optional bracket table to reuse between calls.
-    compresslevel, compressor
-        Level and compressor of the gzip output (see :func:`nuham.me2j.write_me2j`).
-    assembler, formatter, compress_threads
-        Assembly and formatting machinery and the threads of igzip's parallel compressor; see
-        :func:`nuham.me2j.write_channels`.
     n2max
         Truncation ``2n + l <= n2max`` of the relative space in which the SRG flow runs.
+    options
+        How the values are assembled, formatted and compressed; ``None`` takes the defaults of the
+        current backend (:class:`nuham.runtime.WriterOptions`).
     timer
         Optional stage timer. Records ``project``, ``srg``, ``lab_coeffs``, ``lab_contract``,
         ``assemble`` (building value chunks) and ``write`` (formatting and the final flush;
@@ -68,6 +67,7 @@ def generate_me2j(
         The number of values written.
     """
     mosh = MoshinskyTable() if mosh is None else mosh
+    opts = (WriterOptions() if options is None else options).resolve()
     relative = {
         (c.j, c.parity, c.s, c.tz): c
         for c in evolve_relative_nn(nn, hw, lam, n2max=n2max, coulomb=coulomb, timer=timer)
@@ -75,17 +75,14 @@ def generate_me2j(
     orb = make_orbits(emax, lmax)
     channels = {
         jp: LabChannel(
-            lab_channel_matrices(orb, e2max, *jp, relative, mosh, timer, assembler == "device"),
+            lab_channel_matrices(orb, e2max, *jp, relative, mosh, timer, opts.on_device),
             len(orb),
         )
         for jp in lab_channels(orb, e2max)
     }
     if path is None:
         return 0
-    return write_channels(
-        path, orb, e2max, channels, assembler, formatter, compresslevel, compressor,
-        compress_threads, timer,
-    )  # fmt: skip
+    return write_channels(path, orb, e2max, channels, opts, timer)
 
 
 def main() -> None:
@@ -100,16 +97,7 @@ def main() -> None:
     p.add_argument("--lmax", type=int, default=None)
     p.add_argument("--no-coulomb", action="store_true")
     p.add_argument("--n2max", type=int, default=100, help="relative space of the SRG flow")
-    p.add_argument("--gzip-level", type=int, default=1, help="gzip level of the output (1-9)")
-    p.add_argument("--assembler", choices=["numpy", "device"], default="numpy")
-    p.add_argument("--formatter", choices=["host", "device"], default="host")
-    p.add_argument(
-        "--compress-threads", type=int, default=1, help="threads of the igzip compressor"
-    )
-    p.add_argument(
-        "--compressor", choices=["auto", "gzip", "isal"], default="auto",
-        help="gzip implementation (auto: isal if installed, see --help of the isal extra)",
-    )  # fmt: skip
+    add_writer_arguments(p)
     p.add_argument("--bracket-cache", default=None, help="directory for cached Moshinsky tables")
     p.add_argument(
         "--compile-cache",
@@ -123,11 +111,7 @@ def main() -> None:
     mosh = MoshinskyTable(args.bracket_cache)
     n = generate_me2j(
         read_nn_mom(args.nn_file), args.output, args.hw, args.lam, args.emax, args.e2max,
-        args.lmax, not args.no_coulomb, mosh, args.gzip_level, args.n2max,
-        compressor=args.compressor,
-        assembler=args.assembler,
-        formatter=args.formatter,
-        compress_threads=args.compress_threads,
+        args.lmax, not args.no_coulomb, mosh, args.n2max, options=writer_options_from_args(args),
     )  # fmt: skip
     print(f"wrote {n} values to {args.output}")
 

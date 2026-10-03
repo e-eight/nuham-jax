@@ -17,6 +17,7 @@ import subprocess
 import sys
 import tempfile
 import time
+from dataclasses import asdict
 from pathlib import Path
 
 import jax
@@ -25,7 +26,7 @@ import nuham  # noqa: F401  sets JAX allocation defaults before the first device
 from nuham.angmom.moshinsky_table import MoshinskyTable
 from nuham.generate import generate_me2j
 from nuham.interactions.nn_file import read_nn_mom
-from nuham.runtime import enable_compilation_cache
+from nuham.runtime import add_writer_arguments, enable_compilation_cache, writer_options_from_args
 from nuham.timing import StageTimer
 
 STAGES = ("project", "srg", "lab_coeffs", "lab_contract", "assemble", "write")
@@ -70,26 +71,16 @@ def main() -> None:
     p.add_argument("--lam", type=float, default=None)
     p.add_argument("--repeat", type=int, default=2)
     p.add_argument("--compute-only", action="store_true", help="skip assembly and file writing")
-    p.add_argument("--gzip-level", type=int, default=1)
     p.add_argument("--bracket-cache", default=None)
+    add_writer_arguments(p)
     p.add_argument("--no-compile-cache", action="store_true")
-    p.add_argument("--compressor", choices=["auto", "gzip", "isal"], default="auto")
-    p.add_argument("--assembler", choices=["numpy", "device"], default="numpy")
-    p.add_argument("--formatter", choices=["host", "device"], default="host")
-    p.add_argument("--compress-threads", type=int, default=1)
     p.add_argument("--json", default=None, help="also write the record to this file")
     args = p.parse_args()
     if not args.no_compile_cache:
         enable_compilation_cache()
     nn = read_nn_mom(args.nn_file)
     mosh = MoshinskyTable(args.bracket_cache)
-    # One dict for the call and the record, so what is logged is what ran.
-    writer_options = {
-        "compressor": args.compressor,
-        "assembler": args.assembler,
-        "formatter": args.formatter,
-        "compress_threads": args.compress_threads,
-    }
+    options = writer_options_from_args(args).resolve()  # the record states what ran
     runs = []
     with tempfile.TemporaryDirectory() as tmp:
         out = None if args.compute_only else Path(tmp) / "bench.me2j.gz"
@@ -98,7 +89,7 @@ def main() -> None:
             start = time.perf_counter()
             n = generate_me2j(
                 nn, out, args.hw, args.lam, args.emax, args.e2max, mosh=mosh,
-                compresslevel=args.gzip_level, timer=timer, **writer_options,
+                timer=timer, options=options,
             )  # fmt: skip
             total = time.perf_counter() - start
             runs.append(
@@ -118,8 +109,7 @@ def main() -> None:
         "case": {k: getattr(args, k) for k in ("nn_file", "emax", "e2max", "hw", "lam")}
         | {
             "compute_only": args.compute_only,
-            "gzip_level": args.gzip_level,
-            **writer_options,
+            "writer": asdict(options),
         },
         "runs": runs,
     }
