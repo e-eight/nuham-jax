@@ -1,0 +1,112 @@
+{
+  "env": {
+    "host": "darjeeling",
+    "platform": "Linux-7.1.13+deb13-amd64-x86_64-with-glibc2.41",
+    "cpu_count": 16,
+    "python": "3.12.9",
+    "jax": "0.11.2",
+    "backend": "cpu",
+    "device": "cpu:cpu",
+    "x64": true,
+    "git_commit": "5d04b63"
+  },
+  "case": {
+    "nn_file": "../../NuHamil-public/input_nn_files/N3LO_EM500_kmax8_N100_Jmax8.bin",
+    "emax": 8,
+    "e2max": 16,
+    "grid": [
+      [
+        12.0,
+        1.8
+      ],
+      [
+        12.0,
+        2.0
+      ],
+      [
+        16.0,
+        1.8
+      ],
+      [
+        16.0,
+        2.0
+      ],
+      [
+        20.0,
+        1.8
+      ],
+      [
+        20.0,
+        2.0
+      ]
+    ],
+    "compute_only": false,
+    "flow_sets": 1
+  },
+  "runs": [
+    {
+      "batch_size": 0,
+      "n_sets": 6,
+      "total_s": 27.572913740999866,
+      "per_set_s": 4.595485623499978,
+      "stages_s": {
+        "project": 0.21742082300170296,
+        "srg": 12.658166924001307,
+        "lab_coeffs": 2.4340478819967757,
+        "lab_contract": 6.139266399010921,
+        "assemble": 2.25068089704655,
+        "write": 3.702874723953755
+      },
+      "peak_rss_gb": 1.2156639099121094,
+      "peak_device_gb": null
+    },
+    {
+      "batch_size": 2,
+      "n_sets": 6,
+      "total_s": 25.363217615000394,
+      "per_set_s": 4.227202935833399,
+      "stages_s": {
+        "project": 0.2037728370005425,
+        "srg": 12.905623505001131,
+        "lab_coeffs": 1.2530523639979947,
+        "lab_contract": 4.963909766002871,
+        "assemble": 2.2708661259894143,
+        "write": 3.6725742430107857
+      },
+      "peak_rss_gb": 1.4711875915527344,
+      "peak_device_gb": null
+    },
+    {
+      "batch_size": 3,
+      "n_sets": 6,
+      "total_s": 25.051278743000694,
+      "per_set_s": 4.175213123833449,
+      "stages_s": {
+        "project": 0.20212867300051585,
+        "srg": 13.415240303000246,
+        "lab_coeffs": 0.8306240369956868,
+        "lab_contract": 4.643414064001263,
+        "assemble": 2.2666162179912135,
+        "write": 3.626284789010242
+      },
+      "peak_rss_gb": 1.5926246643066406,
+      "peak_device_gb": null
+    },
+    {
+      "batch_size": 6,
+      "n_sets": 6,
+      "total_s": 23.813093853999817,
+      "per_set_s": 3.9688489756666363,
+      "stages_s": {
+        "project": 0.2093552059996,
+        "srg": 12.533702552999785,
+        "lab_coeffs": 0.42970112299917673,
+        "lab_contract": 4.6661110600007305,
+        "assemble": 2.2536802940294365,
+        "write": 3.6811223769709613
+      },
+      "peak_rss_gb": 1.8272285461425781,
+      "peak_device_gb": null
+    }
+  ]
+}

@@ -7,7 +7,7 @@ from nuham.angmom.moshinsky_table import MoshinskyTable
 from nuham.basis.lab import lab_channels, make_orbits
 from nuham.interactions.nn_file import MomentumNN, read_nn_mom
 from nuham.lab_transform import lab_channel_matrices
-from nuham.me2j import LabChannel, assemble, write_me2j
+from nuham.me2j import LabChannel, assemble, write_me2j, write_me2j_timed
 from nuham.relative_nn import evolve_relative_nn
 from nuham.runtime import enable_compilation_cache
 from nuham.timing import StageTimer
@@ -75,11 +75,7 @@ def generate_me2j(
     chunks = assemble(orb, e2max, channels)
     if timer is None:
         return write_me2j(path, chunks, compresslevel=compresslevel)
-    # `write` is the total minus the time spent inside the generator.
-    with timer.stage("write"):
-        n = write_me2j(path, timer.wrap("assemble", chunks), compresslevel=compresslevel)
-    timer.seconds["write"] -= timer.seconds.get("assemble", 0.0)
-    return n
+    return write_me2j_timed(path, chunks, timer, compresslevel)
 
 
 def main() -> None:

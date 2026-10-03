@@ -82,3 +82,33 @@ alternating runs) and changed the output bytes (summation order flips a last-dig
 
 **Open options for the gzip cost** (all produce valid single-stream gzip, none is byte-identical to the standard `gzip` module):
 `python-isal` (igzip) as a drop-in; or pigz-style parallel compression of linked blocks. Not started.
+
+## Phase 4d: parameter scans (CPU part, 2026-10-03)
+
+`nuham.scan.generate_scan` writes one `me2j` per `(hw, lambda)` point (CLI `python -m nuham.scan`). Per batch of `batch_size` points:
+the SRG flows of `flow_sets` points share a batch (`evolve_relative_nn_many`, per-entry `hw` and flow parameter in
+`srg_evolve_batch`); the lab coefficients of each `(J, parity)` are built and uploaded once and contracted with every point's relative
+interaction in one kernel (`accumulate_blocks_multi`, a single GEMM `P x (blocks*r) x (K*P)` instead of K). Brackets were already shared.
+All lab matrices of a batch stay in memory until its files are written, so `batch_size` trades speed for memory (about 2 GB per point at
+emax 14). Gate: every scan file equals the separate single run, `tests/test_scan.py` (several batch sizes and flow groupings, bare and
+evolved points, atol 1e-8 on file values; relative potentials 1e-9). The single-run output is bit-identical to before the change.
+
+CPU measurements (`benchmarks/run_scan.py`, emax 8, e2max 16, grid hw 12/16/20 x lambda 1.8/2.0 = 6 points, second pass of two;
+raw record `benchmarks/baseline_cpu_scan_e8.json`). Seconds per point, `flow_sets` 1:
+
+| batch size | compute-only | with writing | lab_coeffs (6 points) | lab_contract (6 points) | peak RSS |
+|---|---|---|---|---|---|
+| 0 (separate single runs) | 3.50 | 4.60 | 2.4 | 6.1 | 1.2 GB |
+| 2 | 3.17 | 4.23 | 1.3 | 5.0 | 1.5 GB |
+| 3 | 3.44 | 4.18 | 0.9 | 4.6 | 1.6 GB |
+| 6 | 2.89 | 3.97 | 0.4 | 4.7 | 1.8 GB |
+
+- Sharing the coefficients works as intended (`lab_coeffs` 2.4 -> 0.4 s) and the multi-set contraction gains ~20%. Both are small next to
+  the SRG flow, which is ~70% of a CPU scan point (12.3 s of 17.4 s) and does not get cheaper per point.
+- **Batching the flows across sets is slower on CPU.** With all six points in one flow batch the SRG stage took 34.9 s instead of 12.3 s.
+  Flowing K identical sets together cost 1.96 s per set alone and 2.83/3.04/3.37 s per set for K = 2/3/6, so it is mostly cache and
+  memory pressure on the dense dopri8 stages; different sets add imbalance, since a vmapped adaptive solver runs as long as its slowest
+  entry (flow cost per set at hw 16: 1.18 s for lambda 2.4, 3.08 s for lambda 1.6). So `flow_sets` defaults to 1 and the speed-up above comes
+  from coefficients and contraction only.
+- Per-point cost is nearly flat in batch size on CPU, as expected: there is little spare parallelism to fill. The open question for DeltaAI
+  is whether a GPU gains from `flow_sets` > 1 and from larger `batch_size`; the benchmark has both knobs (`--flow-sets`, `--batch-sizes`).

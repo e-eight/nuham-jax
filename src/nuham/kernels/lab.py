@@ -57,3 +57,33 @@ def accumulate_blocks(total: Array, t_rows: Array, row_index: Array, v_blocks: A
         The updated sum, shape ``(P, P)``.
     """
     return total + congruence_sum(t_rows[row_index], v_blocks)
+
+
+@partial(jax.jit, donate_argnums=0)
+def accumulate_blocks_multi(
+    total: Array, t_rows: Array, row_index: Array, v_blocks: Array
+) -> Array:
+    """Like :func:`accumulate_blocks` for several parameter sets that share the coefficients.
+
+    The coefficient stack is gathered once and used for every set, so the dominant product is one
+    GEMM of size ``P x (n_blocks * r) x (K * P)``.
+
+    Parameters
+    ----------
+    total
+        Running sums, shape ``(K, P, P)``; the buffer is reused for the result.
+    t_rows
+        Coefficients of all relative-CM rows, shape ``(n_rows, P)``.
+    row_index
+        Integer array of shape ``(n_blocks, r)`` selecting the rows of each block.
+    v_blocks
+        Relative interaction blocks of every set, shape ``(K, n_blocks, r, r)``.
+
+    Returns
+    -------
+    Array
+        The updated sums, shape ``(K, P, P)``.
+    """
+    t = t_rows[row_index]
+    w = jnp.einsum("kbrs,bsq->kbrq", v_blocks, t)
+    return total + jnp.einsum("brp,kbrq->kpq", t, w)

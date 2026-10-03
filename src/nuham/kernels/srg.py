@@ -95,13 +95,17 @@ def srg_evolve_batch(
     h0: Array,
     t_diag: Array,
     t_off: Array,
-    hw: float,
-    alpha: float,
+    hw: float | Array,
+    alpha: float | Array,
     rtol: float = 1e-10,
     atol: float = 1e-10,
     max_steps: int = 100_000,
 ) -> Array:
     """Evolve a batch of channels, in units of ``hw`` so that the tolerances are well scaled.
+
+    Each batch entry has its own ``hw`` and ``alpha``, so channels of several parameter sets can
+    share one batch. Entries keep their own adaptive step sequence, so a batched result equals
+    the one from a batch of its own.
 
     Parameters
     ----------
@@ -110,9 +114,9 @@ def srg_evolve_batch(
     t_diag, t_off
         Diagonals of ``T`` in MeV, shapes ``(B, n)`` and ``(B, n - 1)``.
     hw
-        Oscillator energy in MeV.
+        Oscillator energy in MeV: a scalar, or one value per entry, shape ``(B,)``.
     alpha
-        Final flow parameter in MeV^-2.
+        Final flow parameter in MeV^-2: a scalar, or one value per entry.
     rtol, atol
         Tolerances; ``atol`` is in MeV.
     max_steps
@@ -123,6 +127,17 @@ def srg_evolve_batch(
     Array
         Evolved Hamiltonians in MeV, shape ``(B, n, n)``.
     """
-    flow = jax.vmap(srg_flow, in_axes=(0, 0, 0, None, None, None, None))
-    out = flow(h0 / hw, t_diag / hw, t_off / hw, alpha * hw**2, rtol, atol / hw, max_steps)
-    return out * hw
+    batch = h0.shape[0]
+    hw = jnp.broadcast_to(jnp.asarray(hw, dtype=h0.dtype), (batch,))
+    alpha = jnp.broadcast_to(jnp.asarray(alpha, dtype=h0.dtype), (batch,))
+    flow = jax.vmap(srg_flow, in_axes=(0, 0, 0, 0, None, 0, None))
+    out = flow(
+        h0 / hw[:, None, None],
+        t_diag / hw[:, None],
+        t_off / hw[:, None],
+        alpha * hw**2,
+        rtol,
+        atol / hw,
+        max_steps,
+    )
+    return out * hw[:, None, None]

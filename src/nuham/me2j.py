@@ -12,6 +12,7 @@ import numpy as np
 
 from nuham.basis.lab import Orbits
 from nuham.lab_transform import LabMatrix
+from nuham.timing import StageTimer
 
 HEADER = "NN int. calculated by nuham (JAX)"
 _LINE = "%16.8f" * 10
@@ -251,6 +252,22 @@ def write_me2j(
     if failure:
         raise failure[0]
     return total
+
+
+def write_me2j_timed(
+    path: str | Path, chunks: Iterator[np.ndarray], timer: StageTimer, compresslevel: int = 1
+) -> int:
+    """Write like :func:`write_me2j` and record ``assemble`` and ``write`` on ``timer``.
+
+    ``assemble`` is the time spent producing chunks; ``write`` is the rest of the call (formatting
+    and the final flush; compression overlaps in its thread and shows up as back-pressure). Safe to
+    call repeatedly with the same timer.
+    """
+    before = timer.seconds.get("assemble", 0.0)
+    with timer.stage("write"):
+        n = write_me2j(path, timer.wrap("assemble", chunks), compresslevel=compresslevel)
+    timer.seconds["write"] -= timer.seconds["assemble"] - before
+    return n
 
 
 def read_me2j(path: str | Path) -> np.ndarray:

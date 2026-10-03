@@ -6,6 +6,7 @@ in ``(S, j_rel, N_cm, L_cm)``, so ``V_lab = sum_blocks T_b^T V_b T_b``.
 """
 
 import math
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 import jax.numpy as jnp
@@ -16,7 +17,7 @@ from nuham.angmom.moshinsky_table import MoshinskyTable
 from nuham.angmom.racah import ninej, sixj
 from nuham.angmom.racah_array import ninej_array, sixj_array
 from nuham.basis.lab import Orbits, ordered_pairs
-from nuham.kernels.lab import accumulate_blocks
+from nuham.kernels.lab import accumulate_blocks_multi
 from nuham.kernels.transfer import to_host
 from nuham.relative_nn import RelativeChannel
 from nuham.timing import StageTimer, stage
@@ -385,10 +386,35 @@ def lab_matrix(
 ) -> LabMatrix:
     """Contract the relative interaction of one ``Tz`` with the transformation coefficients.
 
+    This is :func:`lab_matrix_many` for a single parameter set; see there for the arguments and
+    the memory layout.
+
+    Returns
+    -------
+    LabMatrix
+        The lab matrix over the pair basis appropriate to ``tz``.
+    """
+    return lab_matrix_many(rows, t_raw, pair_a, pair_b, j, parity, tz, [relative])[0]
+
+
+def lab_matrix_many(
+    rows: RelCmRows,
+    t_raw: np.ndarray | Array,
+    pair_a: np.ndarray,
+    pair_b: np.ndarray,
+    j: int,
+    parity: int,
+    tz: int,
+    relatives: Sequence[dict[tuple[int, int, int, int], RelativeChannel]],
+) -> list[LabMatrix]:
+    """Contract the relative interactions of several parameter sets with shared coefficients.
+
     The coefficients live on the device (JAX default device) for the whole call. Blocks are
     grouped by size and zero-padded into stacks of equal shape; each stack is gathered on the
-    device and added into a running sum by :func:`nuham.kernels.lab.accumulate_blocks`, so the
-    result crosses to the host once.
+    device and added into running sums for all sets by
+    :func:`nuham.kernels.lab.accumulate_blocks_multi`, so every result crosses to the host once.
+    The block structure depends only on the channel, so all sets must have the same relative
+    channels (they do when they come from the same interaction file).
 
     Parameters
     ----------
@@ -403,18 +429,19 @@ def lab_matrix(
         Lab parity.
     tz
         ``-1`` pp, ``0`` pn, ``+1`` nn.
-    relative
-        Relative channels keyed by ``(j, parity, s, tz)``.
+    relatives
+        One dict of relative channels per set, keyed by ``(j, parity, s, tz)``.
 
     Returns
     -------
-    LabMatrix
-        The lab matrix over the pair basis appropriate to ``tz``.
+    list[LabMatrix]
+        One lab matrix per set over the pair basis appropriate to ``tz``.
     """
     cols, t = _select(rows, t_raw, pair_a, pair_b, j, tz)
     dim = len(cols)
+    n_sets = len(relatives)
     if dim == 0:
-        return LabMatrix(pair_a[cols], pair_b[cols], np.zeros((0, 0)))
+        return [LabMatrix(pair_a[cols], pair_b[cols], np.zeros((0, 0))) for _ in relatives]
     padded = -(-dim // _PAD_P) * _PAD_P
     n_rows = len(rows.s)
     t_rows = (
@@ -422,23 +449,32 @@ def lab_matrix(
         .at[:n_rows, :dim]
         .set(jnp.asarray(t))
     )
-    by_size: dict[int, list[tuple[list[int], np.ndarray]]] = {}
-    for members, v_b in _blocks(rows, tz, relative):
+    per_set = [_blocks(rows, tz, relative) for relative in relatives]
+    by_size: dict[int, list[tuple[list[int], list[np.ndarray]]]] = {}
+    for k, blocks in enumerate(per_set):
+        if len(blocks) != len(per_set[0]) or any(
+            m != m0 for (m, _), (m0, _) in zip(blocks, per_set[0], strict=True)
+        ):
+            raise ValueError(f"set {k} has a different relative channel structure than set 0")
+    for b, (members, _) in enumerate(per_set[0]):
         size = max(4, 1 << (len(members) - 1).bit_length())
-        by_size.setdefault(size, []).append((members, v_b))
-    total = jnp.zeros((padded, padded))
+        by_size.setdefault(size, []).append((members, [blocks[b][1] for blocks in per_set]))
+    total = jnp.zeros((n_sets, padded, padded))
     for size, group in by_size.items():
-        chunk = max(1, _MAX_BLOCK_BYTES // (size * padded * 8))
+        chunk = max(1, _MAX_BLOCK_BYTES // (n_sets * size * padded * 8))
         for start in range(0, len(group), chunk):
             part = group[start : start + chunk]
             n_pad = -(-len(part) // 64) * 64
             idx = np.full((n_pad, size), n_rows, dtype=np.int64)
-            v_blocks = np.zeros((n_pad, size, size))
-            for b, (members, v_b) in enumerate(part):
+            v_blocks = np.zeros((n_sets, n_pad, size, size))
+            for b, (members, v_per_set) in enumerate(part):
                 idx[b, : len(members)] = members
-                v_blocks[b, : len(members), : len(members)] = v_b
-            total = accumulate_blocks(total, t_rows, jnp.asarray(idx), jnp.asarray(v_blocks))
-    return LabMatrix(pair_a[cols], pair_b[cols], to_host(total[:dim, :dim]))
+                for k, v_b in enumerate(v_per_set):
+                    v_blocks[k, b, : len(members), : len(members)] = v_b
+            total = accumulate_blocks_multi(total, t_rows, jnp.asarray(idx), jnp.asarray(v_blocks))
+    return [
+        LabMatrix(pair_a[cols], pair_b[cols], to_host(total[k, :dim, :dim])) for k in range(n_sets)
+    ]
 
 
 def lab_channel_matrices(
@@ -465,3 +501,36 @@ def lab_channel_matrices(
             tz: lab_matrix(rows, t_dev, pair_a, pair_b, j, parity, tz, relative)
             for tz in (-1, 0, 1)
         }
+
+
+def lab_channel_matrices_many(
+    orb: Orbits,
+    e2max: int,
+    j: int,
+    parity: int,
+    relatives: Sequence[dict[tuple[int, int, int, int], RelativeChannel]],
+    mosh: MoshinskyTable,
+    timer: StageTimer | None = None,
+) -> list[dict[int, LabMatrix]]:
+    """Lab matrices for ``tz = -1, 0, +1`` of one ``(J, parity)`` channel, for several sets.
+
+    The transformation coefficients do not depend on ``hw`` or the cutoff, so they are built and
+    uploaded once and contracted with every set's relative interaction. Records the same timer
+    stages as :func:`lab_channel_matrices`.
+
+    Returns
+    -------
+    list[dict[int, LabMatrix]]
+        One ``{tz: matrix}`` dict per set, in the order of ``relatives``.
+    """
+    jrel_max = max(k[0] for k in relatives[0])
+    pair_a, pair_b = ordered_pairs(orb, e2max, j, parity)
+    rows = enumerate_rows(j, parity, e2max, jrel_max)
+    with stage(timer, "lab_coeffs"):
+        t_dev = jnp.asarray(t_matrix(rows, pair_a, pair_b, orb, j, mosh))
+    with stage(timer, "lab_contract"):
+        by_tz = {
+            tz: lab_matrix_many(rows, t_dev, pair_a, pair_b, j, parity, tz, relatives)
+            for tz in (-1, 0, 1)
+        }
+    return [{tz: by_tz[tz][k] for tz in (-1, 0, 1)} for k in range(len(relatives))]
