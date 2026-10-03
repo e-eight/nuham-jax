@@ -44,6 +44,8 @@ def main() -> None:
     )
     p.add_argument("--compressor", choices=["auto", "gzip", "isal"], default="auto")
     p.add_argument("--assembler", choices=["numpy", "device"], default="numpy")
+    p.add_argument("--formatter", choices=["host", "device"], default="host")
+    p.add_argument("--compress-threads", type=int, default=1)
     p.add_argument("--compute-only", action="store_true", help="skip assembly and file writing")
     p.add_argument("--bracket-cache", default=None)
     p.add_argument("--no-compile-cache", action="store_true")
@@ -80,6 +82,8 @@ def main() -> None:
                             timer=timer,
                             compressor=args.compressor,
                             assembler=args.assembler,
+                            formatter=args.formatter,
+                            compress_threads=args.compress_threads,
                         )
                 else:
                     points = [ScanPoint(hw, lam, o) for (hw, lam), o in zip(grid, out, strict=True)]

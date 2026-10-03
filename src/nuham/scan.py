@@ -15,7 +15,7 @@ from nuham.angmom.moshinsky_table import MoshinskyTable
 from nuham.basis.lab import lab_channels, make_orbits
 from nuham.interactions.nn_file import MomentumNN, read_nn_mom
 from nuham.lab_transform import lab_channel_matrices_many
-from nuham.me2j import LabChannel, assemble, assemble_device, write_me2j, write_me2j_timed
+from nuham.me2j import LabChannel, write_channels
 from nuham.relative_nn import evolve_relative_nn_many
 from nuham.runtime import default_flow_sets, enable_compilation_cache
 from nuham.timing import StageTimer
@@ -55,6 +55,8 @@ def generate_scan(
     flow_sets: int | None = None,
     compressor: str = "auto",
     assembler: str = "numpy",
+    formatter: str = "host",
+    compress_threads: int = 1,
 ) -> list[int]:
     """Generate one NN ``me2j`` file per scan point, sharing work between points.
 
@@ -72,7 +74,8 @@ def generate_scan(
         Momentum-space interaction.
     points
         The parameter sets and their output files.
-    emax, e2max, lmax, coulomb, mosh, compresslevel, n2max, compressor, assembler
+    emax, e2max, lmax, coulomb, mosh, compresslevel, n2max, compressor, assembler, formatter,
+    compress_threads
         As in :func:`nuham.generate.generate_me2j`.
     batch_size
         Number of points processed together.
@@ -117,17 +120,12 @@ def generate_scan(
             if point.path is None:
                 counts.append(0)
                 continue
-            chunks = (assemble_device if assembler == "device" else assemble)(orb, e2max, chans)
-            if timer is None:
-                counts.append(
-                    write_me2j(
-                        point.path, chunks, compresslevel=compresslevel, compressor=compressor
-                    )
+            counts.append(
+                write_channels(
+                    point.path, orb, e2max, chans, assembler, formatter, compresslevel, compressor,
+                    compress_threads, timer,
                 )
-            else:
-                counts.append(
-                    write_me2j_timed(point.path, chunks, timer, compresslevel, compressor)
-                )
+            )  # fmt: skip
     return counts
 
 
@@ -156,6 +154,8 @@ def main() -> None:
     p.add_argument("--gzip-level", type=int, default=1)
     p.add_argument("--compressor", choices=["auto", "gzip", "isal"], default="auto")
     p.add_argument("--assembler", choices=["numpy", "device"], default="numpy")
+    p.add_argument("--formatter", choices=["host", "device"], default="host")
+    p.add_argument("--compress-threads", type=int, default=1)
     p.add_argument("--bracket-cache", default=None, help="directory for cached Moshinsky tables")
     p.add_argument("--no-compile-cache", action="store_true")
     args = p.parse_args()
@@ -171,6 +171,8 @@ def main() -> None:
         flow_sets=args.flow_sets,
         compressor=args.compressor,
         assembler=args.assembler,
+        formatter=args.formatter,
+        compress_threads=args.compress_threads,
     )  # fmt: skip
     for point, n in zip(points, counts, strict=True):
         print(f"wrote {n} values to {point.path}")

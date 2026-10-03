@@ -2,13 +2,14 @@
 
 import gzip
 import math
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from functools import cache
 from pathlib import Path
 from queue import Queue
 from threading import Thread
 from types import ModuleType
+from typing import Any
 
 import jax.numpy as jnp
 import numpy as np
@@ -16,6 +17,8 @@ from jax import Array
 
 from nuham.basis.lab import Orbits
 from nuham.kernels.assemble import assemble_values
+from nuham.kernels.format import format_fields
+from nuham.kernels.format import tables as format_tables
 from nuham.lab_transform import LabMatrix
 from nuham.timing import StageTimer
 
@@ -192,40 +195,32 @@ def _flatten_channels(channels: dict[tuple[int, int], LabChannel], n_orb: int) -
     )
 
 
-def assemble_device(
+def _device_windows(
     orb: Orbits,
     e2max: int,
     channels: dict[tuple[int, int], LabChannel],
-    batch_tuples: int = 1 << 20,
-) -> Iterator[np.ndarray]:
-    """Yield the same chunks as :func:`assemble`, computed by a JAX kernel on the default device.
+    batch_tuples: int,
+    post: Callable[[Array, int], Any],
+) -> Iterator[tuple[Any, int]]:
+    """Run the assembly kernel over fixed windows of tuples and yield ``(post(values, n), n)``.
 
     The tuples of the file are cut into windows of ``batch_tuples`` (the last one is padded to a
-    power of two), so the kernel compiles for few shapes. The host builds the index arrays of the
-    next window while the device works on the current one.
-
-    Parameters
-    ----------
-    orb, e2max, channels
-        As in :func:`assemble`.
-    batch_tuples
-        Tuples per kernel call.
-
-    Yields
-    ------
-    np.ndarray
-        Values of shape ``(n, 4)``; the windows are not aligned with the ``(a, b)`` pairs.
+    power of two), so the kernel compiles for few shapes. ``post`` is called with the device array
+    of values ``(N, 4)`` and the number ``n`` of real tuples as soon as the window is launched, so
+    more device work can be queued behind the kernel. The host builds the index arrays of the next
+    window while the device works on the current one; results are yielded one window late.
     """
     flat = _flatten_channels(channels, len(orb))
     j2 = jnp.asarray(orb.j2, dtype=jnp.int32)
     l_orb = np.asarray(orb.l)
 
-    def launch(cols: np.ndarray, size: int) -> tuple[Array, int]:
+    def launch(cols: np.ndarray, size: int) -> tuple[Any, int]:
         n = cols.shape[1]
         padded = np.zeros((6, size), dtype=np.int32)
         padded[:, :n] = cols
         a, b, c, d, jj, g = (jnp.asarray(row) for row in padded)
-        return assemble_values(flat.v, flat.pos, flat.dim, flat.off, j2, a, b, c, d, jj, g), n
+        values = assemble_values(flat.v, flat.pos, flat.dim, flat.off, j2, a, b, c, d, jj, g)
+        return post(values, n), n
 
     def columns(chunks: list[tuple[int, int, np.ndarray, np.ndarray, np.ndarray]]) -> np.ndarray:
         sizes = [len(ch[2]) for ch in chunks]
@@ -238,12 +233,12 @@ def assemble_device(
              np.concatenate([ch[3] for ch in chunks]), jj, g]
         ).astype(np.int32)  # fmt: skip
 
-    inflight: tuple[Array, int] | None = None
+    inflight: tuple[Any, int] | None = None
     carry = np.zeros((6, 0), dtype=np.int32)
     pending: list[tuple[int, int, np.ndarray, np.ndarray, np.ndarray]] = []
     count = 0
 
-    def flush(final: bool) -> Iterator[np.ndarray]:
+    def flush(final: bool) -> Iterator[tuple[Any, int]]:
         nonlocal inflight, carry, pending, count
         if pending:
             carry = np.concatenate([carry, columns(pending)], axis=1)
@@ -254,10 +249,10 @@ def assemble_device(
             current = launch(carry[:, :take], size)
             carry = carry[:, take:]
             if inflight is not None:
-                yield np.asarray(inflight[0])[: inflight[1]]
+                yield inflight
             inflight = current
         if final and inflight is not None:
-            yield np.asarray(inflight[0])[: inflight[1]]
+            yield inflight
             inflight = None
 
     for chunk in tuple_chunks(orb, e2max):
@@ -266,6 +261,84 @@ def assemble_device(
         if count >= batch_tuples:
             yield from flush(final=False)
     yield from flush(final=True)
+
+
+def assemble_device(
+    orb: Orbits,
+    e2max: int,
+    channels: dict[tuple[int, int], LabChannel],
+    batch_tuples: int = 1 << 20,
+) -> Iterator[np.ndarray]:
+    """Yield the same values as :func:`assemble`, computed by a JAX kernel on the default device.
+
+    Parameters
+    ----------
+    orb, e2max, channels
+        As in :func:`assemble`. The matrices may be host or device arrays.
+    batch_tuples
+        Tuples per kernel call.
+
+    Yields
+    ------
+    np.ndarray
+        Values of shape ``(n, 4)``; the windows are not aligned with the ``(a, b)`` pairs.
+    """
+    for values, n in _device_windows(orb, e2max, channels, batch_tuples, lambda v, _n: v):
+        yield np.asarray(values)[:n]
+
+
+_FLAG_CAPACITY = 4096
+
+
+def format_device(
+    orb: Orbits,
+    e2max: int,
+    channels: dict[tuple[int, int], LabChannel],
+    batch_tuples: int = 1 << 20,
+) -> Iterator[np.ndarray]:
+    """Yield the file's values as 16-character ``f16.8`` text fields, formatted on the device.
+
+    The values never leave the device: each window is assembled and formatted there and only
+    the bytes (16 per value) come back. The few values near a rounding tie, which the device
+    cannot decide exactly, are formatted here with Python's own ``%``, so the text is identical to
+    :func:`write_me2j`'s. Use :func:`write_me2j_fields` to write it.
+
+    Parameters
+    ----------
+    orb, e2max, channels, batch_tuples
+        As in :func:`assemble_device`.
+
+    Yields
+    ------
+    np.ndarray
+        Fields of shape ``(4 n, 16)``, uint8, in file order.
+
+    Raises
+    ------
+    ValueError
+        If a value is not finite or has magnitude of 1e5 or more (it would not fit a field).
+    """
+    frac, head = format_tables()
+
+    def post(values: Array, n: int) -> tuple[Array, tuple[Array, ...]]:
+        return values, format_fields(values, 4 * n, frac, head, _FLAG_CAPACITY)
+
+    for (values, formatted), n in _device_windows(orb, e2max, channels, batch_tuples, post):
+        fields_dev, n_flagged, n_bad, index, flagged = formatted
+        if int(n_bad):
+            raise ValueError("a value is not finite or has magnitude >= 1e5; cannot format it")
+        n_flagged = int(n_flagged)
+        if n_flagged > _FLAG_CAPACITY:  # rare: redo with room for every flagged value
+            size = 1 << (n_flagged - 1).bit_length()
+            fields_dev, _, _, index, flagged = format_fields(values, 4 * n, frac, head, size)
+        fields = np.asarray(fields_dev)[: 4 * n]
+        if n_flagged:
+            fields = fields.copy()  # the device buffer's host view is read-only
+        for i, x in zip(
+            np.asarray(index)[:n_flagged], np.asarray(flagged)[:n_flagged], strict=True
+        ):
+            fields[i] = np.frombuffer(f"{x:16.8f}".encode("ascii"), dtype=np.uint8)
+        yield fields
 
 
 _FLUSH_VALUES = 400_000
@@ -344,12 +417,16 @@ def _igzip() -> ModuleType | None:
     return igzip
 
 
-def _open_gzip(path: str | Path, compresslevel: int, compressor: str) -> gzip.GzipFile:
+def _open_gzip(
+    path: str | Path, compresslevel: int, compressor: str, threads: int = 1
+) -> gzip.GzipFile:
     """Open ``path`` for binary gzip output with the compressor chosen by ``compressor``.
 
     ``"gzip"`` is the standard library, ``"isal"`` is ISA-L's igzip (levels 0-3; needs the
     optional ``isal`` package) and ``"auto"`` uses igzip when it is installed and the level allows,
-    else ``gzip``. Both write standard gzip streams, but not byte-identical ones.
+    else ``gzip``. With igzip, ``threads > 1`` compresses blocks in parallel threads
+    (``isal.igzip_threaded``) into one valid stream of the same size. All write standard gzip
+    streams, but not byte-identical ones.
     """
     if compressor not in ("auto", "gzip", "isal"):
         raise ValueError(f"unknown compressor {compressor!r}; use 'auto', 'gzip' or 'isal'")
@@ -359,8 +436,57 @@ def _open_gzip(path: str | Path, compresslevel: int, compressor: str) -> gzip.Gz
     if compressor == "isal" and compresslevel > 3:
         raise ValueError("isal supports compression levels 0-3")
     if igzip is not None and compresslevel <= 3:
+        if threads > 1:
+            from isal import igzip_threaded
+
+            return igzip_threaded.open(path, "wb", compresslevel=compresslevel, threads=threads)
         return igzip.open(path, "wb", compresslevel=compresslevel)
     return gzip.open(path, "wb", compresslevel=compresslevel)
+
+
+def _write_stream(
+    path: str | Path,
+    header: str,
+    compresslevel: int,
+    compressor: str,
+    threads: int,
+    produce: Callable[[Callable[[bytes | memoryview], None]], int],
+) -> int:
+    """Run ``produce(put)`` in the caller while a background thread compresses and writes.
+
+    ``put`` queues bytes behind a bounded queue; ``produce`` returns the number of values it
+    wrote. A ``.gz`` suffix gives gzip output, anything else plain text. A failure in the writer
+    thread is re-raised here.
+    """
+    queue: Queue[bytes | memoryview | None] = Queue(maxsize=8)
+    failure: list[BaseException] = []
+
+    def drain() -> None:
+        try:
+            fh = (
+                _open_gzip(path, compresslevel, compressor, threads)
+                if str(path).endswith(".gz")
+                else open(path, "wb")
+            )
+            with fh:
+                while (item := queue.get()) is not None:
+                    fh.write(item)
+        except BaseException as exc:  # noqa: BLE001  re-raised in the caller
+            failure.append(exc)
+            while queue.get() is not None:
+                pass
+
+    worker = Thread(target=drain, daemon=True)
+    worker.start()
+    queue.put((header + "\n").encode("ascii"))
+    try:
+        total = produce(queue.put)
+    finally:
+        queue.put(None)
+        worker.join()
+    if failure:
+        raise failure[0]
+    return total
 
 
 def write_me2j(
@@ -369,6 +495,7 @@ def write_me2j(
     header: str = HEADER,
     compresslevel: int = 1,
     compressor: str = "auto",
+    compress_threads: int = 1,
 ) -> int:
     """Write values as gzip text: one header line, then Fortran ``10f16.8`` (10 values per line).
 
@@ -390,59 +517,76 @@ def write_me2j(
     compresslevel
         gzip level for ``.gz`` files. Level 1 compresses at about 150 MB/s and gives files about
         10% larger than level 4 (70 MB/s), so it is the default.
+    compress_threads
+        Threads for igzip's parallel compressor (1 is the single-threaded igzip).
 
     Returns
     -------
     int
         The number of values written.
     """
-    pending: list[np.ndarray] = []
-    n_pending = 0
-    total = 0
-    queue: Queue[bytes | None] = Queue(maxsize=8)
-    failure: list[BaseException] = []
 
-    def drain() -> None:
-        try:
-            fh = (
-                _open_gzip(path, compresslevel, compressor)
-                if str(path).endswith(".gz")
-                else open(path, "wb")
-            )
-            with fh:
-                while (item := queue.get()) is not None:
-                    fh.write(item)
-        except BaseException as exc:  # noqa: BLE001  re-raised in the caller
-            failure.append(exc)
-            while queue.get() is not None:
-                pass
-
-    worker = Thread(target=drain, daemon=True)
-    worker.start()
-    queue.put((header + "\n").encode("ascii"))
-    try:
+    def produce(put: Callable[[bytes | memoryview], None]) -> int:
+        pending: list[np.ndarray] = []
+        n_pending = 0
+        total = 0
         for chunk in chunks:
             pending.append(np.asarray(chunk).ravel())
             n_pending += pending[-1].size
             if n_pending >= _FLUSH_VALUES:
                 data = np.concatenate(pending)
                 full = len(data) // 10 * 10
-                queue.put(_format_lines(data[:full]))
+                put(_format_lines(data[:full]))
                 total += full
                 pending, n_pending = [data[full:]], len(data) - full
         data = np.concatenate(pending) if pending else np.empty(0)
         full = len(data) // 10 * 10
         if full:
-            queue.put(_format_lines(data[:full]))
+            put(_format_lines(data[:full]))
         if len(data) > full:
-            queue.put(("".join(f"{x:16.8f}" for x in data[full:].tolist()) + "\n").encode("ascii"))
-        total += len(data)
-    finally:
-        queue.put(None)
-        worker.join()
-    if failure:
-        raise failure[0]
-    return total
+            put(("".join(f"{x:16.8f}" for x in data[full:].tolist()) + "\n").encode("ascii"))
+        return total + len(data)
+
+    return _write_stream(path, header, compresslevel, compressor, compress_threads, produce)
+
+
+def write_me2j_fields(
+    path: str | Path,
+    fields: Iterator[np.ndarray],
+    header: str = HEADER,
+    compresslevel: int = 1,
+    compressor: str = "auto",
+    compress_threads: int = 1,
+) -> int:
+    """Write values that are already formatted, as the 16-byte fields of :func:`format_device`.
+
+    Only the line layout is done here (ten fields and a newline per line), so the calling thread
+    does little more than copy bytes. The arguments are those of :func:`write_me2j`.
+
+    Returns
+    -------
+    int
+        The number of values written.
+    """
+
+    def produce(put: Callable[[bytes | memoryview], None]) -> int:
+        carry = np.empty((0, 16), dtype=np.uint8)
+        total = 0
+        for chunk in fields:
+            data = np.concatenate([carry, chunk]) if len(carry) else chunk
+            full = len(data) // 10 * 10
+            if full:
+                lines = np.empty((full // 10, 161), dtype=np.uint8)
+                lines[:, :160] = data[:full].reshape(-1, 160)
+                lines[:, 160] = ord("\n")
+                put(memoryview(lines.reshape(-1)))
+                total += full
+            carry = data[full:].copy()
+        if len(carry):
+            put(carry.tobytes() + b"\n")
+        return total + len(carry)
+
+    return _write_stream(path, header, compresslevel, compressor, compress_threads, produce)
 
 
 def write_me2j_timed(
@@ -451,20 +595,89 @@ def write_me2j_timed(
     timer: StageTimer,
     compresslevel: int = 1,
     compressor: str = "auto",
+    compress_threads: int = 1,
+    writer: Callable[..., int] = write_me2j,
 ) -> int:
-    """Write like :func:`write_me2j` and record ``assemble`` and ``write`` on ``timer``.
+    """Write like ``writer`` (:func:`write_me2j` or :func:`write_me2j_fields`) and time it.
 
-    ``assemble`` is the time spent producing chunks; ``write`` is the rest of the call (formatting
-    and the final flush; compression overlaps in its thread and shows up as back-pressure). Safe to
-    call repeatedly with the same timer.
+    Records ``assemble`` (time spent producing chunks, which for the device path includes waiting
+    for the device and copying the result) and ``write`` (the rest of the call: formatting and
+    line layout, and the final flush; compression overlaps in its thread and shows up as
+    back-pressure). Safe to call repeatedly with the same timer.
     """
     before = timer.seconds.get("assemble", 0.0)
     with timer.stage("write"):
-        n = write_me2j(
-            path, timer.wrap("assemble", chunks), compresslevel=compresslevel, compressor=compressor
+        n = writer(
+            path,
+            timer.wrap("assemble", chunks),
+            compresslevel=compresslevel,
+            compressor=compressor,
+            compress_threads=compress_threads,
         )
     timer.seconds["write"] -= timer.seconds["assemble"] - before
     return n
+
+
+def write_channels(
+    path: str | Path,
+    orb: Orbits,
+    e2max: int,
+    channels: dict[tuple[int, int], LabChannel],
+    assembler: str = "numpy",
+    formatter: str = "host",
+    compresslevel: int = 1,
+    compressor: str = "auto",
+    compress_threads: int = 1,
+    timer: StageTimer | None = None,
+) -> int:
+    """Assemble the values of ``channels`` and write them as ``me2j``, with the chosen machinery.
+
+    Parameters
+    ----------
+    path
+        Output file.
+    orb, e2max, channels
+        As in :func:`assemble`.
+    assembler
+        ``"numpy"`` (:func:`assemble`) or ``"device"`` (:func:`assemble_device`, a JAX kernel; the
+        lab matrices may then stay on the device).
+    formatter
+        ``"host"`` (:func:`write_me2j`) or ``"device"`` (:func:`format_device` with
+        :func:`write_me2j_fields`; needs ``assembler="device"``).
+    compresslevel, compressor, compress_threads
+        See :func:`write_me2j`.
+    timer
+        Optional stage timer; records ``assemble`` and ``write``.
+
+    Returns
+    -------
+    int
+        The number of values written.
+    """
+    if assembler not in ("numpy", "device"):
+        raise ValueError(f"unknown assembler {assembler!r}; use 'numpy' or 'device'")
+    if formatter not in ("host", "device"):
+        raise ValueError(f"unknown formatter {formatter!r}; use 'host' or 'device'")
+    if formatter == "device" and assembler != "device":
+        raise ValueError("formatter='device' needs assembler='device'")
+    chunks: Iterator[np.ndarray]
+    if formatter == "device":
+        chunks, writer = format_device(orb, e2max, channels), write_me2j_fields
+    elif assembler == "device":
+        chunks, writer = assemble_device(orb, e2max, channels), write_me2j
+    else:
+        chunks, writer = assemble(orb, e2max, channels), write_me2j
+    if timer is None:
+        return writer(
+            path,
+            chunks,
+            compresslevel=compresslevel,
+            compressor=compressor,
+            compress_threads=compress_threads,
+        )
+    return write_me2j_timed(
+        path, chunks, timer, compresslevel, compressor, compress_threads, writer
+    )
 
 
 def read_me2j(path: str | Path) -> np.ndarray:

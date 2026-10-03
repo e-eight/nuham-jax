@@ -307,3 +307,28 @@ isal rows of job 3301348 (same code, same numbers within 1%).
 - **Next floor: the writer.** Options, none started: isal's threaded compressor (`igzip_threaded`, 1.7x on this x86 machine at 8 threads with identical output size and valid gzip; not yet
   measured on Grace); formatting on the device (the table-driven formatter is integer arithmetic) or in worker threads; releasing the per-channel device arrays once the flat copy exists
   (halves the transient GPU memory); building the host index arrays once per scan instead of once per point.
+
+## Device formatter and threaded compression: CPU prototype (2026-10-03)
+
+`nuham.kernels.format.format_fields` formats the `(N, 4)` values of an assembled window as 16-byte `f16.8` fields on the device with the host formatter's integer
+arithmetic and lookup tables (`formatter="device"`, `--formatter device`; needs `assembler="device"`). The values never leave the device: only the fields (16 bytes
+per value) come back, and `write_me2j_fields` does the line layout (ten fields and a newline). Values whose scaled fraction is within 8 ulp of 0.5 are returned as a list
+(capacity 4096 per window, redone with room for all if exceeded) and formatted on the host with Python's `%`, so the text is identical; a value that is not finite or has
+magnitude >= 1e5 raises, because it would not fit a field. `compress_threads` (`--compress-threads`) selects `isal.igzip_threaded` for blocks compressed in parallel
+(one valid stream, same size).
+
+Checks (`tests/test_format_device.py`): fields equal Python's formatting on the adversarial set (ties, near-ties, signs, -0.0, powers of ten) and on random values at five
+scales; the fields writer writes the same file as the host writer across windows that split lines; the patch and overflow paths; unformattable values; every
+assembler/formatter combination writes identical files; threaded streams decompress to the same text.
+
+Local CPU, emax 10, warm, isal, seconds (the CPU run is dominated by the contraction, 8-9 s in total, so only the writer stages are informative):
+
+| assembler | formatter | compress threads | assemble | write | total |
+|---|---|---|---|---|---|
+| numpy | host | 1 | 0.78 | 0.46 | 8.85 |
+| numpy | host | 8 | 0.89 | 0.49 | 8.97 |
+| device | host | 1 | 0.38 | 0.83 | 8.38 |
+| device | device | 1 | 0.52 | 0.44 | 8.12 |
+| device | device | 8 | 0.57 | 0.22 | 8.32 |
+
+On a CPU the XLA kernels share cores with the rest of the process, so there is nothing to gain there; the measurement that matters is on the GH200.
