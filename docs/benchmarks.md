@@ -209,8 +209,7 @@ when importable, with `gzip` as the fallback; output bytes would differ from the
 **`assemble`, batched** (`nuham.me2j.assemble`). Profile at emax 10 (local CPU): 1.37 s for 12.7 M values, 45% of it in 75 000 tiny `element()` calls, i.e.
 numpy call overhead, not memory. It now batches consecutive `(a, b)` pairs into chunks of ~260 k tuples and handles each `(J, parity)` with one set of array
 operations per chunk. Result: 0.69 s (2.0x), bit-identical to the old per-pair version (`tests/test_synthetic_pipeline.py` against
-`tests/assemble_reference.py`, including tiny batches; the NuHamil reference comparisons pass unchanged). Expected on the GH200 at emax 14: about 7.5 -> 3.5 s per point.
-Not yet measured on the GPU node.
+`tests/assemble_reference.py`, including tiny batches; the NuHamil reference comparisons pass unchanged). I expected the same on the GH200; it did not happen, see the next section.
 
 **Memory.** A fresh process per point count at emax 14 on the GH200 (`benchmarks/bench_memory.py`; an earlier run of this tool assumed 4 KB pages and
 was discarded, the kernel here has 64 KB pages), GB:
@@ -229,3 +228,29 @@ was discarded, the kernel here has 64 KB pages), GB:
   passes of the same process and transient block stacks. For planning use ~6 GB per point at emax 14.
 - The matrices are symmetric but stored as full square arrays, so packing the lower triangle would halve them (about 2 GB per point). That changes the values
   at the 1e-15 level (the two triangles of a GEMM result are not bit-equal), so output bytes would differ in rare last digits. Not done.
+
+## DeltaAI GH200: batched `assemble` and the isal extra (job 3301348, 2026-10-03, commit 2cb9a9e, ~11 min)
+
+Raw records `benchmarks/baseline_gh200_asm_*.json`. Single runs: second (warm) pass of two. Scans: 6 points (hw 12/16/20 x lambda 1.8/2.0), batch 6,
+full mode, the pass reported is the second of two, seconds. Both compressors ran with the batched `assemble`.
+
+| case | compressor | total | assemble | write | file |
+|---|---|---|---|---|---|
+| emax 12 single | gzip | 8.9 | 2.59 | 3.48 | 278 MB |
+| emax 12 single | isal | 6.7 | 2.57 | 1.12 | 281 MB |
+| emax 14 single | gzip | 25.4 | 8.51 | 11.29 | 914 MB |
+| emax 14 single | isal | 17.7 | 8.44 | 3.61 | 922 MB |
+| emax 14 scan, per point | gzip | 21.8 | 8.5 | 11.3 | |
+| emax 14 scan, per point | isal | 13.95 | 8.4 | 3.5 | |
+
+- **isal confirms its gain at emax 14:** write stage 11.3 -> 3.6 s (3.1x), a scan point 21.8 -> 13.95 s (-36%), a single run 25.4 -> 17.7 s (-30%); files +1%.
+- **The batched `assemble` did not speed up on the GH200.** It took 8.4-8.5 s per point at emax 14 (7.5 s per point before in job 3301003) and 2.6 s at emax 12 (2.78 s before).
+  My local measurements gave 2.0x at emax 10 but only 1.5x at emax 12 (4.74 -> 3.13 s) on this x86 CPU, so the gain shrinks as the matrices grow. Profile
+  of the batched version at emax 12: `element()` 1.08 s and the batch function's own array operations 0.9 s, i.e. about 14 ns per looked-up element over
+  ~76 M gathers, which is numpy's per-element cost (index arithmetic, masks, temporaries), not call overhead any more. On Grace this is no faster than before.
+- `assemble` is now 60% of a full emax 14 scan point (8.5 of 13.95 s), then write (3.5 s); the compute stages total about 2 s.
+
+Candidates, not started: (1) run assemble and formatting in worker threads over batches (numpy releases the GIL in these loops; 16 cores were allocated), keeping the
+batches in order for the writer; (2) isal's multi-threaded compressor (`isal.igzip_threaded`), which writes one valid gzip stream from parallel blocks and would remove the
+single compression thread (about 9 s of compression work per emax 14 file at 300 MB/s) as the floor once assembly is parallel; (3) assembling on the device, where the
+matrices already are, and copying only the values back.
