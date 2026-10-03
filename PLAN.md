@@ -54,6 +54,7 @@ Original description:
 - Check the imsrg++ `me2j` format against both NuHamil's writer and imsrg++'s reader.
 
 ### Decisions made after Phase 0
+- Benchmark runner lives outside the package (`benchmarks/`). Optional binary/HDF5 output waits until after the writer work.
 - Tests are not tied to a NuHamil checkout: the one data file can be downloaded (`nuham.fetch`, pinned commit and checksum) and a synthetic charge-independent interaction tests the whole pipeline with exact identities. Without any NuHamil data 549 tests pass and 17 skip; without `refs/` as well, 545 pass and 19 skip.
 - Provenance: code that transcribes NuHamil's Fortran (the explicit Moshinsky bracket sum, the oracle) lives in `refs/`, not `src/`. The package only has the rotation-based Moshinsky tables, and its tests pass without `refs/` (reference-dependent tests skip).
 - Moshinsky brackets and 6j/9j coefficients: host NumPy with caching. Move to JAX only if
@@ -105,15 +106,35 @@ Original description:
 Relative -> lab transform plus Trel/Hcm. Write `me2j`. Compare elementwise with NuHamil.
 End-to-end: imsrg++ on 4He with our file and with NuHamil's.
 
-### Phase 4: GPU readiness — started (first GPU run done on ICRN, see docs/icrn-run.md: emax 14 in ~2 min cold, 566 tests pass)
-Done so far: Moshinsky brackets as exp(theta G) (`docs/study-moshinsky-rotation.md`): all tables for e2max 28 in ~15 s
-(was hours); full pipeline 3.2 s (emax 6), 8.2 s (8), 41 s (10), 302 s (12, 2.4 GB). Next: block contraction by
-tabulated 9j/6j, writer speed; then a Delta run. Contraction done (padded block stacks + one GEMM, device-resident coefficients and accumulation; ~10% faster end to end on the H200). Writer (threaded, gzip level 1) and JAX compile cache done: Vectorized 9j/6j done. CLI with warm caches: emax 10 in 18.5 s, emax 12 in 48 s.
-Original description:
-Test on Delta at larger emax. Compare time and memory with Fortran. Tune bucketing and chunking.
+### Phase 4: GPU readiness and speed — in progress
+Done (see `docs/study-moshinsky-rotation.md`, `docs/icrn-run.md`, `docs/deltaai-run.md`):
+- Moshinsky brackets from a rotation generator (all tables for e2max 28 in ~15 s, was hours); vectorized 6j/9j; device-resident
+  contraction (padded block stacks, one GEMM, result copied back once); threaded writer (gzip level 1) and JAX compile cache;
+  `XLA_PYTHON_CLIENT_PREALLOCATE=false` by default on import.
+- Runs: ICRN shared H200 (warm emax 14 in 75-80 s) and DeltaAI GH200 (warm emax 14 in ~54 s; emax 10: 14.5 s, emax 12: 25.3 s).
+  Local CPU, emax 14: ~174 s (profiled). Largest emax-14 channel build: 0.24 s on GH200.
+- Finding: at NN size the GPU-friendly work (contraction, SRG flow) is a small share; file formatting and gzip are ~45% of a warm
+  run, and the bracket disk cache (1.52 GB, 38 s to load from /projects) costs more than regenerating.
 
-### Phase 5: 3N (later)
-Jacobi-HO basis, cfp, local N2LO force, Jacobi SRG, Jacobi -> lab, streaming `me3j` writer.
+Agreed order (each phase needs a correctness gate and a benchmark gate; nothing is done until both pass):
+
+| Phase | What gets built | Correctness gate | Benchmark gate (where) |
+|---|---|---|---|
+| 4a. Quick fixes | Compact bracket cache (valid blocks only, ~0.15 GB, or skip the disk cache when regeneration is cheaper). Pinned-host result copy on GPU backends, no fresh host buffer per result. | me2j unchanged; all tests pass. | Cache load time vs the 38 s measured; device-to-host copy vs the 9 GB/s pageable path (DeltaAI, ICRN). |
+| 4b. Harness | Stage timers built into `generate_me2j`. A benchmark runner **outside the package** (`benchmarks/`) writing JSON with device, versions, stage times, peak memory. A compute-only mode that skips file writing. | Timers do not change results. | Baselines on local CPU, ICRN, DeltaAI; NuHamil's own NN time and memory on this machine as a reference. |
+| 4c. Writer | Parallel text formatting (gzip stays in its thread); NumPy contraction path for CPU runs. Binary/HDF5 output is deferred. | me2j byte-identical; imsrg++-readable. | Share of run time spent writing (now ~45%); compute-only vs full-run times. |
+| 4d. Parameter scans | Many (hw, lambda) sets sharing brackets and coefficients; batched SRG flows and batched contraction. | Each set matches a single run. | Time per set vs batch size, CPU vs GPU: the clearest test of GPU advantage at NN size. |
+
+### Phase 5: 3N — planned, same gates per step
+| Step | What gets built | Correctness gate | Benchmark gate |
+|---|---|---|---|
+| 5.0 | Spec and oracle in the style of Phase 0: Jacobi basis, cfp, local N2LO force, small NuHamil 3N references, numpy oracle. | Oracle reproduces the references. | NuHamil 3N time and memory as the baseline for any speedup claim. |
+| 5.1-5.4 | Jacobi basis and cfp; local N2LO force; Jacobi SRG; Jacobi-to-lab with e3max truncation and a streaming `me3j` writer. | Match the oracle at each step. | Stage times per step, CPU vs GPU (large dense products: where the GPU should dominate). |
+| 5.5 | imsrg++ validation on 4He and 16O, NN first (still open) and then NN+3N. | Energies match the NuHamil-based run. | none |
+
+Why this order: fix the known confounders (4a) before taking baselines (4b); measure writer gains with the same harness (4c); a scan
+multiplies output, so the writer goes before scans (4d); benchmark at every feature step so the GPU question is answered where it matters.
+DeltaAI budget: account `bhhk-dtai-gh` only (118 h left); 4a-4d need roughly 1-2 GPU-hours; ask before 3N-scale jobs.
 
 ## Risks
 

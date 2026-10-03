@@ -13,7 +13,7 @@ so nothing may assume a device.
 
 **Status:** Phases 0-3 are done: spec and oracle; HO functions, projection, Racah/Moshinsky; Coulomb and SRG
 flow (`nuham.relative_nn.evolve_relative_nn`); lab transform and `me2j` writer (`nuham.generate.generate_me2j`,
-CLI `uv run python -m nuham.generate --help`; it enables JAX's persistent compile cache by default). Phase 4 (scale and GPU) is started (fast Moshinsky tables, JAX contraction, threaded writer and compile cache done; vectorized 9j/6j done; a GPU run and an emax 14 timing not yet); do not start a
+CLI `uv run python -m nuham.generate --help`; it enables JAX's persistent compile cache by default). Phase 4 (speed and GPU) is in progress: fast Moshinsky tables, JAX contraction, threaded writer, compile cache and vectorized 9j/6j are done, and runs on ICRN (H200) and DeltaAI (GH200) are recorded in `docs/`. Agreed next steps, in order: 4a quick fixes (compact bracket cache, pinned-host result copy), 4b benchmark harness in `benchmarks/` outside the package, 4c writer, 4d parameter scans, then 3N (Phase 5). Do not start a
 phase unless the user asks.
 `PLAN.md` holds the phases and decisions made so far.
 
