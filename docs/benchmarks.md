@@ -332,3 +332,38 @@ Local CPU, emax 10, warm, isal, seconds (the CPU run is dominated by the contrac
 | device | device | 8 | 0.57 | 0.22 | 8.32 |
 
 On a CPU the XLA kernels share cores with the rest of the process, so there is nothing to gain there; the measurement that matters is on the GH200.
+
+## DeltaAI GH200: device formatter and threaded compression (jobs 3301636 and 3301673, 2026-10-03)
+
+All with `--compressor isal`, `--assembler device` except where noted. Single runs: warm second pass, seconds (`benchmarks/baseline_gh200_fmt_e*_*.json`; the `case` field of those
+records does not list the options, the file name does, because the runner only recorded them from job 3301673 on). The job 3301528 row is the previous best.
+
+| emax | formatter | compress threads | assemble | write | total |
+|---|---|---|---|---|---|
+| 12 | host | 1 (job 3301528) | 0.66 | 2.66 | 6.2 |
+| 12 | host | 8 | 0.73 | 1.35 | 5.0 |
+| 12 | device | 1 | 0.71 | 2.44 | 6.0 |
+| 12 | device | 4 | 0.76 | 0.30 | 3.9 |
+| 12 | device | 8 | 0.78 | 0.23 | 3.9 |
+| 14 | host | 1 (job 3301528) | 1.98 | 8.35 | 15.9 |
+| 14 | host | 8 | 2.16 | 4.35 | 11.9 |
+| 14 | device | 1 | 2.06 | 7.91 | 15.3 |
+| 14 | device | 4 | 2.27 | 0.65 | 8.29 |
+| 14 | device | 8 | 2.32 | 0.56 | 8.09 |
+
+- **The two changes need each other.** Threaded compression alone leaves the host formatter as the floor (write 8.35 -> 4.35 s); the device formatter alone leaves the single compression thread
+  as the floor (7.91 s). Together `write` falls to 0.56 s and assemble plus write from 10.3 to 2.9 s. 4 threads are as good as 8 (16 cores were allocated).
+- An emax 14 single run takes 8.1 s now: 25.4 s with numpy, host formatting and gzip, 17.7 s with isal. GPU peak 10.3 GB, host RSS 2.9 GB, file 922 MB.
+- The largest stage of a single run is now `lab_coeffs` (about 3.5 s, host NumPy), then `assemble` (2.3 s, mostly host-side index preparation) and `lab_contract` (1.7 s).
+
+Scans, 6 points (hw 12/16/20 x lambda 1.8/2.0) at batch 6 and 12 points (hw 12..22 step 2 x lambda 1.8/2.0) at batch 12, emax 14, `--formatter device --compress-threads 8`, seconds
+(`baseline_gh200_fmt_scan*.json`). A first scan in job 3301636 ran with the wrong options because the runner did not pass them to `generate_scan`; its record was discarded and the runner fixed.
+
+| points | batch | per point | compute (project+srg+lab) | assemble | write | host RSS | GPU peak |
+|---|---|---|---|---|---|---|---|
+| 6 | 6 | 4.81 | 1.87 | 2.34 | 0.58 | 3.9 GB | 32 GB |
+| 12 | 12 | 4.58 | 1.65 | 2.34 | 0.58 | 5.2 GB | 57 GB |
+
+- A full emax 14 scan point costs 4.6-4.8 s, against 25 s for a separate gzip/numpy run at the start of this work (5x) and 8.1 s for the best single run.
+- Batch 12 fits easily (57 GB of the GPU, 5 GB of host memory) and is only 5% cheaper per point than batch 6: the per-point work is now dominated by `assemble` (host index preparation, not shared) and
+  `lab_contract`; only `lab_coeffs` is shared.
