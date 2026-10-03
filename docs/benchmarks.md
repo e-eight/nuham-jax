@@ -174,8 +174,58 @@ two. Raw records: `benchmarks/baseline_gh200_scan_*.json`. Stage columns are tot
   file, 225 MB/s through one gzip level-1 thread plus formatting). The same point costs about 25 s as a separate run (5.5 s of compute plus
   ~19.5 s of writing), so a full scan saves only ~14% at this size. This is the point at which the deferred gzip options become relevant
   (`python-isal`, or parallel blocks), and the host-side `assemble` is the second candidate.
-- **Host memory grows by about 6 GB per extra point at emax 14** (6.5 GB for one point, 19.4 GB for two, 36.3 GB for six), three times the
-  2 GB I estimated from the size of the lab matrices, so the "about 2 GB per point" figure in earlier notes is for the matrices alone.
-  With 64 GB requested the largest safe batch at emax 14 is about 8 points. The reason for the extra memory has not been looked into
-  (candidates: pinned host copies, the per-channel coefficient arrays that stay referenced).
+- **Host memory grew by about 6 GB per extra point at emax 14** (6.5 GB for one point, 19.4 GB for two, 36.3 GB for six), three times the
+  2 GB I estimated. With 64 GB requested the largest safe batch at emax 14 is about 8 points. The follow-up section below explains it: the lab
+  matrices themselves are 3.9 GB per point, not 2 GB.
 - The job took ~15 min against an estimate of ~20, about 0.26 GPU-hours.
+
+## Writer and memory follow-up (DeltaAI jobs 3301083 and 3301101, CPU profiling, 2026-10-03)
+
+**Compression: `isal` (igzip) against `gzip`.** `isal` writes standard gzip streams (`gzip -t` and `zcat` accept them, decompressed text identical).
+Microbenchmark on 40 MB of emax-8 me2j text, MB/s and output size:
+
+| compressor | local x86 CPU | GH200 (Grace) | size |
+|---|---|---|---|
+| gzip level 1 | 50 | 137 | 13.9 MB |
+| isal level 1 | 484 | 267 | 14.2 MB (14.2 vs 13.9: +2%) |
+| isal level 2 | 476 | 278 | 14.1 MB |
+| isal level 0 | 493 | 374 | 16.9 MB |
+
+ISA-L is much better optimised for x86 (10x) than for Grace (2x), but the whole `write` stage still improves a lot because formatting is cheap now.
+End to end on the GH200 (warm second pass, two runs of each, `run_nn.py --isal`, `benchmarks/baseline_gh200_gz_*`):
+
+| emax | compressor | total | assemble | write | file |
+|---|---|---|---|---|---|
+| 10 | gzip | 3.29 | 0.96 | 0.66 | 70.5 MB |
+| 10 | isal | 2.87 | 0.96 | 0.26 | 71.5 MB |
+| 12 | gzip | 8.95 | 2.78 | 3.27 | 278.4 MB |
+| 12 | isal | 6.58 | 2.77 | 0.93 | 281.5 MB |
+
+At emax 12 the write stage is 3.5x shorter and the run 26% shorter (local x86 emax 10: write 3.5 -> 0.4 s, run 12.4 -> 8.8 s). Extrapolating
+to emax 14 (write 12 s per point now) gives about 3.5 s per point. An aarch64 wheel exists (`isal` 1.8.0, installed for the test into
+`/projects/bhhk/soham/nuham/pylibs` with `PYTHONPATH`, the venv was not changed). Not yet in the package: it would be an optional dependency used
+when importable, with `gzip` as the fallback; output bytes would differ from the `gzip` module's.
+
+**`assemble`, batched** (`nuham.me2j.assemble`). Profile at emax 10 (local CPU): 1.37 s for 12.7 M values, 45% of it in 75 000 tiny `element()` calls, i.e.
+numpy call overhead, not memory. It now batches consecutive `(a, b)` pairs into chunks of ~260 k tuples and handles each `(J, parity)` with one set of array
+operations per chunk. Result: 0.69 s (2.0x), bit-identical to the old per-pair version (`tests/test_synthetic_pipeline.py` against
+`tests/assemble_reference.py`, including tiny batches; the NuHamil reference comparisons pass unchanged). Expected on the GH200 at emax 14: about 7.5 -> 3.5 s per point.
+Not yet measured on the GPU node.
+
+**Memory.** A fresh process per point count at emax 14 on the GH200 (`benchmarks/bench_memory.py`; an earlier run of this tool assumed 4 KB pages and
+was discarded, the kernel here has 64 KB pages), GB:
+
+| pinned copy | points | RSS after | growth per point | matrices per point |
+|---|---|---|---|---|
+| on | 1 | 6.50 | 5.78 | 3.94 |
+| on | 2 | 11.03 | 5.15 | 3.94 |
+| off | 1 | 5.97 | 5.26 | 3.94 |
+| off | 2 | 10.02 | 4.64 | 3.94 |
+
+- **The lab matrices are 3.94 GB per point at emax 14**, twice the "about 2 GB" in `CLAUDE.md` and my earlier notes (that figure was too low).
+  The marginal cost of an extra point is 4.0 GB (4.5 GB with the pinned copy), so almost all of it is the matrices; a fixed ~1.8 GB comes on top (coefficients, caches).
+  The pinned copy costs about 0.5 GB per point (+12%).
+- The 36 GB seen with 6 points in a scan (job 3301003) is above the 26-29 GB this predicts; the rest is probably allocator retention from the earlier
+  passes of the same process and transient block stacks. For planning use ~6 GB per point at emax 14.
+- The matrices are symmetric but stored as full square arrays, so packing the lower triangle would halve them (about 2 GB per point). That changes the values
+  at the 1e-15 level (the two triangles of a GEMM result are not bit-equal), so output bytes would differ in rare last digits. Not done.

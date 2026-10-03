@@ -1,0 +1,16 @@
+{
+  "emax": 14,
+  "backend": "gpu",
+  "pinned_copy": true,
+  "results": [
+    {
+      "points": 2,
+      "rss_before_gb": 0.735248384,
+      "rss_after_gb": 11.030560768,
+      "rss_peak_gb": 11.030560768,
+      "maxrss_gb": 10.27301025390625,
+      "growth_per_point_gb": 5.147656192,
+      "matrix_gb_per_point": 3.941646592
+    }
+  ]
+}

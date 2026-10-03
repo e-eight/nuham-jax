@@ -1,0 +1,47 @@
+{
+  "text_mb": 40.188082,
+  "rows": [
+    {
+      "compressor": "gzip level 1",
+      "mb_per_s": 136.97095209959366,
+      "size_mb": 13.908532,
+      "roundtrip_ok": true
+    },
+    {
+      "compressor": "gzip level 2",
+      "mb_per_s": 103.83766423703676,
+      "size_mb": 13.551843,
+      "roundtrip_ok": true
+    },
+    {
+      "compressor": "gzip level 6",
+      "mb_per_s": 32.554682975085456,
+      "size_mb": 11.851986,
+      "roundtrip_ok": true
+    },
+    {
+      "compressor": "isal level 0",
+      "mb_per_s": 373.5965934618778,
+      "size_mb": 16.885415,
+      "roundtrip_ok": true
+    },
+    {
+      "compressor": "isal level 1",
+      "mb_per_s": 267.4393250721527,
+      "size_mb": 14.150215,
+      "roundtrip_ok": true
+    },
+    {
+      "compressor": "isal level 2",
+      "mb_per_s": 277.63142554221287,
+      "size_mb": 14.130317,
+      "roundtrip_ok": true
+    },
+    {
+      "compressor": "isal level 3",
+      "mb_per_s": 114.95194821763276,
+      "size_mb": 13.715126,
+      "roundtrip_ok": true
+    }
+  ]
+}
