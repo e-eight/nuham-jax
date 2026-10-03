@@ -275,3 +275,10 @@ Local CPU timing, warm, seconds for the whole assembly (XLA-CPU, host index prep
 At emax 12 the device version's 1.8 s splits into: flattening the matrices 0.7 s (one-off per call, a host concatenation of 1.2 GB; it goes away once matrices are
 built into the flat layout on the device), tuple generation on the host 0.5 s, building the index columns 0.4 s, kernel and uploads about 0.5 s (about 25 M tuples/s on
 the CPU). Host preparation does not depend on the matrices, so a scan can build it once and reuse it for every point. Not yet measured on a GPU.
+
+**Device-resident matrices (added after the first prototype).** With `assembler="device"` the lab contraction keeps its results as device arrays (`on_device=True`, no
+`to_host`; the stage timers then wait for the device so `lab_contract` stays honest) and `_flatten_channels` concatenates them on the device, so on an accelerator the
+matrices never visit the host: no host-device round trip, and about 4 GB less host memory per point at emax 14. Equality with the numpy assembly is exact
+(`tests/test_assemble_device.py`). On the CPU this path is not useful: emax 12 end to end, `assemble` 3.0 -> 1.2 s but `write` 1.6 -> 2.8 s (the XLA-CPU kernel and the
+formatting share the same cores) and host RSS 2.7 -> 4.5 GB (matrices exist as device arrays and again as the flat copy), total unchanged. So `numpy` stays the default and
+the device assembly is meant for accelerators.

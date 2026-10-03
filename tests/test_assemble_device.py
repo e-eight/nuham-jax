@@ -69,3 +69,23 @@ def test_scan_with_device_assembler_matches(tmp_path) -> None:
         np.testing.assert_array_equal(
             read_me2j(tmp_path / f"{a}.me2j"), read_me2j(tmp_path / f"{b}.me2j")
         )
+
+
+def test_device_resident_matrices_give_the_same_values(setup) -> None:
+    import jax
+
+    orb, channels = setup
+    relative = {
+        (c.j, c.parity, c.s, c.tz): c
+        for c in evolve_relative_nn(synthetic_nn(), 16.0, 2.0, n2max=24)
+    }
+    mosh = MoshinskyTable()
+    on_device = {
+        jp: LabChannel(lab_channel_matrices(orb, E2MAX, *jp, relative, mosh, None, True), len(orb))
+        for jp in lab_channels(orb, E2MAX)
+    }
+    some = next(m for ch in on_device.values() for m in ch.matrices.values() if m.v.size)
+    assert isinstance(some.v, jax.Array)
+    want = np.concatenate(list(assemble(orb, E2MAX, channels)))
+    got = np.concatenate(list(assemble_device(orb, E2MAX, on_device, 4096)))
+    np.testing.assert_array_equal(got, want)

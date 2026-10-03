@@ -72,7 +72,10 @@ def generate_me2j(
     }
     orb = make_orbits(emax, lmax)
     channels = {
-        jp: LabChannel(lab_channel_matrices(orb, e2max, *jp, relative, mosh, timer), len(orb))
+        jp: LabChannel(
+            lab_channel_matrices(orb, e2max, *jp, relative, mosh, timer, assembler == "device"),
+            len(orb),
+        )
         for jp in lab_channels(orb, e2max)
     }
     if path is None:

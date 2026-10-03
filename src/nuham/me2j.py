@@ -164,6 +164,9 @@ class _FlatChannels:
 def _flatten_channels(channels: dict[tuple[int, int], LabChannel], n_orb: int) -> _FlatChannels:
     """Concatenate the matrices of all ``(J, parity)`` groups into one flat array per ``Tz``.
 
+    Host matrices are uploaded; device matrices (``on_device=True`` in the lab contraction) are
+    concatenated where they are, with no host round trip.
+
     ``group[J, odd]`` is the group index of total ``J`` and parity ``(-1)^odd`` (``-1`` if absent).
     """
     keys = sorted(channels)
@@ -174,16 +177,16 @@ def _flatten_channels(channels: dict[tuple[int, int], LabChannel], n_orb: int) -
     off = np.zeros((3, len(keys)), dtype=np.int64)
     flats = []
     for t, tz in enumerate((0, 1, -1)):
-        parts, cursor = [np.zeros(1)], 1  # one spare element keeps masked gathers in range
+        parts, cursor = [jnp.zeros(1)], 1  # one spare element keeps masked gathers in range
         for g, key in enumerate(keys):
             ch = channels[key]
             group[key[0], 0 if key[1] == 1 else 1] = g
             m = ch.matrices[tz].v
             dim[t, g], off[t, g] = m.shape[0], cursor
             pos[t, g] = ch.position[tz].ravel()
-            parts.append(m.ravel())
+            parts.append(jnp.asarray(m).ravel())
             cursor += m.size
-        flats.append(jnp.asarray(np.concatenate(parts)))
+        flats.append(jnp.concatenate(parts))
     return _FlatChannels(
         (flats[0], flats[1], flats[2]), jnp.asarray(pos), jnp.asarray(dim), jnp.asarray(off), group
     )

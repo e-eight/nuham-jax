@@ -108,7 +108,9 @@ def generate_scan(
         ]
         channels: list[dict[tuple[int, int], LabChannel]] = [{} for _ in batch]
         for jp in lab_channels(orb, e2max):
-            matrices = lab_channel_matrices_many(orb, e2max, *jp, relatives, mosh, timer)
+            matrices = lab_channel_matrices_many(
+                orb, e2max, *jp, relatives, mosh, timer, assembler == "device"
+            )
             for k, m in enumerate(matrices):
                 channels[k][jp] = LabChannel(m, len(orb))
         for point, chans in zip(batch, channels, strict=True):

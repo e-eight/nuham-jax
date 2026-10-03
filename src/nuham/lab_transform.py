@@ -9,6 +9,7 @@ import math
 from collections.abc import Sequence
 from dataclasses import dataclass
 
+import jax
 import jax.numpy as jnp
 import numpy as np
 from jax import Array
@@ -252,12 +253,13 @@ class LabMatrix:
         Orbit indices defining the pair basis (rows and columns of ``v``).
     v
         Symmetric matrix of ``<ab; J|V|cd; J>`` in MeV. For ``|Tz| = 1`` the states are normalised
-        and antisymmetrised; for ``Tz = 0`` they are ordered proton-neutron products.
+        and antisymmetrised; for ``Tz = 0`` they are ordered proton-neutron products. A device
+        array when the matrix was built with ``on_device=True`` (empty matrices stay NumPy).
     """
 
     pair_a: np.ndarray
     pair_b: np.ndarray
-    v: np.ndarray
+    v: np.ndarray | Array
 
 
 def lab_matrix_reference(
@@ -269,6 +271,7 @@ def lab_matrix_reference(
     parity: int,
     tz: int,
     relative: dict[tuple[int, int, int, int], RelativeChannel],
+    on_device: bool = False,
 ) -> LabMatrix:
     """Slow reference for :func:`lab_matrix`: one rank update of the full matrix per block.
 
@@ -383,6 +386,7 @@ def lab_matrix(
     parity: int,
     tz: int,
     relative: dict[tuple[int, int, int, int], RelativeChannel],
+    on_device: bool = False,
 ) -> LabMatrix:
     """Contract the relative interaction of one ``Tz`` with the transformation coefficients.
 
@@ -394,7 +398,7 @@ def lab_matrix(
     LabMatrix
         The lab matrix over the pair basis appropriate to ``tz``.
     """
-    return lab_matrix_many(rows, t_raw, pair_a, pair_b, j, parity, tz, [relative])[0]
+    return lab_matrix_many(rows, t_raw, pair_a, pair_b, j, parity, tz, [relative], on_device)[0]
 
 
 def lab_matrix_many(
@@ -406,6 +410,7 @@ def lab_matrix_many(
     parity: int,
     tz: int,
     relatives: Sequence[dict[tuple[int, int, int, int], RelativeChannel]],
+    on_device: bool = False,
 ) -> list[LabMatrix]:
     """Contract the relative interactions of several parameter sets with shared coefficients.
 
@@ -431,6 +436,9 @@ def lab_matrix_many(
         ``-1`` pp, ``0`` pn, ``+1`` nn.
     relatives
         One dict of relative channels per set, keyed by ``(j, parity, s, tz)``.
+    on_device
+        Keep the matrices as device arrays instead of copying them to the host; the device
+        assembly (:func:`nuham.me2j.assemble_device`) then never moves them.
 
     Returns
     -------
@@ -473,7 +481,12 @@ def lab_matrix_many(
                     v_blocks[k, b, : len(members), : len(members)] = v_b
             total = accumulate_blocks_multi(total, t_rows, jnp.asarray(idx), jnp.asarray(v_blocks))
     return [
-        LabMatrix(pair_a[cols], pair_b[cols], to_host(total[k, :dim, :dim])) for k in range(n_sets)
+        LabMatrix(
+            pair_a[cols],
+            pair_b[cols],
+            total[k, :dim, :dim] if on_device else to_host(total[k, :dim, :dim]),
+        )
+        for k in range(n_sets)
     ]
 
 
@@ -485,11 +498,13 @@ def lab_channel_matrices(
     relative: dict[tuple[int, int, int, int], RelativeChannel],
     mosh: MoshinskyTable,
     timer: StageTimer | None = None,
+    on_device: bool = False,
 ) -> dict[int, LabMatrix]:
     """Lab matrices for ``tz = -1, 0, +1`` of one ``(J, parity)`` channel.
 
     An optional ``timer`` records ``lab_coeffs`` (coefficient build, including any bracket-table
-    construction) and ``lab_contract`` (upload, contraction and copy back).
+    construction) and ``lab_contract`` (upload, contraction and copy back, or, with ``on_device``,
+    until the device arrays are ready).
     """
     jrel_max = max(k[0] for k in relative)
     pair_a, pair_b = ordered_pairs(orb, e2max, j, parity)
@@ -497,10 +512,13 @@ def lab_channel_matrices(
     with stage(timer, "lab_coeffs"):
         t_dev = jnp.asarray(t_matrix(rows, pair_a, pair_b, orb, j, mosh))
     with stage(timer, "lab_contract"):
-        return {
-            tz: lab_matrix(rows, t_dev, pair_a, pair_b, j, parity, tz, relative)
+        result = {
+            tz: lab_matrix(rows, t_dev, pair_a, pair_b, j, parity, tz, relative, on_device)
             for tz in (-1, 0, 1)
         }
+        if on_device:
+            jax.block_until_ready([m.v for m in result.values()])
+        return result
 
 
 def lab_channel_matrices_many(
@@ -511,6 +529,7 @@ def lab_channel_matrices_many(
     relatives: Sequence[dict[tuple[int, int, int, int], RelativeChannel]],
     mosh: MoshinskyTable,
     timer: StageTimer | None = None,
+    on_device: bool = False,
 ) -> list[dict[int, LabMatrix]]:
     """Lab matrices for ``tz = -1, 0, +1`` of one ``(J, parity)`` channel, for several sets.
 
@@ -530,7 +549,9 @@ def lab_channel_matrices_many(
         t_dev = jnp.asarray(t_matrix(rows, pair_a, pair_b, orb, j, mosh))
     with stage(timer, "lab_contract"):
         by_tz = {
-            tz: lab_matrix_many(rows, t_dev, pair_a, pair_b, j, parity, tz, relatives)
+            tz: lab_matrix_many(rows, t_dev, pair_a, pair_b, j, parity, tz, relatives, on_device)
             for tz in (-1, 0, 1)
         }
+        if on_device:
+            jax.block_until_ready([m.v for ms in by_tz.values() for m in ms])
     return [{tz: by_tz[tz][k] for tz in (-1, 0, 1)} for k in range(len(relatives))]
