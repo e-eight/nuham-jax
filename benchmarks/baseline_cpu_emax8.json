@@ -1,0 +1,58 @@
+{
+  "env": {
+    "host": "darjeeling",
+    "platform": "Linux-7.1.13+deb13-amd64-x86_64-with-glibc2.41",
+    "cpu_count": 16,
+    "python": "3.12.9",
+    "jax": "0.11.2",
+    "backend": "cpu",
+    "device": "cpu:cpu",
+    "x64": true,
+    "git_commit": "54e6719"
+  },
+  "case": {
+    "nn_file": "../NuHamil-public/input_nn_files/N3LO_EM500_kmax8_N100_Jmax8.bin",
+    "emax": 8,
+    "e2max": 16,
+    "hw": 16.0,
+    "lam": 2.0,
+    "compute_only": false,
+    "gzip_level": 1
+  },
+  "runs": [
+    {
+      "repeat": 0,
+      "total_s": 36.63764472599996,
+      "stages_s": {
+        "project": 9.450827722999975,
+        "srg": 6.748689678999995,
+        "lab_coeffs": 2.489545156000304,
+        "lab_contract": 16.493377462000012,
+        "assemble": 0.4145392660005882,
+        "write": 1.0111413129993707
+      },
+      "unaccounted_s": 0.029524126999717737,
+      "values": 2496152,
+      "file_bytes": 13908826,
+      "peak_rss_gb": 1.0096435546875,
+      "peak_device_gb": null
+    },
+    {
+      "repeat": 1,
+      "total_s": 4.707537140999989,
+      "stages_s": {
+        "project": 0.04160904399998344,
+        "srg": 1.834999438000068,
+        "lab_coeffs": 0.4988691030001746,
+        "lab_contract": 1.0185222109995493,
+        "assemble": 0.43971843800034094,
+        "write": 0.8380483629996434
+      },
+      "unaccounted_s": 0.035770544000229165,
+      "values": 2496152,
+      "file_bytes": 13908826,
+      "peak_rss_gb": 1.1256027221679688,
+      "peak_device_gb": null
+    }
+  ]
+}

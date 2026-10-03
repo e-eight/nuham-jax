@@ -13,6 +13,7 @@ from nuham.kernels.coulomb import coulomb_matrix
 from nuham.kernels.projection import project_channel
 from nuham.kernels.relative import kinetic_matrix
 from nuham.kernels.srg import srg_alpha, srg_evolve_batch
+from nuham.timing import StageTimer, stage
 
 
 @dataclass(frozen=True)
@@ -74,6 +75,7 @@ def evolve_relative_nn(
     rtol: float = 1e-10,
     atol: float = 1e-10,
     granularity: int = 16,
+    timer: StageTimer | None = None,
 ) -> tuple[RelativeChannel, ...]:
     """Project the NN potential to the HO relative basis and SRG-evolve every channel.
 
@@ -99,6 +101,8 @@ def evolve_relative_nn(
         Flow tolerances; ``atol`` in MeV.
     granularity
         Padding multiple for batching channels of different dimension.
+    timer
+        Optional stage timer; records ``project`` and ``srg``.
 
     Returns
     -------
@@ -107,20 +111,24 @@ def evolve_relative_nn(
     """
     b = math.sqrt(oscillator_length_sq(hw))
     prepared = []
-    for ch in nn.channels:
-        if ch.j > jmax:
-            continue
-        n, l = relative_states(ch.ls, n2max)
-        v = project_channel(nn.k, nn.w, ch.v, ch.ls, n2max, b)
-        if coulomb and ch.tz == -1:
-            v = v + coulomb_matrix(ch.ls, n2max, hw)
-        t = kinetic_matrix(n, l, hw)
-        prepared.append(
-            _Prepared((ch.j, ch.parity, ch.s, ch.tz), n, l, np.asarray(v), np.asarray(t))
+    with stage(timer, "project"):
+        for ch in nn.channels:
+            if ch.j > jmax:
+                continue
+            n, l = relative_states(ch.ls, n2max)
+            v = project_channel(nn.k, nn.w, ch.v, ch.ls, n2max, b)
+            if coulomb and ch.tz == -1:
+                v = v + coulomb_matrix(ch.ls, n2max, hw)
+            t = kinetic_matrix(n, l, hw)
+            prepared.append(
+                _Prepared((ch.j, ch.parity, ch.s, ch.tz), n, l, np.asarray(v), np.asarray(t))
+            )
+    with stage(timer, "srg"):
+        potentials = (
+            [p.v for p in prepared]
+            if not lam
+            else _flow(prepared, hw, lam, rtol, atol, granularity)
         )
-    potentials = (
-        [p.v for p in prepared] if not lam else _flow(prepared, hw, lam, rtol, atol, granularity)
-    )
     return tuple(
         RelativeChannel(*p.channel_key, p.n, p.l, v)
         for p, v in zip(prepared, potentials, strict=True)

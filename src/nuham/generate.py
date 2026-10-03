@@ -10,11 +10,12 @@ from nuham.lab_transform import lab_channel_matrices
 from nuham.me2j import LabChannel, assemble, write_me2j
 from nuham.relative_nn import evolve_relative_nn
 from nuham.runtime import enable_compilation_cache
+from nuham.timing import StageTimer
 
 
 def generate_me2j(
     nn: MomentumNN,
-    path: str | Path,
+    path: str | Path | None,
     hw: float,
     lam: float | None,
     emax: int,
@@ -24,6 +25,7 @@ def generate_me2j(
     mosh: MoshinskyTable | None = None,
     compresslevel: int = 1,
     n2max: int = 100,
+    timer: StageTimer | None = None,
 ) -> int:
     """Generate the NN interaction in the lab HO basis and write it as ``me2j``.
 
@@ -32,7 +34,8 @@ def generate_me2j(
     nn
         Momentum-space interaction.
     path
-        Output file (gzip if it ends in ``.gz``).
+        Output file (gzip if it ends in ``.gz``). ``None`` runs compute-only: the lab matrices
+        are built but not assembled or written, and the return value is 0.
     hw
         Oscillator energy in MeV.
     lam
@@ -47,6 +50,10 @@ def generate_me2j(
         gzip level of the output (see :func:`nuham.me2j.write_me2j`).
     n2max
         Truncation ``2n + l <= n2max`` of the relative space in which the SRG flow runs.
+    timer
+        Optional stage timer. Records ``project``, ``srg``, ``lab_coeffs``, ``lab_contract``,
+        ``assemble`` (building value chunks) and ``write`` (formatting and the final flush;
+        compression overlaps in a thread and is only seen as back-pressure here).
 
     Returns
     -------
@@ -56,14 +63,23 @@ def generate_me2j(
     mosh = MoshinskyTable() if mosh is None else mosh
     relative = {
         (c.j, c.parity, c.s, c.tz): c
-        for c in evolve_relative_nn(nn, hw, lam, n2max=n2max, coulomb=coulomb)
+        for c in evolve_relative_nn(nn, hw, lam, n2max=n2max, coulomb=coulomb, timer=timer)
     }
     orb = make_orbits(emax, lmax)
     channels = {
-        jp: LabChannel(lab_channel_matrices(orb, e2max, *jp, relative, mosh), len(orb))
+        jp: LabChannel(lab_channel_matrices(orb, e2max, *jp, relative, mosh, timer), len(orb))
         for jp in lab_channels(orb, e2max)
     }
-    return write_me2j(path, assemble(orb, e2max, channels), compresslevel=compresslevel)
+    if path is None:
+        return 0
+    chunks = assemble(orb, e2max, channels)
+    if timer is None:
+        return write_me2j(path, chunks, compresslevel=compresslevel)
+    # `write` is the total minus the time spent inside the generator.
+    with timer.stage("write"):
+        n = write_me2j(path, timer.wrap("assemble", chunks), compresslevel=compresslevel)
+    timer.seconds["write"] -= timer.seconds.get("assemble", 0.0)
+    return n
 
 
 def main() -> None:

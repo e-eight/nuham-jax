@@ -19,6 +19,7 @@ from nuham.basis.lab import Orbits, ordered_pairs
 from nuham.kernels.lab import accumulate_blocks
 from nuham.kernels.transfer import to_host
 from nuham.relative_nn import RelativeChannel
+from nuham.timing import StageTimer, stage
 
 
 @dataclass(frozen=True)
@@ -447,12 +448,20 @@ def lab_channel_matrices(
     parity: int,
     relative: dict[tuple[int, int, int, int], RelativeChannel],
     mosh: MoshinskyTable,
+    timer: StageTimer | None = None,
 ) -> dict[int, LabMatrix]:
-    """Lab matrices for ``tz = -1, 0, +1`` of one ``(J, parity)`` channel."""
+    """Lab matrices for ``tz = -1, 0, +1`` of one ``(J, parity)`` channel.
+
+    An optional ``timer`` records ``lab_coeffs`` (coefficient build, including any bracket-table
+    construction) and ``lab_contract`` (upload, contraction and copy back).
+    """
     jrel_max = max(k[0] for k in relative)
     pair_a, pair_b = ordered_pairs(orb, e2max, j, parity)
     rows = enumerate_rows(j, parity, e2max, jrel_max)
-    t_dev = jnp.asarray(t_matrix(rows, pair_a, pair_b, orb, j, mosh))
-    return {
-        tz: lab_matrix(rows, t_dev, pair_a, pair_b, j, parity, tz, relative) for tz in (-1, 0, 1)
-    }
+    with stage(timer, "lab_coeffs"):
+        t_dev = jnp.asarray(t_matrix(rows, pair_a, pair_b, orb, j, mosh))
+    with stage(timer, "lab_contract"):
+        return {
+            tz: lab_matrix(rows, t_dev, pair_a, pair_b, j, parity, tz, relative)
+            for tz in (-1, 0, 1)
+        }
