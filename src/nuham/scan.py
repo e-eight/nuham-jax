@@ -17,7 +17,7 @@ from nuham.interactions.nn_file import MomentumNN, read_nn_mom
 from nuham.lab_transform import lab_channel_matrices_many
 from nuham.me2j import LabChannel, assemble, write_me2j, write_me2j_timed
 from nuham.relative_nn import evolve_relative_nn_many
-from nuham.runtime import enable_compilation_cache
+from nuham.runtime import default_flow_sets, enable_compilation_cache
 from nuham.timing import StageTimer
 
 
@@ -52,7 +52,7 @@ def generate_scan(
     n2max: int = 100,
     batch_size: int = 2,
     timer: StageTimer | None = None,
-    flow_sets: int = 1,
+    flow_sets: int | None = None,
 ) -> list[int]:
     """Generate one NN ``me2j`` file per scan point, sharing work between points.
 
@@ -76,8 +76,8 @@ def generate_scan(
     timer
         Optional stage timer with the stages of :func:`nuham.generate.generate_me2j`.
     flow_sets
-        Points whose SRG flows share a batch. The default 1 was fastest on a CPU; a GPU may prefer
-        more (see :func:`nuham.relative_nn.evolve_relative_nn_many`).
+        Points whose SRG flows share a batch; ``None`` takes :func:`nuham.runtime.default_flow_sets`
+        (1 on a CPU, all points of a batch on an accelerator).
 
     Returns
     -------
@@ -87,6 +87,7 @@ def generate_scan(
     if batch_size < 1:
         raise ValueError("batch_size must be at least 1")
     mosh = MoshinskyTable() if mosh is None else mosh
+    flow_sets = default_flow_sets() if flow_sets is None else flow_sets
     orb = make_orbits(emax, lmax)
     counts: list[int] = []
     for first in range(0, len(points), batch_size):
@@ -135,7 +136,12 @@ def main() -> None:
     p.add_argument("--no-coulomb", action="store_true")
     p.add_argument("--n2max", type=int, default=100, help="relative space of the SRG flow")
     p.add_argument("--batch-size", type=int, default=2, help="points processed together")
-    p.add_argument("--flow-sets", type=int, default=1, help="points whose SRG flows share a batch")
+    p.add_argument(
+        "--flow-sets",
+        type=int,
+        default=None,
+        help="points per SRG flow batch (default: by backend)",
+    )
     p.add_argument("--gzip-level", type=int, default=1)
     p.add_argument("--bracket-cache", default=None, help="directory for cached Moshinsky tables")
     p.add_argument("--no-compile-cache", action="store_true")

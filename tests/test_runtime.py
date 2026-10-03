@@ -19,3 +19,14 @@ def test_enable_compilation_cache_sets_jax_config(tmp_path: Path) -> None:
         assert jax.config.jax_compilation_cache_dir == str(tmp_path / "cc")
     finally:
         jax.config.update("jax_compilation_cache_dir", previous)
+
+
+def test_default_flow_sets_follows_backend(monkeypatch) -> None:
+    import jax
+
+    from nuham.runtime import default_flow_sets
+
+    monkeypatch.setattr(jax, "default_backend", lambda: "cpu")
+    assert default_flow_sets() == 1
+    monkeypatch.setattr(jax, "default_backend", lambda: "gpu")
+    assert default_flow_sets() is None

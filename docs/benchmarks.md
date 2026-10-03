@@ -108,8 +108,9 @@ raw record `benchmarks/baseline_cpu_scan_e8.json`). Seconds per point, `flow_set
 - **Batching the flows across sets is slower on CPU.** With all six points in one flow batch the SRG stage took 34.9 s instead of 12.3 s.
   Flowing K identical sets together cost 1.96 s per set alone and 2.83/3.04/3.37 s per set for K = 2/3/6, so it is mostly cache and
   memory pressure on the dense dopri8 stages; different sets add imbalance, since a vmapped adaptive solver runs as long as its slowest
-  entry (flow cost per set at hw 16: 1.18 s for lambda 2.4, 3.08 s for lambda 1.6). So `flow_sets` defaults to 1 and the speed-up above comes
-  from coefficients and contraction only.
+  entry (flow cost per set at hw 16: 1.18 s for lambda 2.4, 3.08 s for lambda 1.6). So on the CPU the default `flow_sets` is 1 and the speed-up above comes
+  from coefficients and contraction only. On accelerators the default is all points of a batch together
+  (`nuham.runtime.default_flow_sets`, chosen from the DeltaAI result below).
 - Per-point cost is nearly flat in batch size on CPU, as expected: there is little spare parallelism to fill. The open question for DeltaAI
   is whether a GPU gains from `flow_sets` > 1 and from larger `batch_size`; the benchmark has both knobs (`--flow-sets`, `--batch-sizes`).
 

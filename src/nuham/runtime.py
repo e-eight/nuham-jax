@@ -34,3 +34,13 @@ def enable_compilation_cache(directory: str | Path | None = None) -> Path:
     jax.config.update("jax_persistent_cache_min_compile_time_secs", 0.0)
     jax.config.update("jax_persistent_cache_min_entry_size_bytes", 0)
     return path
+
+
+def default_flow_sets() -> int | None:
+    """Return how many parameter sets share one SRG flow batch by default.
+
+    ``1`` on the CPU backend, where larger batches were slower per set (cache pressure, and a
+    batch runs as long as its slowest entry); ``None`` (all sets of a scan batch together) on
+    accelerators, where a batch of 6 sets halved the flow time on a GH200 (``docs/benchmarks.md``).
+    """
+    return 1 if jax.default_backend() == "cpu" else None

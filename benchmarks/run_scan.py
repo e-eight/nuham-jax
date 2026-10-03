@@ -36,7 +36,12 @@ def main() -> None:
     p.add_argument("--hw", type=float, nargs="+", required=True)
     p.add_argument("--lam", type=float, nargs="+", required=True)
     p.add_argument("--batch-sizes", type=int, nargs="+", default=[0, 1, 2])
-    p.add_argument("--flow-sets", type=int, default=1, help="points whose SRG flows share a batch")
+    p.add_argument(
+        "--flow-sets",
+        type=int,
+        default=None,
+        help="points per SRG flow batch (default: by backend)",
+    )
     p.add_argument("--compute-only", action="store_true", help="skip assembly and file writing")
     p.add_argument("--bracket-cache", default=None)
     p.add_argument("--no-compile-cache", action="store_true")
