@@ -7,7 +7,7 @@ from nuham.angmom.moshinsky_table import MoshinskyTable
 from nuham.basis.lab import lab_channels, make_orbits
 from nuham.interactions.nn_file import MomentumNN, read_nn_mom
 from nuham.lab_transform import lab_channel_matrices
-from nuham.me2j import LabChannel, assemble, write_me2j, write_me2j_timed
+from nuham.me2j import LabChannel, assemble, assemble_device, write_me2j, write_me2j_timed
 from nuham.relative_nn import evolve_relative_nn
 from nuham.runtime import enable_compilation_cache
 from nuham.timing import StageTimer
@@ -27,6 +27,7 @@ def generate_me2j(
     n2max: int = 100,
     timer: StageTimer | None = None,
     compressor: str = "auto",
+    assembler: str = "numpy",
 ) -> int:
     """Generate the NN interaction in the lab HO basis and write it as ``me2j``.
 
@@ -49,6 +50,9 @@ def generate_me2j(
         Optional bracket table to reuse between calls.
     compresslevel, compressor
         Level and compressor of the gzip output (see :func:`nuham.me2j.write_me2j`).
+    assembler
+        ``"numpy"`` (:func:`nuham.me2j.assemble`) or ``"device"``
+        (:func:`nuham.me2j.assemble_device`, a JAX kernel on the default device).
     n2max
         Truncation ``2n + l <= n2max`` of the relative space in which the SRG flow runs.
     timer
@@ -73,7 +77,7 @@ def generate_me2j(
     }
     if path is None:
         return 0
-    chunks = assemble(orb, e2max, channels)
+    chunks = (assemble_device if assembler == "device" else assemble)(orb, e2max, channels)
     if timer is None:
         return write_me2j(path, chunks, compresslevel=compresslevel, compressor=compressor)
     return write_me2j_timed(path, chunks, timer, compresslevel, compressor)
@@ -92,6 +96,7 @@ def main() -> None:
     p.add_argument("--no-coulomb", action="store_true")
     p.add_argument("--n2max", type=int, default=100, help="relative space of the SRG flow")
     p.add_argument("--gzip-level", type=int, default=1, help="gzip level of the output (1-9)")
+    p.add_argument("--assembler", choices=["numpy", "device"], default="numpy")
     p.add_argument(
         "--compressor", choices=["auto", "gzip", "isal"], default="auto",
         help="gzip implementation (auto: isal if installed, see --help of the isal extra)",
@@ -111,6 +116,7 @@ def main() -> None:
         read_nn_mom(args.nn_file), args.output, args.hw, args.lam, args.emax, args.e2max,
         args.lmax, not args.no_coulomb, mosh, args.gzip_level, args.n2max,
         compressor=args.compressor,
+        assembler=args.assembler,
     )  # fmt: skip
     print(f"wrote {n} values to {args.output}")
 

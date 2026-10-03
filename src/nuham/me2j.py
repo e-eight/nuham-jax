@@ -3,15 +3,19 @@
 import gzip
 import math
 from collections.abc import Iterator
+from dataclasses import dataclass
 from functools import cache
 from pathlib import Path
 from queue import Queue
 from threading import Thread
 from types import ModuleType
 
+import jax.numpy as jnp
 import numpy as np
+from jax import Array
 
 from nuham.basis.lab import Orbits
+from nuham.kernels.assemble import assemble_values
 from nuham.lab_transform import LabMatrix
 from nuham.timing import StageTimer
 
@@ -144,6 +148,121 @@ def _assemble_batch(
         vals[sel, 2] = 0.5 * (x1 + x2 + x3 + x4)
         vals[sel, 3] = ch.element(-1, a, b, cs, ds) * nf
     return vals
+
+
+@dataclass(frozen=True)
+class _FlatChannels:
+    """The lab matrices of all groups in the flat layout of :func:`assemble_values`."""
+
+    v: tuple[Array, Array, Array]
+    pos: Array
+    dim: Array
+    off: Array
+    group: np.ndarray
+
+
+def _flatten_channels(channels: dict[tuple[int, int], LabChannel], n_orb: int) -> _FlatChannels:
+    """Concatenate the matrices of all ``(J, parity)`` groups into one flat array per ``Tz``.
+
+    ``group[J, odd]`` is the group index of total ``J`` and parity ``(-1)^odd`` (``-1`` if absent).
+    """
+    keys = sorted(channels)
+    j_max = max(j for j, _ in keys)
+    group = np.full((j_max + 1, 2), -1, dtype=np.int32)
+    pos = np.full((3, len(keys), n_orb * n_orb), -1, dtype=np.int32)
+    dim = np.zeros((3, len(keys)), dtype=np.int64)
+    off = np.zeros((3, len(keys)), dtype=np.int64)
+    flats = []
+    for t, tz in enumerate((0, 1, -1)):
+        parts, cursor = [np.zeros(1)], 1  # one spare element keeps masked gathers in range
+        for g, key in enumerate(keys):
+            ch = channels[key]
+            group[key[0], 0 if key[1] == 1 else 1] = g
+            m = ch.matrices[tz].v
+            dim[t, g], off[t, g] = m.shape[0], cursor
+            pos[t, g] = ch.position[tz].ravel()
+            parts.append(m.ravel())
+            cursor += m.size
+        flats.append(jnp.asarray(np.concatenate(parts)))
+    return _FlatChannels(
+        (flats[0], flats[1], flats[2]), jnp.asarray(pos), jnp.asarray(dim), jnp.asarray(off), group
+    )
+
+
+def assemble_device(
+    orb: Orbits,
+    e2max: int,
+    channels: dict[tuple[int, int], LabChannel],
+    batch_tuples: int = 1 << 20,
+) -> Iterator[np.ndarray]:
+    """Yield the same chunks as :func:`assemble`, computed by a JAX kernel on the default device.
+
+    The tuples of the file are cut into windows of ``batch_tuples`` (the last one is padded to a
+    power of two), so the kernel compiles for few shapes. The host builds the index arrays of the
+    next window while the device works on the current one.
+
+    Parameters
+    ----------
+    orb, e2max, channels
+        As in :func:`assemble`.
+    batch_tuples
+        Tuples per kernel call.
+
+    Yields
+    ------
+    np.ndarray
+        Values of shape ``(n, 4)``; the windows are not aligned with the ``(a, b)`` pairs.
+    """
+    flat = _flatten_channels(channels, len(orb))
+    j2 = jnp.asarray(orb.j2, dtype=jnp.int32)
+    l_orb = np.asarray(orb.l)
+
+    def launch(cols: np.ndarray, size: int) -> tuple[Array, int]:
+        n = cols.shape[1]
+        padded = np.zeros((6, size), dtype=np.int32)
+        padded[:, :n] = cols
+        a, b, c, d, jj, g = (jnp.asarray(row) for row in padded)
+        return assemble_values(flat.v, flat.pos, flat.dim, flat.off, j2, a, b, c, d, jj, g), n
+
+    def columns(chunks: list[tuple[int, int, np.ndarray, np.ndarray, np.ndarray]]) -> np.ndarray:
+        sizes = [len(ch[2]) for ch in chunks]
+        aa = np.repeat([ch[0] for ch in chunks], sizes)
+        bb = np.repeat([ch[1] for ch in chunks], sizes)
+        jj = np.concatenate([ch[4] for ch in chunks])
+        g = flat.group[jj, (l_orb[aa] + l_orb[bb]) % 2]
+        return np.stack(
+            [aa, bb, np.concatenate([ch[2] for ch in chunks]),
+             np.concatenate([ch[3] for ch in chunks]), jj, g]
+        ).astype(np.int32)  # fmt: skip
+
+    inflight: tuple[Array, int] | None = None
+    carry = np.zeros((6, 0), dtype=np.int32)
+    pending: list[tuple[int, int, np.ndarray, np.ndarray, np.ndarray]] = []
+    count = 0
+
+    def flush(final: bool) -> Iterator[np.ndarray]:
+        nonlocal inflight, carry, pending, count
+        if pending:
+            carry = np.concatenate([carry, columns(pending)], axis=1)
+            pending, count = [], 0
+        while carry.shape[1] >= batch_tuples or (final and carry.shape[1] > 0):
+            take = min(batch_tuples, carry.shape[1])
+            size = batch_tuples if take == batch_tuples else max(1024, 1 << (take - 1).bit_length())
+            current = launch(carry[:, :take], size)
+            carry = carry[:, take:]
+            if inflight is not None:
+                yield np.asarray(inflight[0])[: inflight[1]]
+            inflight = current
+        if final and inflight is not None:
+            yield np.asarray(inflight[0])[: inflight[1]]
+            inflight = None
+
+    for chunk in tuple_chunks(orb, e2max):
+        pending.append(chunk)
+        count += len(chunk[2])
+        if count >= batch_tuples:
+            yield from flush(final=False)
+    yield from flush(final=True)
 
 
 _FLUSH_VALUES = 400_000

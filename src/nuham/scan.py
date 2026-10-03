@@ -15,7 +15,7 @@ from nuham.angmom.moshinsky_table import MoshinskyTable
 from nuham.basis.lab import lab_channels, make_orbits
 from nuham.interactions.nn_file import MomentumNN, read_nn_mom
 from nuham.lab_transform import lab_channel_matrices_many
-from nuham.me2j import LabChannel, assemble, write_me2j, write_me2j_timed
+from nuham.me2j import LabChannel, assemble, assemble_device, write_me2j, write_me2j_timed
 from nuham.relative_nn import evolve_relative_nn_many
 from nuham.runtime import default_flow_sets, enable_compilation_cache
 from nuham.timing import StageTimer
@@ -54,6 +54,7 @@ def generate_scan(
     timer: StageTimer | None = None,
     flow_sets: int | None = None,
     compressor: str = "auto",
+    assembler: str = "numpy",
 ) -> list[int]:
     """Generate one NN ``me2j`` file per scan point, sharing work between points.
 
@@ -71,7 +72,7 @@ def generate_scan(
         Momentum-space interaction.
     points
         The parameter sets and their output files.
-    emax, e2max, lmax, coulomb, mosh, compresslevel, n2max, compressor
+    emax, e2max, lmax, coulomb, mosh, compresslevel, n2max, compressor, assembler
         As in :func:`nuham.generate.generate_me2j`.
     batch_size
         Number of points processed together.
@@ -114,7 +115,7 @@ def generate_scan(
             if point.path is None:
                 counts.append(0)
                 continue
-            chunks = assemble(orb, e2max, chans)
+            chunks = (assemble_device if assembler == "device" else assemble)(orb, e2max, chans)
             if timer is None:
                 counts.append(
                     write_me2j(
@@ -152,6 +153,7 @@ def main() -> None:
     )
     p.add_argument("--gzip-level", type=int, default=1)
     p.add_argument("--compressor", choices=["auto", "gzip", "isal"], default="auto")
+    p.add_argument("--assembler", choices=["numpy", "device"], default="numpy")
     p.add_argument("--bracket-cache", default=None, help="directory for cached Moshinsky tables")
     p.add_argument("--no-compile-cache", action="store_true")
     args = p.parse_args()
@@ -166,6 +168,7 @@ def main() -> None:
         MoshinskyTable(args.bracket_cache), args.gzip_level, args.n2max, args.batch_size,
         flow_sets=args.flow_sets,
         compressor=args.compressor,
+        assembler=args.assembler,
     )  # fmt: skip
     for point, n in zip(points, counts, strict=True):
         print(f"wrote {n} values to {point.path}")

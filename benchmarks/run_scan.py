@@ -43,6 +43,7 @@ def main() -> None:
         help="points per SRG flow batch (default: by backend)",
     )
     p.add_argument("--compressor", choices=["auto", "gzip", "isal"], default="auto")
+    p.add_argument("--assembler", choices=["numpy", "device"], default="numpy")
     p.add_argument("--compute-only", action="store_true", help="skip assembly and file writing")
     p.add_argument("--bracket-cache", default=None)
     p.add_argument("--no-compile-cache", action="store_true")
@@ -78,6 +79,7 @@ def main() -> None:
                             mosh=mosh,
                             timer=timer,
                             compressor=args.compressor,
+                            assembler=args.assembler,
                         )
                 else:
                     points = [ScanPoint(hw, lam, o) for (hw, lam), o in zip(grid, out, strict=True)]
@@ -91,6 +93,7 @@ def main() -> None:
                         timer=timer,
                         flow_sets=args.flow_sets,
                         compressor=args.compressor,
+                        assembler=args.assembler,
                     )
                 total = time.perf_counter() - start
             runs.append(

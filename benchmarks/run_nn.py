@@ -74,6 +74,7 @@ def main() -> None:
     p.add_argument("--bracket-cache", default=None)
     p.add_argument("--no-compile-cache", action="store_true")
     p.add_argument("--compressor", choices=["auto", "gzip", "isal"], default="auto")
+    p.add_argument("--assembler", choices=["numpy", "device"], default="numpy")
     p.add_argument("--json", default=None, help="also write the record to this file")
     args = p.parse_args()
     if not args.no_compile_cache:
@@ -88,7 +89,8 @@ def main() -> None:
             start = time.perf_counter()
             n = generate_me2j(
                 nn, out, args.hw, args.lam, args.emax, args.e2max, mosh=mosh,
-                compresslevel=args.gzip_level, timer=timer, compressor=args.compressor,
+                compresslevel=args.gzip_level, timer=timer,
+                compressor=args.compressor, assembler=args.assembler,
             )  # fmt: skip
             total = time.perf_counter() - start
             runs.append(

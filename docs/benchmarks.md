@@ -254,3 +254,24 @@ Candidates, not started: (1) run assemble and formatting in worker threads over 
 batches in order for the writer; (2) isal's multi-threaded compressor (`isal.igzip_threaded`), which writes one valid gzip stream from parallel blocks and would remove the
 single compression thread (about 9 s of compression work per emax 14 file at 300 MB/s) as the floor once assembly is parallel; (3) assembling on the device, where the
 matrices already are, and copying only the values back.
+
+## Device-side assembly: CPU prototype (2026-10-03)
+
+`nuham.me2j.assemble_device` (kernel `nuham.kernels.assemble.assemble_values`) builds the four values per tuple with JAX instead of numpy, selected with
+`assembler="device"` (`--assembler device` in the CLIs and benchmark runners; `"numpy"` is still the default). All matrices of a run go into three flat arrays
+(one per `Tz`) with per-group offsets and sizes, so the kernel has a static shape and compiles once per run; the host cuts the tuple stream into fixed windows of
+`batch_tuples` (default 2^20) and prepares the next window while the device works on the current one.
+
+Checks: bit-identical to the numpy `assemble` on the test problem and on real data (emax 10 and 12 on XLA-CPU: 0 of 12.7 M and 50.7 M values differ), windows of any size
+including padded ones (`tests/test_assemble_device.py`), and whole files and scans written with it equal those written with numpy.
+
+Local CPU timing, warm, seconds for the whole assembly (XLA-CPU, host index preparation included):
+
+| emax | values | per-pair numpy (old) | batched numpy | device (XLA-CPU) |
+|---|---|---|---|---|
+| 10 | 12.7 M | 1.75 | 0.73 | 0.49 |
+| 12 | 50.7 M | 5.00 | 3.10 | 1.86 |
+
+At emax 12 the device version's 1.8 s splits into: flattening the matrices 0.7 s (one-off per call, a host concatenation of 1.2 GB; it goes away once matrices are
+built into the flat layout on the device), tuple generation on the host 0.5 s, building the index columns 0.4 s, kernel and uploads about 0.5 s (about 25 M tuples/s on
+the CPU). Host preparation does not depend on the matrices, so a scan can build it once and reuse it for every point. Not yet measured on a GPU.
