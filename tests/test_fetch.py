@@ -58,3 +58,34 @@ def test_unknown_name_is_rejected(tmp_path: Path) -> None:
 def test_default_cache_follows_xdg(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path))
     assert fetch.data_dir() == tmp_path / "nuham" / "data"
+
+
+def test_checksum_table_is_well_formed() -> None:
+    assert "N3LO_EM500" in fetch.SHA256
+    assert all(len(h) == 64 and int(h, 16) >= 0 for h in fetch.SHA256.values())
+
+
+def test_find_nn_file_searches_the_directories_in_order(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    public, cache = tmp_path / "public", tmp_path / "cache"
+    (public / "input_nn_files").mkdir(parents=True)
+    cache.mkdir()
+    monkeypatch.setenv("NUHAMIL_PUBLIC", str(public))
+    monkeypatch.setenv("XDG_CACHE_HOME", str(cache))
+    name = fetch.nn_file_name("TEST")
+    assert fetch.find_nn_file("TEST") is None
+    (cache / "nuham" / "data").mkdir(parents=True)
+    (cache / "nuham" / "data" / name).write_bytes(b"cached")
+    assert fetch.find_nn_file("TEST") == cache / "nuham" / "data" / name
+    (public / "input_nn_files" / name).write_bytes(b"checkout")
+    assert fetch.find_nn_file("TEST") == public / "input_nn_files" / name  # the checkout wins
+
+
+def test_checksums_match_the_local_checkout_when_present() -> None:
+    found = {name: fetch.find_nn_file(name) for name in fetch.SHA256}
+    if not any(found.values()):
+        pytest.skip("no local NuHamil checkout")
+    for name, path in found.items():
+        if path is not None and path.parent != fetch.data_dir():
+            assert fetch._sha256(path) == fetch.SHA256[name], name
