@@ -1,11 +1,10 @@
-import itertools
 import random
 
 import pytest
 from sympy import Rational
-from sympy.physics.wigner import clebsch_gordan, wigner_6j, wigner_9j
+from sympy.physics.wigner import wigner_6j, wigner_9j
 
-from nuham.angmom.racah import cg_zero, ninej, sixj
+from nuham.angmom.racah import ninej, sixj
 
 
 def half(x: int) -> Rational:
@@ -38,18 +37,6 @@ def test_ninej_matches_sympy() -> None:
         want = sympy_value(wigner_9j, a)
         assert ninej(*a) == pytest.approx(want, abs=1e-13)
         checked += want != 0.0
-
-
-def test_cg_zero_matches_sympy() -> None:
-    for la, lb in itertools.product(range(7), repeat=2):
-        for l in range(abs(la - lb), la + lb + 1):
-            want = float(clebsch_gordan(la, lb, l, 0, 0, 0))
-            assert cg_zero(la, lb, l) == pytest.approx(want, abs=1e-14)
-
-
-def test_cg_zero_odd_sum_vanishes() -> None:
-    assert cg_zero(1, 1, 1) == 0.0
-    assert cg_zero(2, 0, 3) == 0.0
 
 
 def test_sixj_orthogonality() -> None:

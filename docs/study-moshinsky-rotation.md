@@ -38,8 +38,9 @@ For these matrices (norm ~ 9) `jax.scipy.linalg.expm` in float64 was off by 3e-1
 
 ## Where it lives
 
-`angmom/moshinsky_table.py`: `MoshinskyTable(cache_dir, d, method="rotation" | "bracket")`. The bracket method is kept as the
-independent check (`tests/test_moshinsky_table.py`). The rotation form also covers the unequal-mass brackets needed for 3N
+`angmom/moshinsky_table.py`: `MoshinskyTable(cache_dir, d)`. The explicit sum was moved out of the package to
+`refs/moshinsky_reference.py` (it follows NuHamil's `gmosh` closely) and is used only as an optional check
+(`tests/test_reference_moshinsky.py`, skipped if `refs/` is absent); `tests/test_moshinsky.py` checks 480 stored golden values. The rotation form also covers the unequal-mass brackets needed for 3N
 Jacobi transformations.
 
 ## Effect on the full pipeline (this machine, 16 cores, unprofiled, cold bracket cache)

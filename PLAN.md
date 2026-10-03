@@ -54,6 +54,7 @@ Original description:
 - Check the imsrg++ `me2j` format against both NuHamil's writer and imsrg++'s reader.
 
 ### Decisions made after Phase 0
+- Provenance: code that transcribes NuHamil's Fortran (the explicit Moshinsky bracket sum, the oracle) lives in `refs/`, not `src/`. The package only has the rotation-based Moshinsky tables, and its tests pass without `refs/` (reference-dependent tests skip).
 - Moshinsky brackets and 6j/9j coefficients: host NumPy with caching. Move to JAX only if
   profiling shows a bottleneck.
 - SRG flow: default N_flow = 100 (matches NuHamil to ~1e-7). `n_flow` is an optional,
@@ -67,7 +68,7 @@ Original description:
 ### Phase 1: building blocks, each tested alone — DONE
 Implemented in `src/nuham`: `kernels/ho.py` (recurrence as `lax.scan`, momentum form), `kernels/projection.py`,
 `kernels/relative.py` (T_rel), `interactions/nn_file.py` (.bin reader), `basis/relative.py`,
-`angmom/racah.py` (6j, 9j, CG), `angmom/moshinsky.py`. 510 tests pass. Results: HO vs mpmath 1e-14;
+`angmom/racah.py` (6j, 9j), `angmom/moshinsky.py` (explicit bracket sum; later moved to `refs/moshinsky_reference.py`, see Decisions). 510 tests pass. Results: HO vs mpmath 1e-14;
 6j/9j/CG vs sympy 1e-13; bracket matrices orthogonal (d=1 and 2) and equal to oracle values (480 golden);
 projection vs NuHamil cache 5e-6 MeV (cache has 7 digits); deuteron -2.2246 MeV.
 Open: bracket cost is ~1 ms uncached at E=28; decide in Phase 3 whether caching is enough.

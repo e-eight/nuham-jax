@@ -1,1 +1,1 @@
-"""Host-side angular-momentum algebra: Racah coefficients and Moshinsky brackets."""
+"""Host-side angular-momentum algebra: Racah symbols and Moshinsky bracket tables."""

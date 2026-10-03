@@ -22,7 +22,10 @@ def test_round_trip_and_layout(tmp_path: Path) -> None:
 
 
 def test_reads_nuhamil_file() -> None:
-    ref = read_me2j(REF / "TwBME-HO_NN-only_N3LO_EM500_srg2.0_hw16_emax4_e2max8.me2j.gz")
+    path = REF / "TwBME-HO_NN-only_N3LO_EM500_srg2.0_hw16_emax4_e2max8.me2j.gz"
+    if not path.exists():
+        pytest.skip("reference file missing")
+    ref = read_me2j(path)
     assert len(ref) == 4 * 6834
     assert ref[0] == np.float64(ref[0]) and abs(ref[1] - -15.12895093) < 1e-8
 

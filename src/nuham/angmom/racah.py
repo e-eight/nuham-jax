@@ -1,4 +1,4 @@
-"""Wigner 6j and 9j symbols and a zero-projection Clebsch-Gordan coefficient.
+"""Wigner 6j and 9j symbols.
 
 Angular momenta of the 6j and 9j symbols are passed as *doubled integers* (``2j``), so
 half-integers need no floating point. Results are cached; this is host-side NumPy-free code.
@@ -99,37 +99,3 @@ def ninej(a: int, b: int, c: int, d: int, e: int, f: int, g: int, h: int, i: int
             * sixj(g, h, i, x, a, d)
         )
     return total
-
-
-@cache
-def cg_zero(la: int, lb: int, l: int) -> float:
-    """Clebsch-Gordan coefficient ``<la 0 lb 0 | l 0>`` for integer (not doubled) arguments.
-
-    Parameters
-    ----------
-    la, lb, l
-        Orbital angular momenta.
-
-    Returns
-    -------
-    float
-        The coefficient; zero unless the triangle condition holds and ``la + lb + l`` is even.
-    """
-    if l < abs(la - lb) or l > la + lb or (la + lb + l) % 2:
-        return 0.0
-    g = (la + lb + l) // 2
-    log_val = (
-        0.5
-        * (
-            math.log(2 * l + 1)
-            + _log_fact(2 * g - 2 * la)
-            + _log_fact(2 * g - 2 * lb)
-            + _log_fact(2 * g - 2 * l)
-            - _log_fact(2 * g + 1)
-        )
-        + _log_fact(g)
-        - _log_fact(g - la)
-        - _log_fact(g - lb)
-        - _log_fact(g - l)
-    )
-    return (-1) ** (g - l) * math.exp(log_val)

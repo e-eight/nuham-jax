@@ -1,11 +1,11 @@
 """Cached Moshinsky bracket matrices for fixed total quanta ``N`` and coupled momentum ``lam``.
 
-The default backend uses that the transformation is a rotation of the two-oscillator Fock space
-by ``theta = atan(sqrt(d))`` (45 degrees for equal masses). At fixed ``N`` and ``lam`` the
-bracket matrix is ``(-1)^(N + lam) exp(theta G) P`` with a sparse antisymmetric generator ``G``
-built from oscillator ladder-operator matrix elements and ``P`` the permutation exchanging the
-centre-of-mass and relative labels. This agrees with the explicit Kamuntavicius sum in
-:func:`nuham.angmom.moshinsky.bracket` to about 1e-13 and is orders of magnitude faster.
+The transformation is a rotation of the two-oscillator Fock space by ``theta = atan(sqrt(d))``
+(45 degrees for equal masses). At fixed ``N`` and ``lam`` the bracket matrix is
+``(-1)^(N + lam) exp(theta G) P`` with a sparse antisymmetric generator ``G`` built from
+oscillator ladder-operator matrix elements and ``P`` the permutation exchanging the
+centre-of-mass and relative labels. This agrees with the explicit Kamuntavicius sum, kept as a
+slow reference in ``refs/moshinsky_reference.py``, to about 1e-13 and is far faster.
 """
 
 import math
@@ -14,7 +14,6 @@ from pathlib import Path
 import jax.numpy as jnp
 import numpy as np
 
-from nuham.angmom.moshinsky import bracket
 from nuham.angmom.racah import sixj
 from nuham.kernels.rotation import expm_antisymmetric
 
@@ -89,9 +88,7 @@ class MoshinskyTable:
     orthogonal once the entries that violate a triangle condition (which are zero) are included.
     """
 
-    def __init__(
-        self, cache_dir: str | Path | None = None, d: float = 1.0, method: str = "rotation"
-    ) -> None:
+    def __init__(self, cache_dir: str | Path | None = None, d: float = 1.0) -> None:
         """Create an empty table.
 
         Parameters
@@ -102,14 +99,8 @@ class MoshinskyTable:
             not depend on ħω, the SRG cutoff or the interaction, so one cache serves every run.
         d
             Mass ratio of the two particles; ``1`` for two nucleons.
-        method
-            ``"rotation"`` (matrix exponential of the generator, fast) or ``"bracket"`` (explicit
-            sum, slow; kept as an independent check).
         """
-        if method not in ("rotation", "bracket"):
-            raise ValueError(f"unknown method {method!r}")
         self._d = d
-        self._method = method
         self._cache_dir = None if cache_dir is None else Path(cache_dir)
         if self._cache_dir is not None:
             self._cache_dir.mkdir(parents=True, exist_ok=True)
@@ -139,27 +130,10 @@ class MoshinskyTable:
         if key not in self._matrices and path is not None and path.exists():
             self._matrices[key] = np.load(path)
         if key not in self._matrices:
-            if self._method == "rotation":
-                mat = self._rotation_matrix(total, lam)
-            else:
-                mat = self._bracket_matrix(total, lam)
-            self._matrices[key] = mat
+            self._matrices[key] = self._rotation_matrix(total, lam)
             if path is not None:
-                np.save(path, mat)
+                np.save(path, self._matrices[key])
         return self._matrices[key]
-
-    def _bracket_matrix(self, total: int, lam: int) -> np.ndarray:
-        """Evaluate every entry with the explicit Kamuntavicius sum."""
-        rows = list(self.row_index(total))
-        cols = list(self.col_index(total))
-        mat = np.zeros((len(rows), len(cols)))
-        for i, (ncm, lcm, nr, lr) in enumerate(rows):
-            if abs(lcm - lr) > lam or lam > lcm + lr:
-                continue
-            for j, (n1, l1, n2, l2) in enumerate(cols):
-                if abs(l1 - l2) <= lam <= l1 + l2:
-                    mat[i, j] = bracket(ncm, lcm, nr, lr, n1, l1, n2, l2, lam, self._d)
-        return mat
 
     def _rotation_matrix(self, total: int, lam: int) -> np.ndarray:
         """Build the matrix as ``(-1)^(N + lam) exp(theta G) P`` and scatter it to full size."""

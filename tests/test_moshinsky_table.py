@@ -7,8 +7,9 @@ from nuham.angmom.moshinsky_table import MoshinskyTable
 
 
 @pytest.mark.parametrize("total", [3, 6, 8])
-def test_matrices_are_orthogonal(total: int) -> None:
-    table = MoshinskyTable()
+@pytest.mark.parametrize("d", [1.0, 2.0])
+def test_matrices_are_orthogonal(total: int, d: float) -> None:
+    table = MoshinskyTable(d=d)
     for lam in range(total + 1):
         m = table.matrix(total, lam)
         assert m.shape[0] == m.shape[1]
@@ -24,16 +25,7 @@ def test_disk_cache_round_trip(tmp_path: Path) -> None:
     np.testing.assert_array_equal(first, second)
 
 
-@pytest.mark.parametrize("d", [1.0, 2.0])
-def test_rotation_backend_matches_bracket_formula(d: float) -> None:
-    fast = MoshinskyTable(d=d)
-    slow = MoshinskyTable(d=d, method="bracket")
-    for total in range(0, 10):
-        for lam in range(total + 1):
-            np.testing.assert_allclose(fast.matrix(total, lam), slow.matrix(total, lam), atol=1e-12)
-
-
-def test_rotation_backend_is_orthogonal_at_high_n() -> None:
+def test_tables_are_orthogonal_at_high_n() -> None:
     table = MoshinskyTable()
     for total, lam in [(20, 0), (24, 7), (28, 14), (28, 28)]:
         m = table.matrix(total, lam)
@@ -52,8 +44,3 @@ def test_stretched_state_has_exact_parity_zero() -> None:
 def test_cache_name_includes_mass_ratio(tmp_path: Path) -> None:
     MoshinskyTable(tmp_path, d=2.0).matrix(4, 1)
     assert (tmp_path / "N4_lam1_d2.npy").exists()
-
-
-def test_unknown_method_is_rejected() -> None:
-    with pytest.raises(ValueError):
-        MoshinskyTable(method="nope")

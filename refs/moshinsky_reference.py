@@ -1,9 +1,55 @@
-"""Talmi-Moshinsky brackets for two-particle harmonic-oscillator states (Kamuntavicius form)."""
+"""Reference implementation of the Moshinsky bracket by the explicit Kamuntavicius sum.
+
+NOT PART OF THE PACKAGE. This is a close transcription of the sum used by NuHamil's ``gmosh``
+(Kamuntavicius et al., Nucl. Phys. A 695, 191 (2001)), kept only as an independent check of the
+rotation-generator tables in ``nuham.angmom.moshinsky_table``. It is slow (50-500 us per bracket)
+and lives outside ``src/`` so the package does not ship it. Tests that use it skip when this
+directory is absent.
+"""
 
 import math
 from functools import cache
 
-from nuham.angmom.racah import cg_zero, ninej
+from nuham.angmom.racah import ninej
+
+
+@cache
+def _log_fact(n: int) -> float:
+    """Return ``log(n!)``."""
+    return math.lgamma(n + 1)
+
+@cache
+def cg_zero(la: int, lb: int, l: int) -> float:
+    """Clebsch-Gordan coefficient ``<la 0 lb 0 | l 0>`` for integer (not doubled) arguments.
+
+    Parameters
+    ----------
+    la, lb, l
+        Orbital angular momenta.
+
+    Returns
+    -------
+    float
+        The coefficient; zero unless the triangle condition holds and ``la + lb + l`` is even.
+    """
+    if l < abs(la - lb) or l > la + lb or (la + lb + l) % 2:
+        return 0.0
+    g = (la + lb + l) // 2
+    log_val = (
+        0.5
+        * (
+            math.log(2 * l + 1)
+            + _log_fact(2 * g - 2 * la)
+            + _log_fact(2 * g - 2 * lb)
+            + _log_fact(2 * g - 2 * l)
+            - _log_fact(2 * g + 1)
+        )
+        + _log_fact(g)
+        - _log_fact(g - la)
+        - _log_fact(g - lb)
+        - _log_fact(g - l)
+    )
+    return (-1) ** (g - l) * math.exp(log_val)
 
 
 def _double_factorial(n: int) -> int:

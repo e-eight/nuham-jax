@@ -1,12 +1,14 @@
 """Shared fixtures: locations of NuHamil inputs and reference outputs."""
 
 import os
+import sys
 from pathlib import Path
 
 import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
 REF_WORK = ROOT / "refs" / "work"
+sys.path.insert(0, str(ROOT / "refs"))  # optional reference implementations (not the package)
 
 
 @pytest.fixture(scope="session")
