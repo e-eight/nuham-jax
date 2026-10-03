@@ -13,7 +13,7 @@ so nothing may assume a device.
 
 **Status:** Phases 0-3 are done: spec and oracle; HO functions, projection, Racah/Moshinsky; Coulomb and SRG
 flow (`nuham.relative_nn.evolve_relative_nn`); lab transform and `me2j` writer (`nuham.generate.generate_me2j`,
-CLI `uv run python -m nuham.generate --help`). Phase 4 (scale and GPU) is started (fast Moshinsky tables done; contraction not yet); do not start a
+CLI `uv run python -m nuham.generate --help`; it enables JAX's persistent compile cache by default). Phase 4 (scale and GPU) is started (fast Moshinsky tables, JAX contraction, threaded writer and compile cache done; 9j/6j tables and a GPU run not yet); do not start a
 phase unless the user asks.
 `PLAN.md` holds the phases and decisions made so far.
 

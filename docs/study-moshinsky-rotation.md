@@ -81,3 +81,17 @@ The old routine is kept as `lab_matrix_reference` and tested against the new one
 Per-channel results agree to 2e-15. At emax=10 (profiled, 29 s) the remaining shares are roughly: file writing 11 s (gzip 7 s,
 formatting), channel matrices 16 s (T-coefficient build 7 s, contraction 8 s including JAX compiles of new shapes),
 brackets ~3 s. The emax=14 time is still not measured.
+
+
+## Update: writer and compile cache (done)
+
+- **Compile cache** (`nuham/runtime.py`, `--compile-cache`, on by default in the CLI, default dir `~/.cache/nuham/jax`):
+  the SRG flow and the lab contraction compile ~380 kernels at emax 10 (2.7 MB on disk). Fresh-process CLI runs at
+  emax 10: 35.7 s with no cache, 36.6 s with a cold cache (about 1 s overhead), 24.2 s with a warm cache.
+- **Writer**: formatting stays in the calling thread; gzip and disk writes run in a background thread behind a bounded
+  queue. Isolated test, 2.4e7 values: 20.1 s serial vs 16.9 s threaded (decompressed output byte-identical). Compression
+  dominates, so the default gzip level is now 1 (`--gzip-level`): on real me2j text level 1 = 150 MB/s, ratio 2.89;
+  level 4 = 69 MB/s, ratio 3.20; level 6 = 36 MB/s, ratio 3.39.
+- Fresh-process CLI timings with warm compile cache: emax 10 / e2max 20: 21.3 s (68 MB file; 25.0 s and 61 MB at gzip level 4);
+  emax 12 / e2max 24: ~56-60 s (266 MB file, 5.07e7 values). Both include reading the NN file and the SRG flow.
+- Still not done: tabulated 9j/6j (T-coefficient build), an emax 14 run, GPU timing.

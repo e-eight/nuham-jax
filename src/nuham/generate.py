@@ -9,6 +9,7 @@ from nuham.interactions.nn_file import MomentumNN, read_nn_mom
 from nuham.lab_transform import lab_channel_matrices
 from nuham.me2j import LabChannel, assemble, write_me2j
 from nuham.relative_nn import evolve_relative_nn
+from nuham.runtime import enable_compilation_cache
 
 
 def generate_me2j(
@@ -21,6 +22,7 @@ def generate_me2j(
     lmax: int | None = None,
     coulomb: bool = True,
     mosh: MoshinskyTable | None = None,
+    compresslevel: int = 1,
 ) -> int:
     """Generate the NN interaction in the lab HO basis and write it as ``me2j``.
 
@@ -40,6 +42,8 @@ def generate_me2j(
         Whether to include the pp Coulomb interaction.
     mosh
         Optional bracket table to reuse between calls.
+    compresslevel
+        gzip level of the output (see :func:`nuham.me2j.write_me2j`).
 
     Returns
     -------
@@ -56,7 +60,7 @@ def generate_me2j(
         jp: LabChannel(lab_channel_matrices(orb, e2max, *jp, relative, mosh), len(orb))
         for jp in lab_channels(orb, e2max)
     }
-    return write_me2j(path, assemble(orb, e2max, channels))
+    return write_me2j(path, assemble(orb, e2max, channels), compresslevel=compresslevel)
 
 
 def main() -> None:
@@ -70,12 +74,21 @@ def main() -> None:
     p.add_argument("--e2max", type=int, required=True)
     p.add_argument("--lmax", type=int, default=None)
     p.add_argument("--no-coulomb", action="store_true")
+    p.add_argument("--gzip-level", type=int, default=1, help="gzip level of the output (1-9)")
     p.add_argument("--bracket-cache", default=None, help="directory for cached Moshinsky tables")
+    p.add_argument(
+        "--compile-cache",
+        default=None,
+        help="directory for JAX's compilation cache (default ~/.cache/nuham/jax)",
+    )
+    p.add_argument("--no-compile-cache", action="store_true", help="do not cache compiled kernels")
     args = p.parse_args()
+    if not args.no_compile_cache:
+        enable_compilation_cache(args.compile_cache)
     mosh = MoshinskyTable(args.bracket_cache)
     n = generate_me2j(
         read_nn_mom(args.nn_file), args.output, args.hw, args.lam, args.emax, args.e2max,
-        args.lmax, not args.no_coulomb, mosh,
+        args.lmax, not args.no_coulomb, mosh, args.gzip_level,
     )  # fmt: skip
     print(f"wrote {n} values to {args.output}")
 

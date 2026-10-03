@@ -4,6 +4,8 @@ import gzip
 import math
 from collections.abc import Iterator
 from pathlib import Path
+from queue import Queue
+from threading import Thread
 
 import numpy as np
 
@@ -107,8 +109,24 @@ def assemble(
         yield vals
 
 
-def write_me2j(path: str | Path, chunks: Iterator[np.ndarray], header: str = HEADER) -> int:
+_FLUSH_VALUES = 400_000
+
+
+def _format_lines(values: np.ndarray) -> str:
+    """Format a multiple of 10 values as ``10f16.8`` lines, each ending in a newline."""
+    return "".join(_LINE % tuple(r) + "\n" for r in values.reshape(-1, 10).tolist())
+
+
+def write_me2j(
+    path: str | Path,
+    chunks: Iterator[np.ndarray],
+    header: str = HEADER,
+    compresslevel: int = 1,
+) -> int:
     """Write values as gzip text: one header line, then Fortran ``10f16.8`` (10 values per line).
+
+    Formatting runs in the calling thread; compression and disk writes run in a background
+    thread behind a bounded queue, so they overlap with the computation that produces ``chunks``.
 
     Parameters
     ----------
@@ -118,28 +136,61 @@ def write_me2j(path: str | Path, chunks: Iterator[np.ndarray], header: str = HEA
         Arrays of values, flattened in order.
     header
         Free-text first line.
+    compresslevel
+        gzip level for ``.gz`` files. Level 1 compresses at about 150 MB/s and gives files about
+        10% larger than level 4 (70 MB/s), so it is the default.
 
     Returns
     -------
     int
         The number of values written.
     """
+    pending: list[np.ndarray] = []
+    n_pending = 0
     total = 0
-    pending = np.empty(0)
-    fh = gzip.open(path, "wt", compresslevel=4) if str(path).endswith(".gz") else open(path, "w")
-    with fh:
-        fh.write(header + "\n")
+    queue: Queue[bytes | None] = Queue(maxsize=8)
+    failure: list[BaseException] = []
+
+    def drain() -> None:
+        try:
+            fh = (
+                gzip.open(path, "wb", compresslevel=compresslevel)
+                if str(path).endswith(".gz")
+                else open(path, "wb")
+            )
+            with fh:
+                while (item := queue.get()) is not None:
+                    fh.write(item)
+        except BaseException as exc:  # noqa: BLE001  re-raised in the caller
+            failure.append(exc)
+            while queue.get() is not None:
+                pass
+
+    worker = Thread(target=drain, daemon=True)
+    worker.start()
+    queue.put((header + "\n").encode("ascii"))
+    try:
         for chunk in chunks:
-            pending = np.concatenate([pending, np.asarray(chunk).ravel()])
-            full = len(pending) // 10 * 10
-            fh.write("\n".join(_LINE % tuple(r) for r in pending[:full].reshape(-1, 10).tolist()))
-            if full:
-                fh.write("\n")
-            total += full
-            pending = pending[full:]
-        if len(pending):
-            fh.write("".join(f"{x:16.8f}" for x in pending.tolist()) + "\n")
-            total += len(pending)
+            pending.append(np.asarray(chunk).ravel())
+            n_pending += pending[-1].size
+            if n_pending >= _FLUSH_VALUES:
+                data = np.concatenate(pending)
+                full = len(data) // 10 * 10
+                queue.put(_format_lines(data[:full]).encode("ascii"))
+                total += full
+                pending, n_pending = [data[full:]], len(data) - full
+        data = np.concatenate(pending) if pending else np.empty(0)
+        full = len(data) // 10 * 10
+        if full:
+            queue.put(_format_lines(data[:full]).encode("ascii"))
+        if len(data) > full:
+            queue.put(("".join(f"{x:16.8f}" for x in data[full:].tolist()) + "\n").encode("ascii"))
+        total += len(data)
+    finally:
+        queue.put(None)
+        worker.join()
+    if failure:
+        raise failure[0]
     return total
 
 
