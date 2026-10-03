@@ -1,0 +1,64 @@
+{
+  "env": {
+    "host": "gh070.hsn.cm.delta.internal.ncsa.edu",
+    "platform": "Linux-6.4.0-150600.23.53-64kb-aarch64-with-glibc2.38",
+    "cpu_count": 288,
+    "python": "3.12.11",
+    "jax": "0.11.2",
+    "backend": "gpu",
+    "device": "gpu:NVIDIA GH200 120GB",
+    "x64": true,
+    "git_commit": "a19fabd"
+  },
+  "case": {
+    "nn_file": "/projects/bhhk/soham/nuham/cache/nuham/data/N3LO_EM500_kmax8_N100_Jmax8.bin",
+    "emax": 14,
+    "e2max": 28,
+    "grid": [
+      [
+        12.0,
+        1.8
+      ],
+      [
+        12.0,
+        2.0
+      ],
+      [
+        16.0,
+        1.8
+      ],
+      [
+        16.0,
+        2.0
+      ],
+      [
+        20.0,
+        1.8
+      ],
+      [
+        20.0,
+        2.0
+      ]
+    ],
+    "compute_only": false,
+    "flow_sets": null
+  },
+  "runs": [
+    {
+      "batch_size": 6,
+      "n_sets": 6,
+      "total_s": 128.95259596797405,
+      "per_set_s": 21.492099327995675,
+      "stages_s": {
+        "project": 1.0675220849807374,
+        "srg": 0.20634236000478268,
+        "lab_coeffs": 3.484648549987469,
+        "lab_contract": 6.839994917972945,
+        "assemble": 45.24653982097516,
+        "write": 71.9635284410906
+      },
+      "peak_rss_gb": 35.66357421875,
+      "peak_device_gb": 3.353381376
+    }
+  ]
+}

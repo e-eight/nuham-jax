@@ -89,8 +89,8 @@ alternating runs) and changed the output bytes (summation order flips a last-dig
 the SRG flows of `flow_sets` points share a batch (`evolve_relative_nn_many`, per-entry `hw` and flow parameter in
 `srg_evolve_batch`); the lab coefficients of each `(J, parity)` are built and uploaded once and contracted with every point's relative
 interaction in one kernel (`accumulate_blocks_multi`, a single GEMM `P x (blocks*r) x (K*P)` instead of K). Brackets were already shared.
-All lab matrices of a batch stay in memory until its files are written, so `batch_size` trades speed for memory (about 2 GB per point at
-emax 14). Gate: every scan file equals the separate single run, `tests/test_scan.py` (several batch sizes and flow groupings, bare and
+All lab matrices of a batch stay in memory until its files are written, so `batch_size` trades speed for memory (measured host RSS grows by about 6 GB per extra point at
+emax 14, see the DeltaAI emax 12-14 section). Gate: every scan file equals the separate single run, `tests/test_scan.py` (several batch sizes and flow groupings, bare and
 evolved points, atol 1e-8 on file values; relative potentials 1e-9). The single-run output is bit-identical to before the change.
 
 CPU measurements (`benchmarks/run_scan.py`, emax 8, e2max 16, grid hw 12/16/20 x lambda 1.8/2.0 = 6 points, second pass of two;
@@ -150,3 +150,32 @@ than `write`, and `lab_coeffs` + `lab_contract` is 1.4 s.
 - What is left per point: `assemble` (0.31 s, host Python) is the largest stage of a full scan point, then `project` (0.18 s) and
   `lab_contract` (0.26 s). `write` is 0.11 s. Peak GPU memory stayed below 0.33 GB and host RSS below 1.9 GB.
 - Only one job, one pass per case: no spread. Larger emax (where contraction and writing grow) was not scanned.
+
+## DeltaAI GH200: scans at emax 12 and 14 (job 3301003, 2026-10-03, commit a19fabd, ~15 min)
+
+6 points (hw 12/16/20 x lambda 1.8/2.0), e2max = 2 emax, one GH200, `flow_sets` default (all points of a batch together on a GPU), second pass of
+two. Raw records: `benchmarks/baseline_gh200_scan_*.json`. Stage columns are totals over the 6 points; seconds.
+
+| emax | mode | batch | per point | srg | lab_coeffs | lab_contract | assemble | write | peak host RSS | peak GPU |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 12 | compute-only | 0 | 2.93 | 0.42 | 8.77 | 6.86 | - | - | 4.0 GB | 0.7 GB |
+| 12 | compute-only | 2 | 1.86 | 0.27 | 4.46 | 5.18 | - | - | 6.3 GB | 0.9 GB |
+| 12 | compute-only | 6 | 1.13 | 0.20 | 1.48 | 3.96 | - | - | 10.7 GB | 1.9 GB |
+| 14 | compute-only | 0 | 5.50 | 0.42 | 20.61 | 10.25 | - | - | 6.5 GB | 1.5 GB |
+| 14 | compute-only | 2 | 3.36 | 0.27 | 10.35 | 8.14 | - | - | 19.4 GB | 2.1 GB |
+| 14 | compute-only | 6 | 1.97 | 0.21 | 3.51 | 6.87 | - | - | 36.3 GB | 5.1 GB |
+| 14 | full | 6 | 21.49 | 0.21 | 3.48 | 6.84 | 45.25 | 71.96 | 35.7 GB | 3.4 GB |
+
+(`project` was 1.05 s for the 6 points in every row.)
+
+- **Compute-only, a scan of 6 points is 2.6x (emax 12) and 2.8x (emax 14) faster per point than separate runs.** `lab_coeffs` is the big
+  saving (20.6 -> 3.5 s at emax 14, built once instead of six times); `lab_contract` improves by a third (10.3 -> 6.9 s).
+- **A full emax 14 scan point is dominated by the writer:** 21.5 s per point, of which assemble 7.5 s and write 12.0 s (2.7 GB of text per
+  file, 225 MB/s through one gzip level-1 thread plus formatting). The same point costs about 25 s as a separate run (5.5 s of compute plus
+  ~19.5 s of writing), so a full scan saves only ~14% at this size. This is the point at which the deferred gzip options become relevant
+  (`python-isal`, or parallel blocks), and the host-side `assemble` is the second candidate.
+- **Host memory grows by about 6 GB per extra point at emax 14** (6.5 GB for one point, 19.4 GB for two, 36.3 GB for six), three times the
+  2 GB I estimated from the size of the lab matrices, so the "about 2 GB per point" figure in earlier notes is for the matrices alone.
+  With 64 GB requested the largest safe batch at emax 14 is about 8 points. The reason for the extra memory has not been looked into
+  (candidates: pinned host copies, the per-channel coefficient arrays that stay referenced).
+- The job took ~15 min against an estimate of ~20, about 0.26 GPU-hours.
