@@ -63,16 +63,19 @@ class LabChannel:
             pos[m.pair_a, m.pair_b] = np.arange(len(m.pair_a))
             self.position[tz] = pos
 
-    def element(self, tz: int, a: int, b: int, c: np.ndarray, d: np.ndarray) -> np.ndarray:
-        """Matrix elements ``<ab|V|cd>`` for arrays ``c, d``; zero outside the pair basis."""
+    def element(
+        self, tz: int, a: int | np.ndarray, b: int | np.ndarray, c: np.ndarray, d: np.ndarray
+    ) -> np.ndarray:
+        """Matrix elements ``<ab|V|cd>`` for arrays ``c, d``; zero outside the pair basis.
+
+        ``a`` and ``b`` are scalars or arrays of the same shape as ``c`` and ``d``.
+        """
         pos = self.position[tz]
-        i = pos[a, b]
+        i = np.broadcast_to(pos[a, b], c.shape)
         k = pos[c, d]
-        out = np.zeros(len(k))
-        if i < 0:
-            return out
-        ok = k >= 0
-        out[ok] = self.matrices[tz].v[i, k[ok]]
+        out = np.zeros(k.shape)
+        ok = (i >= 0) & (k >= 0)
+        out[ok] = self.matrices[tz].v[i[ok], k[ok]]
         return out
 
 
@@ -81,34 +84,65 @@ def _phase(orb: Orbits, x: int | np.ndarray, y: int | np.ndarray, j: int) -> np.
     return -((-1.0) ** ((orb.j2[x] + orb.j2[y]) // 2 - j))
 
 
+_BATCH_TUPLES = 1 << 18
+
+
 def assemble(
     orb: Orbits,
     e2max: int,
     channels: dict[tuple[int, int], LabChannel],
 ) -> Iterator[np.ndarray]:
-    """Yield the four ``me2j`` values per tuple, chunk by chunk, shape ``(n, 4)``.
+    """Yield the four ``me2j`` values per tuple in file order, shape ``(n, 4)`` per chunk.
 
     The columns are ``T = 0``, nn, pn ``T = 1`` and pp, in the un-normalised Darmstadt convention.
+    Consecutive ``(a, b)`` pairs are batched into chunks of about ``_BATCH_TUPLES`` tuples and each
+    ``(J, parity)`` is handled with one set of array operations per chunk, which is far fewer small
+    numpy calls than one per pair and ``J``.
     """
-    for a, b, c, d, jj in tuple_chunks(orb, e2max):
-        vals = np.zeros((len(c), 4))
-        par = (-1) ** (orb.l[a] + orb.l[b])
-        for j in np.unique(jj):
-            sel = np.flatnonzero(jj == j)
-            ch = channels[(int(j), par)]
-            cs, ds = c[sel], d[sel]
-            nf = (math.sqrt(2.0) if a == b else 1.0) * np.where(cs == ds, math.sqrt(2.0), 1.0)
-            ph_ab = _phase(orb, a, b, int(j))
-            ph_cd = _phase(orb, cs, ds, int(j))
-            x1 = ch.element(0, a, b, cs, ds)
-            x2 = ch.element(0, b, a, ds, cs) * ph_ab * ph_cd
-            x3 = ch.element(0, a, b, ds, cs) * ph_cd
-            x4 = ch.element(0, b, a, cs, ds) * ph_ab
-            vals[sel, 0] = 0.5 * (x1 + x2 - x3 - x4)
-            vals[sel, 1] = ch.element(1, a, b, cs, ds) * nf
-            vals[sel, 2] = 0.5 * (x1 + x2 + x3 + x4)
-            vals[sel, 3] = ch.element(-1, a, b, cs, ds) * nf
-        yield vals
+    pending: list[tuple[int, int, np.ndarray, np.ndarray, np.ndarray]] = []
+    count = 0
+    for chunk in tuple_chunks(orb, e2max):
+        pending.append(chunk)
+        count += len(chunk[2])
+        if count >= _BATCH_TUPLES:
+            yield _assemble_batch(orb, channels, pending)
+            pending, count = [], 0
+    if pending:
+        yield _assemble_batch(orb, channels, pending)
+
+
+def _assemble_batch(
+    orb: Orbits,
+    channels: dict[tuple[int, int], LabChannel],
+    pending: list[tuple[int, int, np.ndarray, np.ndarray, np.ndarray]],
+) -> np.ndarray:
+    """Values of the tuples of several consecutive ``(a, b)`` pairs, shape ``(n, 4)``."""
+    sizes = [len(p[2]) for p in pending]
+    aa = np.repeat([p[0] for p in pending], sizes)
+    bb = np.repeat([p[1] for p in pending], sizes)
+    c = np.concatenate([p[2] for p in pending])
+    d = np.concatenate([p[3] for p in pending])
+    jj = np.concatenate([p[4] for p in pending])
+    odd = (orb.l[aa] + orb.l[bb]) % 2
+    group = 2 * jj + odd
+    vals = np.zeros((len(c), 4))
+    for g in np.unique(group):
+        sel = np.flatnonzero(group == g)
+        j, par = int(g) // 2, -1 if g % 2 else 1
+        ch = channels[(j, par)]
+        a, b, cs, ds = aa[sel], bb[sel], c[sel], d[sel]
+        nf = np.where(a == b, math.sqrt(2.0), 1.0) * np.where(cs == ds, math.sqrt(2.0), 1.0)
+        ph_ab = _phase(orb, a, b, j)
+        ph_cd = _phase(orb, cs, ds, j)
+        x1 = ch.element(0, a, b, cs, ds)
+        x2 = ch.element(0, b, a, ds, cs) * ph_ab * ph_cd
+        x3 = ch.element(0, a, b, ds, cs) * ph_cd
+        x4 = ch.element(0, b, a, cs, ds) * ph_ab
+        vals[sel, 0] = 0.5 * (x1 + x2 - x3 - x4)
+        vals[sel, 1] = ch.element(1, a, b, cs, ds) * nf
+        vals[sel, 2] = 0.5 * (x1 + x2 + x3 + x4)
+        vals[sel, 3] = ch.element(-1, a, b, cs, ds) * nf
+    return vals
 
 
 _FLUSH_VALUES = 400_000

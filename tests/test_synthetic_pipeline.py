@@ -154,3 +154,25 @@ def test_forbidden_entries_are_exactly_zero(tmp_path: Path, nn) -> None:
             if a == b and j % 2 == 1:
                 assert np.all(vals[k, 1:] == 0.0)
             k += 1
+
+
+def test_batched_assemble_equals_per_pair_reference(
+    nn, mosh, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from assemble_reference import assemble_per_pair
+
+    from nuham.me2j import LabChannel, assemble
+
+    relative = {(c.j, c.parity, c.s, c.tz): c for c in evolve_relative_nn(nn, HW, 2.0, n2max=24)}
+    orb = make_orbits(EMAX)
+    channels = {
+        jp: LabChannel(lab_channel_matrices(orb, E2MAX, *jp, relative, mosh), len(orb))
+        for jp in lab_channels(orb, E2MAX)
+    }
+    want = np.concatenate(list(assemble_per_pair(orb, E2MAX, channels)))
+    got = np.concatenate(list(assemble(orb, E2MAX, channels)))
+    np.testing.assert_array_equal(got, want)
+    # Tiny batches must give the same values as one big batch.
+    monkeypatch.setattr("nuham.me2j._BATCH_TUPLES", 50)
+    small = np.concatenate(list(assemble(orb, E2MAX, channels)))
+    np.testing.assert_array_equal(small, want)
