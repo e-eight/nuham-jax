@@ -59,8 +59,9 @@ def generate_scan(
     Points are processed in batches of ``batch_size``. Within a batch the lab coefficients of each
     ``(J, parity)`` are built once and contracted for all points, and the SRG flows run in groups
     of ``flow_sets`` points. Every point of a batch keeps all its lab matrices in memory until its
-    file is written, so ``batch_size`` trades speed against memory (about 4 GB of matrices per point at emax 14,
-    plus roughly 2 GB fixed; plan on ~6 GB per point, measured on DeltaAI). Each file equals the one a separate
+    file is written, so ``batch_size`` trades speed against memory (about 4 GB of matrices per
+    point at emax 14, plus roughly 2 GB fixed; plan on ~6 GB per point, measured on DeltaAI).
+    Each file equals the one a separate
     :func:`nuham.generate.generate_me2j` call would write, up to the flow tolerances.
 
     Parameters
