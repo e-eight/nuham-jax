@@ -61,3 +61,25 @@ def test_forbidden_entries_vanish(tmp_path: Path, nn, mosh: MoshinskyTable) -> N
             if a == b and j % 2 == 1:
                 assert vals[k, 1] == 0.0 and vals[k, 3] == 0.0 and vals[k, 2] == 0.0
             k += 1
+
+
+# Other interactions of NuHamil's input directory at hw 16, lambda 2.0, emax 4: the interaction is a
+# plug-in, so no code changes were needed. The references come from NuHamil (VODE error ~3e-7);
+# the observed maximum differences were 1.1e-7 to 6.5e-7 MeV, and all 11 other files agreed
+# (docs/imsrg-check.md).
+OTHER_INTERACTIONS = ["LO_EMN500", "N4LO_EMN500", "N2LO_opt", "N2LO_sat", "N3LO_texas"]
+
+
+@pytest.mark.parametrize("interaction", OTHER_INTERACTIONS)
+def test_other_interactions_match_nuhamil(
+    tmp_path: Path, interaction_bin, mosh: MoshinskyTable, interaction: str
+) -> None:
+    ref_path = REF / f"TwBME-HO_NN-only_{interaction}_srg2.0_hw16_emax4_e2max8.me2j.gz"
+    if not ref_path.exists():
+        pytest.skip("reference file missing")
+    nn = read_nn_mom(interaction_bin(interaction))
+    out = tmp_path / "out.me2j.gz"
+    generate_me2j(nn, out, 16.0, 2.0, 4, 8, mosh=mosh)
+    got, ref = read_me2j(out), read_me2j(ref_path)
+    assert got.shape == ref.shape
+    assert np.abs(got - ref).max() < 1e-6

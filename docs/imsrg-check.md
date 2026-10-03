@@ -35,3 +35,29 @@ Element-wise at emax 8: all 2 496 152 values of our file agree with NuHamil's wi
 **What this does and does not show.** It shows that imsrg++ accepts our file format and every compressor variant, including threaded igzip streams with many blocks, and that the physics agrees
 with the NuHamil-based run to about 1e-6 MeV in 4He. Not covered: other nuclei, emax above 8, 3N, a converged flow at emax 8, and files above a few GB (the largest file read was 13.9 MB; a
 threaded stream above ~1 GB would be worth one more test). Build notes: gcc 13 needs `-include cstdint`, and `libIMSRG.so` needs `-fPIC`, which the project only sets with Python bindings on.
+
+## Other interactions at emax 4 (2026-10-03)
+
+The interaction is a plug-in (momentum-space partial-wave file in, nothing else assumed), and every other file in NuHamil's `input_nn_files` works without a code change. Each was run through
+NuHamil (podman image, about 9 s each) and through `nuham` with hw 16, lambda 2.0, emax 4, e2max 8, Coulomb on; element-wise over all 27 336 values:
+
+| interaction | max diff (MeV) | | interaction | max diff (MeV) |
+|---|---|---|---|---|
+| LO_EMN500 | 1.1e-7 | | N2LO_sat | 4.7e-7 |
+| NLO_EMN500 | 1.1e-7 | | N3LO_texas | 6.5e-7 |
+| N2LO_EMN500 | 9.0e-8 | | DNLOGO450 | 7.0e-8 |
+| N3LO_EMN500 | 1.2e-7 | | DN2LOGO394 | 1.5e-7 |
+| N4LO_EMN500 | 2.2e-7 | | DN2LOGO450 | 4.8e-7 |
+| N2LO_opt | 3.5e-7 | | (N3LO_EM500, earlier) | 2.4e-7 at emax 8 |
+
+No value exceeds 1e-6 and the counts and order agree. The largest differences (N3LO_texas, N2LO_sat, DN2LOGO450) are the ones with the stiffest interactions; they are at the level of NuHamil's own integrator error.
+Five of the references (LO_EMN500, N4LO_EMN500, N2LO_opt, N2LO_sat, N3LO_texas) are committed in `refs/work` and tested in `tests/test_generate.py` (they skip when the momentum-space files are not available).
+
+4He with imsrg++ for N2LO_opt (full flow, smax 500, emax 4), MeV:
+
+| file | e2hf | EHF | EMP2 | E(IMSRG(2)) |
+|---|---|---|---|---|
+| NuHamil | -79.6567062 | -23.8799955 | -4.09134418 | -28.221148 |
+| nuham | -79.6567067 | -23.8799959 | -4.09134416 | -28.221148 |
+
+Differences: 4e-7 (HF), 2e-8 (MP2), none visible in the IMSRG(2) energy at the printed precision.
