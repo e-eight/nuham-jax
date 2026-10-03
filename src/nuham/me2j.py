@@ -11,6 +11,7 @@ from nuham.basis.lab import Orbits
 from nuham.lab_transform import LabMatrix
 
 HEADER = "NN int. calculated by nuham (JAX)"
+_LINE = "%16.8f" * 10
 
 
 def unordered_pairs(orb: Orbits, e2max: int) -> np.ndarray:
@@ -131,12 +132,13 @@ def write_me2j(path: str | Path, chunks: Iterator[np.ndarray], header: str = HEA
         for chunk in chunks:
             pending = np.concatenate([pending, np.asarray(chunk).ravel()])
             full = len(pending) // 10 * 10
-            for line in pending[:full].reshape(-1, 10):
-                fh.write("".join(f"{x:16.8f}" for x in line) + "\n")
+            fh.write("\n".join(_LINE % tuple(r) for r in pending[:full].reshape(-1, 10).tolist()))
+            if full:
+                fh.write("\n")
             total += full
             pending = pending[full:]
         if len(pending):
-            fh.write("".join(f"{x:16.8f}" for x in pending) + "\n")
+            fh.write("".join(f"{x:16.8f}" for x in pending.tolist()) + "\n")
             total += len(pending)
     return total
 

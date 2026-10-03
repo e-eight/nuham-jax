@@ -103,7 +103,11 @@ Original description:
 Relative -> lab transform plus Trel/Hcm. Write `me2j`. Compare elementwise with NuHamil.
 End-to-end: imsrg++ on 4He with our file and with NuHamil's.
 
-### Phase 4: GPU readiness
+### Phase 4: GPU readiness — started
+Done so far: Moshinsky brackets as exp(theta G) (`docs/study-moshinsky-rotation.md`): all tables for e2max 28 in ~15 s
+(was hours); full pipeline 3.2 s (emax 6), 8.2 s (8), 41 s (10), 302 s (12, 2.4 GB). Next: block contraction by
+(N, N') GEMMs in JAX, tabulated 9j/6j, writer speed; then a Delta run.
+Original description:
 Test on Delta at larger emax. Compare time and memory with Fortran. Tune bucketing and chunking.
 
 ### Phase 5: 3N (later)
