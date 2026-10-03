@@ -54,3 +54,31 @@ node's 288, not the allocation; `git_commit` is null because the code was upload
   reused it. Cold times therefore mostly measure the compile cache, not the algorithm. Compare warm times.
 - With the compute stages this fast, writing is 40% (emax 8) and 65% (emax 10) of a warm full run, which is the case for 4c.
 - Only one job per case, so no run-to-run spread yet. A shared node can vary by tens of percent.
+
+## Phase 4c: writer (CPU, 2026-10-03)
+
+**Vectorized formatter** (`nuham.me2j._format_lines`). Python's `%16.8f` ran at ~5 M values/s, 71 MB/s, in the calling thread, and
+threads cannot help it (the GIL). The values are now scaled by 1e8, rounded as integers and turned into text through lookup tables
+(`_tables`: four-digit groups for the fraction, a signed right-aligned integer part plus the point for the head). It runs at
+~27 M values/s, 5.6x faster. The output is byte-identical to Python's: scaling is only reliable away from half-way cases, so values whose scaled
+fraction is within 4 ulp of 0.5 are formatted by Python, and chunks with non-finite values or |x| >= 1e5 take the Python path whole.
+Checks: `tests/test_me2j.py` (adversarial ties, near-ties, signs, -0.0, powers of ten, fall-back) and 40 random sweeps of 500 k values with
+no mismatch; the emax 8 file has the same size (13 908 826 bytes) as before.
+
+**What is left in `write`** (emax 10, 1.27e7 values, 205 MB of text):
+
+| output | write stage | file |
+|---|---|---|
+| plain text | 0.42 s | 205 MB |
+| gzip level 1 | 3.7 s | 70.5 MB |
+| gzip level 6 | 11.1 s | 59.8 MB |
+
+Formatting is now cheap; gzip is the whole write cost. It runs in one thread, and only formatting overlaps with it, because the
+lab matrices of all channels are finished before assembly starts. A faster compressor would be a separate decision (see below).
+
+**NumPy contraction path for CPU: tried and dropped.** A plain GEMM microbenchmark favours OpenBLAS over XLA-CPU by 1.1-2.3x, but in
+the pipeline the NumPy path was slower (emax 8 warm 4.65-4.87 s against 4.09-4.45 s; emax 10 11.7-12.1 s against 11.05-11.4 s,
+alternating runs) and changed the output bytes (summation order flips a last-digit rounding). The XLA path stays on every backend.
+
+**Open options for the gzip cost** (all produce valid single-stream gzip, none is byte-identical to the standard `gzip` module):
+`python-isal` (igzip) as a drop-in; or pigz-style parallel compression of linked blocks. Not started.

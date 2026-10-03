@@ -3,6 +3,7 @@
 import gzip
 import math
 from collections.abc import Iterator
+from functools import cache
 from pathlib import Path
 from queue import Queue
 from threading import Thread
@@ -112,9 +113,67 @@ def assemble(
 _FLUSH_VALUES = 400_000
 
 
-def _format_lines(values: np.ndarray) -> str:
-    """Format a multiple of 10 values as ``10f16.8`` lines, each ending in a newline."""
+def _format_lines_python(values: np.ndarray) -> str:
+    """Format a multiple of 10 values as ``10f16.8`` lines with Python's own ``%`` operator."""
     return "".join(_LINE % tuple(r) + "\n" for r in values.reshape(-1, 10).tolist())
+
+
+@cache
+def _tables() -> tuple[np.ndarray, np.ndarray]:
+    """Lookup tables for the formatter, as explicitly little-endian words.
+
+    ``frac[i]`` holds the four ASCII digits of ``i`` (0..9999); ``head[i]`` holds the first eight
+    characters of a field: the right-aligned integer part (signed when ``i >= 100000``, which
+    encodes a negative value ``-(i - 100000)``) and the decimal point.
+    """
+    frac = np.frombuffer(
+        "".join(f"{i:04d}" for i in range(10_000)).encode("ascii"), dtype="<u4"
+    ).copy()
+    head = np.frombuffer(
+        "".join(
+            f"{'-' if neg else ''}{i}".rjust(7) + "."
+            for neg in (False, True)
+            for i in range(100_000)
+        ).encode("ascii"),
+        dtype="<u8",
+    ).copy()
+    return frac, head
+
+
+# Below this magnitude every value fits ``f16.8`` (a rounding carry and a sign included).
+_VECTOR_LIMIT = 1.0e5
+
+
+def _format_lines(values: np.ndarray) -> bytes:
+    """Format a multiple of 10 values as ``10f16.8`` lines, each ending in a newline.
+
+    The output is byte-identical to Python's ``%16.8f``, which rounds the exact binary value
+    half-to-even. Here the value is scaled by 1e8 and rounded as an integer, which is only
+    reliable away from ties: scaling has an error of about one ulp of the product, so any value
+    whose scaled fraction lies within a few ulp of 0.5 is formatted by Python instead. Chunks
+    with non-finite or very large values take the Python path entirely.
+    """
+    x = np.asarray(values, dtype=np.float64).ravel()
+    if not (np.abs(x) < _VECTOR_LIMIT).all():
+        return _format_lines_python(x).encode("ascii")
+    scaled = np.abs(x) * 1.0e8
+    q = np.rint(scaled).astype(np.int64)
+    near_tie = np.abs(np.abs(scaled - np.floor(scaled)) - 0.5) <= 4.0 * np.spacing(scaled)
+    frac_table, head_table = _tables()
+    whole, frac = np.divmod(q, 100_000_000)
+    hi, lo = np.divmod(frac, 10_000)
+    buf = np.empty((len(x), 16), dtype=np.uint8)
+    words = buf.view("<u8")
+    words[:, 0] = head_table[whole + 100_000 * np.signbit(x)]
+    halves = buf.view("<u4")
+    halves[:, 2] = frac_table[hi]
+    halves[:, 3] = frac_table[lo]
+    for i in np.flatnonzero(near_tie):
+        buf[i] = np.frombuffer((f"{x[i]:16.8f}").encode("ascii"), dtype=np.uint8)
+    lines = np.empty((len(x) // 10, 161), dtype=np.uint8)
+    lines[:, :160] = buf.reshape(-1, 160)
+    lines[:, 160] = ord("\n")
+    return lines.tobytes()
 
 
 def write_me2j(
@@ -176,13 +235,13 @@ def write_me2j(
             if n_pending >= _FLUSH_VALUES:
                 data = np.concatenate(pending)
                 full = len(data) // 10 * 10
-                queue.put(_format_lines(data[:full]).encode("ascii"))
+                queue.put(_format_lines(data[:full]))
                 total += full
                 pending, n_pending = [data[full:]], len(data) - full
         data = np.concatenate(pending) if pending else np.empty(0)
         full = len(data) // 10 * 10
         if full:
-            queue.put(_format_lines(data[:full]).encode("ascii"))
+            queue.put(_format_lines(data[:full]))
         if len(data) > full:
             queue.put(("".join(f"{x:16.8f}" for x in data[full:].tolist()) + "\n").encode("ascii"))
         total += len(data)
