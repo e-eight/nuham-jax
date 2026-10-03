@@ -1,0 +1,60 @@
+from pathlib import Path
+
+import jax.numpy as jnp
+import numpy as np
+import pytest
+
+import nuham  # noqa: F401
+from nuham.angmom.moshinsky_table import MoshinskyTable
+from nuham.basis.lab import lab_channels, make_orbits, ordered_pairs
+from nuham.interactions.nn_file import read_nn_mom
+from nuham.kernels.lab import congruence_sum
+from nuham.lab_transform import (
+    enumerate_rows,
+    lab_matrix,
+    lab_matrix_reference,
+    t_matrix,
+)
+from nuham.relative_nn import evolve_relative_nn
+
+
+def test_congruence_sum_matches_loop_with_padding() -> None:
+    rng = np.random.default_rng(0)
+    t = rng.normal(size=(5, 4, 7))
+    v = rng.normal(size=(5, 4, 4))
+    t[2, 2:] = 0.0  # padded rows
+    t[4] = 0.0  # padded block
+    got = np.asarray(congruence_sum(jnp.asarray(t), jnp.asarray(v)))
+    want = sum(t[b].T @ v[b] @ t[b] for b in range(5))
+    np.testing.assert_allclose(got, want, atol=1e-12)
+
+
+@pytest.fixture(scope="module")
+def setup(nn_bin: Path):
+    nn = read_nn_mom(nn_bin)
+    relative = {(c.j, c.parity, c.s, c.tz): c for c in evolve_relative_nn(nn, 16.0, None, n2max=40)}
+    return relative, make_orbits(4), MoshinskyTable()
+
+
+def test_matches_reference_in_every_channel(setup) -> None:
+    relative, orb, mosh = setup
+    e2max = 8
+    for j, parity in lab_channels(orb, e2max):
+        a, b = ordered_pairs(orb, e2max, j, parity)
+        rows = enumerate_rows(j, parity, e2max, 8)
+        t = t_matrix(rows, a, b, orb, j, mosh)
+        for tz in (-1, 0, 1):
+            new = lab_matrix(rows, t, a, b, j, parity, tz, relative)
+            ref = lab_matrix_reference(rows, t, a, b, j, parity, tz, relative)
+            np.testing.assert_array_equal(new.pair_a, ref.pair_a)
+            np.testing.assert_allclose(new.v, ref.v, atol=1e-11)
+
+
+def test_empty_pair_basis_gives_empty_matrix(setup) -> None:
+    # With e2max = 0 the only pair is 0s1/2 0s1/2; for odd J it is excluded for pp and nn.
+    relative, orb, mosh = setup
+    a, b = ordered_pairs(orb, 0, 1, 1)
+    rows = enumerate_rows(1, 1, 0, 8)
+    t = t_matrix(rows, a, b, orb, 1, mosh)
+    assert lab_matrix(rows, t, a, b, 1, 1, 1, relative).v.shape == (0, 0)
+    assert lab_matrix(rows, t, a, b, 1, 1, 0, relative).v.shape == (1, 1)

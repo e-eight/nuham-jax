@@ -62,3 +62,22 @@ factor of ~7 per two units of emax suggests tens of minutes.
 2. T-coefficient 9j/6j factors: python loops; the 9j/6j depend only on a few quantum numbers and can be tabulated and
    applied with array operations.
 3. Writer: gzip level and text formatting (~25% of the run).
+
+
+## Update: contraction (done)
+
+The per-block rank update of the full `P x P` matrix was replaced by `kernels/lab.congruence_sum`: blocks are
+zero-padded into stacks of equal shape (sizes 4, 8, 16, ...; stacks capped at ~0.5 GB) and
+`sum_b T_b^T V_b T_b` is two einsums, i.e. one dense GEMM of size `P x (n_blocks r) x P` plus small batched products.
+The old routine is kept as `lab_matrix_reference` and tested against the new one in every channel at emax 4 (1e-11).
+
+| Case (this CPU) | before | after |
+|---|---|---|
+| contraction, emax 10, J=4 P=- pn (P=1302) | 1.35 s | 0.23 s |
+| contraction, emax 10, J=8 P=+ pn (P=1034) | 1.06 s | 0.10 s |
+| full run emax 10 / e2max 20, cold | 41 s | 25 s (21 s with warm JAX cache) |
+| full run emax 12 / e2max 24, cold | 302 s | 76 s, 2.8 GB peak |
+
+Per-channel results agree to 2e-15. At emax=10 (profiled, 29 s) the remaining shares are roughly: file writing 11 s (gzip 7 s,
+formatting), channel matrices 16 s (T-coefficient build 7 s, contraction 8 s including JAX compiles of new shapes),
+brackets ~3 s. The emax=14 time is still not measured.
