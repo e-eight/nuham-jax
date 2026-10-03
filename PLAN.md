@@ -87,7 +87,19 @@ Read EM500 momentum-space input (`N3LO_EM500_kmax8_N100_Jmax8.bin`), project to 
 SRG flow (stiff; implicit solver or exact-unitary scheme; compare with VODE).
 Check deuteron energy and SRG eigenvalue invariance.
 
-### Phase 3: lab-frame me2j
+### Phase 3: lab-frame me2j — DONE (imsrg++ run not done)
+`basis/lab.py`, `angmom/moshinsky_table.py` (cached (N, lam) matrices, optional disk cache),
+`lab_transform.py` (T-coefficients vectorized over rows/pairs, per-block contraction), `me2j.py`
+(tuple enumeration identical to the imsrg++ reader, 4-value assembly, writer/reader), `generate.py` (+CLI).
+Results vs NuHamil `me2j` (all values, same count and order): srg2.0 hw16 emax4 2.4e-7; srg2.0 hw20 1.6e-7;
+bare hw16 3.3e-6 and srg1.8 emax6 2.2e-6 (those references used the 7-digit relative cache, limit ~5e-6).
+Forbidden entries are exactly zero. 538 tests pass.
+Cost: emax 4: 2.5 s; emax 6: 5 s; emax 8 (e2max 16): ~60-90 s cold, of which ~65% is bracket evaluation
+and ~25% gzip. Brackets needed (entries incl. zeros): e2max 16: 4e5; 20: 1.8e6; 24: 6.2e6; 28: 1.8e7, at
+50-500 us each uncached -> a few CPU-hours at e2max 28 (one-time: hw-independent, disk-cacheable).
+Sizes at emax=14/e2max=28: 59 lab channels, largest pair basis 4234, 4.2e7 tuples (1.3 GB float64).
+Not done: running imsrg++ itself on a generated file; bracket generation at e2max > 16.
+Original description:
 Relative -> lab transform plus Trel/Hcm. Write `me2j`. Compare elementwise with NuHamil.
 End-to-end: imsrg++ on 4He with our file and with NuHamil's.
 

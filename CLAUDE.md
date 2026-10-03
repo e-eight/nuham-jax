@@ -11,9 +11,10 @@ Scope now: EM500 NN, Hamiltonian only, `me2j` output readable by imsrg++. 3N (lo
 Develop and test on this CPU-only machine (float64, small cases); large runs go to a GPU cluster (Delta),
 so nothing may assume a device.
 
-**Status:** Phases 0-2 are done (spec and oracle; HO functions, projection, Racah/Moshinsky; Coulomb and SRG
-flow giving the evolved relative-space V via `nuham.relative_nn.evolve_relative_nn`).
-Phase 3 (relative-to-lab transform and `me2j` writer) has not been started; do not start a phase unless the user asks.
+**Status:** Phases 0-3 are done: spec and oracle; HO functions, projection, Racah/Moshinsky; Coulomb and SRG
+flow (`nuham.relative_nn.evolve_relative_nn`); lab transform and `me2j` writer (`nuham.generate.generate_me2j`,
+CLI `uv run python -m nuham.generate --help`). Phase 4 (scale and GPU) has not been started; do not start a
+phase unless the user asks.
 `PLAN.md` holds the phases and decisions made so far.
 
 ## Conventions (set by the user)
@@ -57,6 +58,8 @@ Full detail: `docs/physics-spec.md` (summary), `docs/spec-1..4` (sources and che
 
 - Pipeline: momentum-space `.bin` -> HO relative basis (quadrature on the file's 100-point mesh) -> add Coulomb to pp -> SRG in the **full Nmax=100 relative space** -> `V = H - T_rel` -> cut to `2n+L <= e2max` -> Talmi-Moshinsky to the lab frame -> `me2j`.
 - The SRG kernel (`kernels/srg.py`) is an adaptive Dopri8 (Diffrax) flow on dense H with T kept as its diagonals; it takes ~2 s for all 54 channels at N_flow=100 on this CPU. Channels are zero-padded to a multiple of 16 and batched with `vmap`; padding does not change results.
+- The lab transform (`lab_transform.py`) builds T-coefficients per lab channel (J, parity) with host NumPy and caches Moshinsky bracket matrices per (N, lam) (`MoshinskyTable`, optional disk cache; hw-independent, reuse it). Brackets dominate the cost: ~1.8e7 are needed at e2max=28 (~0.5 ms each uncached). The contraction `sum_blocks T^T V T` is NumPy/BLAS for now.
+- `me2j` tuples are enumerated in the file's order (`tuple_chunks`), identical to imsrg++'s reader loop; lab matrices of all (J, parity) stay in memory (about 2 GB at emax=14).
 - The SRG flow is independent of emax and always uses N_flow=100 by default. A smaller `n_flow` is a deviation from NuHamil (`docs/study-srg-truncation.md`); do not make it the default.
 - Coulomb in pp is on by default and is evolved with the flow. Relative J > 8 is zero.
 - Use NuHamil's constants (hc=197.32705, m_p=938.27231, m_n=939.56563), not SciPy's. One pn reduced mass is used for pp, nn and pn.
