@@ -82,10 +82,12 @@ def _generator(states: list[tuple[int, int, int, int]], lam: int) -> np.ndarray:
 
 
 class MoshinskyTable:
-    """Lazily built, cached bracket matrices (equal masses).
+    """Lazily built, cached bracket matrices (equal masses unless ``d`` is given).
 
-    For fixed ``total`` and ``lam`` the matrix over ``cm_rel_states`` x ``particle_states`` is
-    orthogonal once the entries that violate a triangle condition (which are zero) are included.
+    For fixed ``total`` and ``lam`` the bracket matrix over the states that satisfy both triangle
+    conditions is square and orthogonal; every other row and column is exactly zero. Only that
+    compact block is kept, in memory and on disk (about a tenth of the zero-padded size);
+    :meth:`gather` and :meth:`matrix` rebuild the zero-padded view on demand.
     """
 
     def __init__(self, cache_dir: str | Path | None = None, d: float = 1.0) -> None:
@@ -94,7 +96,7 @@ class MoshinskyTable:
         Parameters
         ----------
         cache_dir
-            Optional directory where finished matrices are stored as ``N<total>_lam<lam>.npy``
+            Optional directory where finished blocks are stored as ``N<total>_lam<lam>_c.npy``
             (with a ``_d<d>`` suffix for ``d != 1``) and reused by later runs. The brackets do
             not depend on ħω, the SRG cutoff or the interaction, so one cache serves every run.
         d
@@ -104,7 +106,8 @@ class MoshinskyTable:
         self._cache_dir = None if cache_dir is None else Path(cache_dir)
         if self._cache_dir is not None:
             self._cache_dir.mkdir(parents=True, exist_ok=True)
-        self._matrices: dict[tuple[int, int], np.ndarray] = {}
+        self._blocks: dict[tuple[int, int], np.ndarray] = {}
+        self._positions: dict[tuple[int, int], tuple[np.ndarray, np.ndarray]] = {}
         self._rows: dict[int, dict[tuple[int, int, int, int], int]] = {}
         self._cols: dict[int, dict[tuple[int, int, int, int], int]] = {}
 
@@ -120,29 +123,79 @@ class MoshinskyTable:
             self._cols[total] = {s: i for i, s in enumerate(particle_states(total))}
         return self._cols[total]
 
-    def matrix(self, total: int, lam: int) -> np.ndarray:
-        """Bracket matrix ``<cm rel; lam | 1 2; lam>`` of shape ``(n_rows, n_cols)``."""
+    def _valid_states(self, total: int, lam: int) -> list[tuple[int, int, int, int]]:
+        """States of this total whose two orbital momenta couple to ``lam``."""
+        return [s for s in self.col_index(total) if abs(s[1] - s[3]) <= lam <= s[1] + s[3]]
+
+    def _block(self, total: int, lam: int) -> np.ndarray:
+        """Compact square block over :meth:`_valid_states`, from memory, disk or computation."""
         key = (total, lam)
+        if key in self._blocks:
+            return self._blocks[key]
         suffix = "" if self._d == 1.0 else f"_d{self._d:g}"
         path = (
-            None if self._cache_dir is None else self._cache_dir / f"N{total}_lam{lam}{suffix}.npy"
+            None
+            if self._cache_dir is None
+            else self._cache_dir / f"N{total}_lam{lam}_c{suffix}.npy"
         )
-        if key not in self._matrices and path is not None and path.exists():
-            self._matrices[key] = np.load(path)
-        if key not in self._matrices:
-            self._matrices[key] = self._rotation_matrix(total, lam)
+        if path is not None and path.exists():
+            block = np.load(path)
+        else:
+            block = self._rotation_block(self._valid_states(total, lam), total, lam)
             if path is not None:
-                np.save(path, self._matrices[key])
-        return self._matrices[key]
+                np.save(path, block)
+        self._blocks[key] = block
+        return block
 
-    def _rotation_matrix(self, total: int, lam: int) -> np.ndarray:
-        """Build the matrix as ``(-1)^(N + lam) exp(theta G) P`` and scatter it to full size."""
-        rows = self.row_index(total)
-        cols = self.col_index(total)
-        mat = np.zeros((len(rows), len(cols)))
-        states = [s for s in cols if abs(s[1] - s[3]) <= lam <= s[1] + s[3]]
+    def _compact_positions(self, total: int, lam: int) -> tuple[np.ndarray, np.ndarray]:
+        """Compact index of every row and column (``-1`` where the entries are zero)."""
+        key = (total, lam)
+        if key not in self._positions:
+            local = {s: i for i, s in enumerate(self._valid_states(total, lam))}
+            rows = np.array([local.get(s, -1) for s in self.row_index(total)], dtype=np.int64)
+            cols = np.array([local.get(s, -1) for s in self.col_index(total)], dtype=np.int64)
+            self._positions[key] = (rows, cols)
+        return self._positions[key]
+
+    def gather(self, total: int, lam: int, row_idx: np.ndarray, col_idx: np.ndarray) -> np.ndarray:
+        """Bracket entries ``[row_idx, col_idx]`` of the zero-padded matrix, shape ``(r, c)``.
+
+        Parameters
+        ----------
+        total, lam
+            Total quanta and coupled orbital momentum.
+        row_idx, col_idx
+            Row and column positions in the orders of :meth:`row_index` and :meth:`col_index`.
+
+        Returns
+        -------
+        np.ndarray
+            ``matrix(total, lam)[np.ix_(row_idx, col_idx)]`` without building the full matrix.
+        """
+        block = self._block(total, lam)
+        rows_all, cols_all = self._compact_positions(total, lam)
+        r = rows_all[row_idx]
+        c = cols_all[col_idx]
+        out = np.zeros((len(r), len(c)))
+        keep_r, keep_c = r >= 0, c >= 0
+        if keep_r.any() and keep_c.any():
+            out[np.ix_(keep_r, keep_c)] = block[np.ix_(r[keep_r], c[keep_c])]
+        return out
+
+    def matrix(self, total: int, lam: int) -> np.ndarray:
+        """Zero-padded bracket matrix ``<cm rel; lam | 1 2; lam>``, shape ``(n_rows, n_cols)``.
+
+        Built on demand and not cached; use :meth:`gather` in hot paths.
+        """
+        rows_all, cols_all = self._compact_positions(total, lam)
+        return self.gather(total, lam, np.arange(len(rows_all)), np.arange(len(cols_all)))
+
+    def _rotation_block(
+        self, states: list[tuple[int, int, int, int]], total: int, lam: int
+    ) -> np.ndarray:
+        """Compute ``(-1)^(N + lam) exp(theta G) P`` over ``states`` (rows and columns alike)."""
         if not states:
-            return mat
+            return np.zeros((0, 0))
         theta = math.atan(math.sqrt(self._d))
         gen = theta * _generator(states, lam)
         size = -(-len(states) // _PAD) * _PAD
@@ -151,8 +204,4 @@ class MoshinskyTable:
         rot = np.asarray(expm_antisymmetric(jnp.asarray(padded)))[: len(states), : len(states)]
         local = {s: i for i, s in enumerate(states)}
         swap = np.array([local[(s[2], s[3], s[0], s[1])] for s in states])
-        sub = (-1.0) ** (total + lam) * rot[:, np.argsort(swap)]
-        r_idx = np.array([rows[s] for s in states])
-        c_idx = np.array([cols[s] for s in states])
-        mat[np.ix_(r_idx, c_idx)] = sub
-        return mat
+        return (-1.0) ** (total + lam) * rot[:, np.argsort(swap)]

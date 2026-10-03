@@ -17,6 +17,7 @@ from nuham.angmom.racah import ninej, sixj
 from nuham.angmom.racah_array import ninej_array, sixj_array
 from nuham.basis.lab import Orbits, ordered_pairs
 from nuham.kernels.lab import accumulate_blocks
+from nuham.kernels.transfer import to_host
 from nuham.relative_nn import RelativeChannel
 
 
@@ -155,7 +156,7 @@ def t_matrix_reference(
                         orb.j2[y],
                         2 * j,
                     )
-            mat = mosh.matrix(int(total), lam)[np.ix_(cr, cc)]
+            mat = mosh.gather(int(total), lam, cr, cc)
             t[np.ix_(ri, pi)] += b_fac[:, None] * mat * a_fac[rows.s[ri]]
     return t
 
@@ -234,7 +235,7 @@ def t_matrix(
             b_fac = b_all[lam][ri]
             if not b_fac.any():
                 continue
-            mat = mosh.matrix(int(total), lam)[np.ix_(cr, cc)]
+            mat = mosh.gather(int(total), lam, cr, cc)
             t[np.ix_(ri, pi)] += b_fac[:, None] * mat * a_all[lam][:, pi][rows.s[ri]]
     return t
 
@@ -436,7 +437,7 @@ def lab_matrix(
                 idx[b, : len(members)] = members
                 v_blocks[b, : len(members), : len(members)] = v_b
             total = accumulate_blocks(total, t_rows, jnp.asarray(idx), jnp.asarray(v_blocks))
-    return LabMatrix(pair_a[cols], pair_b[cols], np.asarray(total[:dim, :dim]))
+    return LabMatrix(pair_a[cols], pair_b[cols], to_host(total[:dim, :dim]))
 
 
 def lab_channel_matrices(

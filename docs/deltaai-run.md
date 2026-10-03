@@ -56,3 +56,27 @@ when checked).
    24 s, gzip 19.6 s (overlapped in a thread), tuple assembly 8 s. Everything GPU-friendly (contraction 0.07 s per large channel,
    the SRG flow) is a small share.
 4. Run-to-run variation on a shared node is real (profiled 43.5 s vs unprofiled 56.9 s in one job); compare by alternating runs.
+
+
+## Phase 4a results (2026-10-03, job on `gh136`, same node type)
+
+Changes: `MoshinskyTable` keeps and stores only the compact valid block of each bracket matrix (`N<total>_lam<lam>_c.npy`), and
+`lab_matrix` copies its result to the host through `kernels.transfer.to_host` (pinned host memory on accelerator backends,
+`NUHAM_PINNED_COPY=0/1` to override). Output files are unchanged (max difference 0.0 at emax 10 and 12).
+
+| gate | before | after |
+|---|---|---|
+| bracket cache on disk, N <= 28 | 1.55 GB, 421 files | 0.147 GB, 435 files |
+| load the whole cache in a fresh process, from `/projects` | 38.3 s | 0.5 s |
+| peak host memory while loading | ~1.5 GB resident tables | 0.19 GB |
+| cold build of the compact cache (includes compiling the matrix exponential for ~20 padded shapes; 8.3 s locally on the CPU) | n/a | 38.2 s |
+| largest emax-14 channel, `lab_matrix` for tz = -1, 0, +1 | 67.4 ms (pageable copy) | 48.4 ms (pinned copy) |
+| full emax-14 run, warm, alternating | 54.2, 53.8 s (pageable), host RSS 5.9 GB | 55.5, 53.3, 53.2 s (pinned), host RSS 6.4 GB |
+
+Pageable and pinned results are bitwise equal, and the pinned views stay valid after the device arrays are freed. All 581 tests
+pass on the GH200.
+
+Reading: the cache fix is a clear win. The pinned copy is correct and 16x faster per copy, but the copies are a small part of a
+run, so the end-to-end difference is below noise and it costs ~0.5 GB of pinned host memory. It stays on by default for accelerator
+backends (it will matter more when the matrices get larger, as in 3N); `NUHAM_PINNED_COPY=0` turns it off. The same A/B on ICRN's
+PCIe H200 was not run because that server had been shut down (the token cannot start it).
