@@ -83,6 +83,13 @@ def main() -> None:
         enable_compilation_cache()
     nn = read_nn_mom(args.nn_file)
     mosh = MoshinskyTable(args.bracket_cache)
+    # One dict for the call and the record, so what is logged is what ran.
+    writer_options = {
+        "compressor": args.compressor,
+        "assembler": args.assembler,
+        "formatter": args.formatter,
+        "compress_threads": args.compress_threads,
+    }
     runs = []
     with tempfile.TemporaryDirectory() as tmp:
         out = None if args.compute_only else Path(tmp) / "bench.me2j.gz"
@@ -91,9 +98,7 @@ def main() -> None:
             start = time.perf_counter()
             n = generate_me2j(
                 nn, out, args.hw, args.lam, args.emax, args.e2max, mosh=mosh,
-                compresslevel=args.gzip_level, timer=timer,
-                compressor=args.compressor, assembler=args.assembler, formatter=args.formatter,
-                compress_threads=args.compress_threads,
+                compresslevel=args.gzip_level, timer=timer, **writer_options,
             )  # fmt: skip
             total = time.perf_counter() - start
             runs.append(
@@ -114,7 +119,7 @@ def main() -> None:
         | {
             "compute_only": args.compute_only,
             "gzip_level": args.gzip_level,
-            "compressor": args.compressor,
+            **writer_options,
         },
         "runs": runs,
     }

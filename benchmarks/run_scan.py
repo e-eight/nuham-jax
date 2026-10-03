@@ -56,6 +56,13 @@ def main() -> None:
     nn = read_nn_mom(args.nn_file)
     mosh = MoshinskyTable(args.bracket_cache)
     grid = list(itertools.product(args.hw, args.lam))
+    # One dict for both call sites, so a new option cannot reach only one of them.
+    writer_options = {
+        "compressor": args.compressor,
+        "assembler": args.assembler,
+        "formatter": args.formatter,
+        "compress_threads": args.compress_threads,
+    }
     runs = []
     with tempfile.TemporaryDirectory() as tmp:
 
@@ -72,33 +79,16 @@ def main() -> None:
                 if batch == 0:
                     for (hw, lam), path in zip(grid, out, strict=True):
                         generate_me2j(
-                            nn,
-                            path,
-                            hw,
-                            lam,
-                            args.emax,
-                            args.e2max,
-                            mosh=mosh,
-                            timer=timer,
-                            compressor=args.compressor,
-                            assembler=args.assembler,
-                            formatter=args.formatter,
-                            compress_threads=args.compress_threads,
-                        )
+                            nn, path, hw, lam, args.emax, args.e2max,
+                            mosh=mosh, timer=timer, **writer_options,
+                        )  # fmt: skip
                 else:
                     points = [ScanPoint(hw, lam, o) for (hw, lam), o in zip(grid, out, strict=True)]
                     generate_scan(
-                        nn,
-                        points,
-                        args.emax,
-                        args.e2max,
-                        mosh=mosh,
-                        batch_size=batch,
-                        timer=timer,
-                        flow_sets=args.flow_sets,
-                        compressor=args.compressor,
-                        assembler=args.assembler,
-                    )
+                        nn, points, args.emax, args.e2max,
+                        mosh=mosh, batch_size=batch, timer=timer, flow_sets=args.flow_sets,
+                        **writer_options,
+                    )  # fmt: skip
                 total = time.perf_counter() - start
             runs.append(
                 {
@@ -118,7 +108,7 @@ def main() -> None:
             "grid": grid,
             "compute_only": args.compute_only,
             "flow_sets": args.flow_sets,
-            "compressor": args.compressor,
+            **writer_options,
         },
         "runs": runs,
     }
