@@ -58,3 +58,18 @@ def test_empty_pair_basis_gives_empty_matrix(setup) -> None:
     t = t_matrix(rows, a, b, orb, 1, mosh)
     assert lab_matrix(rows, t, a, b, 1, 1, 1, relative).v.shape == (0, 0)
     assert lab_matrix(rows, t, a, b, 1, 1, 0, relative).v.shape == (1, 1)
+
+
+def test_vectorized_t_matrix_matches_scalar_reference(setup) -> None:
+    from nuham.lab_transform import t_matrix_reference
+
+    _, orb, mosh = setup
+    e2max = 8
+    for j, parity in lab_channels(orb, e2max):
+        a, b = ordered_pairs(orb, e2max, j, parity)
+        rows = enumerate_rows(j, parity, e2max, 8)
+        np.testing.assert_allclose(
+            t_matrix(rows, a, b, orb, j, mosh),
+            t_matrix_reference(rows, a, b, orb, j, mosh),
+            atol=1e-12,
+        )

@@ -95,3 +95,18 @@ brackets ~3 s. The emax=14 time is still not measured.
 - Fresh-process CLI timings with warm compile cache: emax 10 / e2max 20: 21.3 s (68 MB file; 25.0 s and 61 MB at gzip level 4);
   emax 12 / e2max 24: ~56-60 s (266 MB file, 5.07e7 values). Both include reading the NN file and the SRG flow.
 - Still not done: tabulated 9j/6j (T-coefficient build), an emax 14 run, GPU timing.
+
+
+## Update: vectorized 9j/6j (done)
+
+- `angmom/racah_array.py`: array versions of the 6j and 9j (doubled-integer arguments, broadcasting, zeros for violated
+  triangles), tested against the scalar versions on 40000 random tuples each (1e-13; 1062 nonzero 6j and 192 nonzero 9j in the samples).
+- `t_matrix` now evaluates the recoupling factors A (9j) and B (6j) for all pairs and rows at once, and sums only
+  `lam = J-1, J, J+1`: both factors vanish unless `|J-S| <= lam <= J+S` with `S` = 0 or 1. The old scalar routine is kept as
+  `t_matrix_reference` and compared to the new one in every emax-4 channel (1e-12).
+- Profile, emax 12 / e2max 24: `t_matrix` 10.2 s -> 2.3 s; total (profiled) 51 s -> 41 s. Fresh-process CLI with warm caches:
+  emax 10: 21.3 -> 18.5 s; emax 12: ~56-60 -> 48 s.
+- Remaining at emax 12 (profiled, 41 s): contraction ~18 s (10.6 s of it waiting on the JAX products), file formatting ~10 s
+  (overlapped with the gzip thread), SRG flow ~2 s, T-coefficients 2.3 s, assembly ~3 s.
+- Observation: for the contraction shapes (n_blocks 512-1024, r 8-16, P 1280-2432) XLA's CPU product reaches 84-95 GFLOP/s here,
+  NumPy BLAS 128-203 GFLOP/s. A NumPy path on CPU (JAX on GPU) would save perhaps 5 s at emax 12; not done.

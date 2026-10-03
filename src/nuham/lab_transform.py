@@ -13,6 +13,7 @@ import numpy as np
 
 from nuham.angmom.moshinsky_table import MoshinskyTable
 from nuham.angmom.racah import ninej, sixj
+from nuham.angmom.racah_array import ninej_array, sixj_array
 from nuham.basis.lab import Orbits, ordered_pairs
 from nuham.kernels.lab import congruence_sum
 from nuham.relative_nn import RelativeChannel
@@ -73,7 +74,7 @@ def enumerate_rows(j: int, parity: int, e2max: int, jrel_max: int) -> RelCmRows:
     return RelCmRows(*cols)
 
 
-def t_matrix(
+def t_matrix_reference(
     rows: RelCmRows,
     pair_a: np.ndarray,
     pair_b: np.ndarray,
@@ -81,7 +82,7 @@ def t_matrix(
     j: int,
     mosh: MoshinskyTable,
 ) -> np.ndarray:
-    """Return the transformation coefficients without the pp/nn antisymmetry factors.
+    """Slow scalar reference for :func:`t_matrix`, looping over every ``lam <= N`` and pair.
 
     ``T[r, p] = (-1)^(Lcm + lrel + S + J) sum_lam A(p, S, lam) B(r, lam) <bracket>`` with the 9j
     LS-to-jj factor ``A`` and the 6j recoupling factor ``B``; it is nonzero only where the
@@ -155,6 +156,85 @@ def t_matrix(
                     )
             mat = mosh.matrix(int(total), lam)[np.ix_(cr, cc)]
             t[np.ix_(ri, pi)] += b_fac[:, None] * mat * a_fac[rows.s[ri]]
+    return t
+
+
+def t_matrix(
+    rows: RelCmRows,
+    pair_a: np.ndarray,
+    pair_b: np.ndarray,
+    orb: Orbits,
+    j: int,
+    mosh: MoshinskyTable,
+) -> np.ndarray:
+    """Return the transformation coefficients without the pp/nn antisymmetry factors.
+
+    ``T[r, p] = (-1)^(Lcm + lrel + S + J) sum_lam A(p, S, lam) B(r, lam) <bracket>`` with the 9j
+    LS-to-jj factor ``A`` and the 6j recoupling factor ``B``; it is nonzero only where the
+    relative-CM quanta equal ``e_a + e_b``. Both factors vanish unless ``|J - S| <= lam <= J + S``,
+    so only ``lam = J - 1, J, J + 1`` are summed, and ``A`` and ``B`` are evaluated for all pairs
+    and rows at once with the array Racah symbols.
+
+    Parameters
+    ----------
+    rows
+        Relative-CM states.
+    pair_a, pair_b
+        Orbit indices of the ordered lab pairs.
+    orb
+        Orbits.
+    j
+        Total angular momentum.
+    mosh
+        Bracket table.
+
+    Returns
+    -------
+    np.ndarray
+        Matrix of shape ``(len(rows.s), len(pair_a))``.
+    """
+    t = np.zeros((len(rows.s), len(pair_a)))
+    pair_total = orb.e[pair_a] + orb.e[pair_b]
+    la, lb = orb.l[pair_a], orb.l[pair_b]
+    ja, jb = orb.j2[pair_a], orb.j2[pair_b]
+    sign = np.where((rows.lcm + rows.lrel + rows.s + j) % 2 == 0, 1.0, -1.0)
+    b_all: dict[int, np.ndarray] = {}
+    a_all: dict[int, np.ndarray] = {}
+    for lam in range(max(0, j - 1), j + 2):
+        b_all[lam] = (
+            sign
+            * np.sqrt((2 * lam + 1) * (2 * rows.jrel + 1))
+            * sixj_array(2 * rows.lcm, 2 * rows.lrel, 2 * lam, 2 * rows.s, 2 * j, 2 * rows.jrel)
+        )
+        a_all[lam] = np.stack(
+            [
+                np.sqrt((2 * lam + 1) * (2 * s + 1) * (ja + 1) * (jb + 1))
+                * ninej_array(2 * la, 2 * lb, 2 * lam, 1, 1, 2 * s, ja, jb, 2 * j)
+                for s in (0, 1)
+            ]
+        )
+    for total in np.unique(rows.total):
+        ri = np.flatnonzero(rows.total == total)
+        pi = np.flatnonzero(pair_total == total)
+        if len(pi) == 0:
+            continue
+        row_map = mosh.row_index(int(total))
+        col_map = mosh.col_index(int(total))
+        cr = np.array([row_map[(rows.ncm[r], rows.lcm[r], rows.nrel[r], rows.lrel[r])] for r in ri])
+        cc = np.array(
+            [
+                col_map[(orb.n[x], orb.l[x], orb.n[y], orb.l[y])]
+                for x, y in zip(pair_a[pi], pair_b[pi], strict=True)
+            ]
+        )
+        for lam in b_all:
+            if lam > total:
+                continue
+            b_fac = b_all[lam][ri]
+            if not b_fac.any():
+                continue
+            mat = mosh.matrix(int(total), lam)[np.ix_(cr, cc)]
+            t[np.ix_(ri, pi)] += b_fac[:, None] * mat * a_all[lam][:, pi][rows.s[ri]]
     return t
 
 
