@@ -59,3 +59,36 @@ cannot list servers: the hub API shows none, while `/user/<name>/api/status` ans
 terminal API (`POST /user/<name>/api/terminals`, then the websocket `/user/<name>/terminals/websocket/<id>` with the token in the
 `Authorization: token ...` header). Files go through the contents API, which refuses hidden directories and only serves paths under
 the home directory. Do not print the token.
+
+
+## Shared-GPU memory (important)
+
+By default JAX reserves ~75% of the GPU's memory when it starts. On the shared H200 a process that did a 1000x1000 matrix
+product raised the used memory from 12 GB to 138 GB of 143 GB; with `XLA_PYTHON_CLIENT_PREALLOCATE=false` it stayed at the
+baseline. The first runs on 2026-10-03 (tests, benchmarks, the emax 10-14 series) used the default, so they probably held most of
+the card's free memory for those minutes, which can make other users' jobs fail with out-of-memory errors. `nuham` now sets
+`XLA_PYTHON_CLIENT_PREALLOCATE=false` on import unless the user has set it (`tests/test_package_defaults.py`). With it, the highest
+total GPU memory seen during the emax 12 and 14 runs was 62.3 GB while others used 59.5 GB, i.e. under 3 GB of ours.
+
+## Update: device-resident contraction
+
+`lab_matrix` now uploads the coefficients once per channel (`lab_channel_matrices` shares one device copy across `tz`), gathers the
+block stacks on the device and accumulates into a donated running total (`kernels/lab.accumulate_blocks`), so the P x P result
+crosses to the host once. Before, each chunk gathered on the host, copied up, copied the P x P result back and added on the host
+(for the largest emax-14 channel the copies back and the host sum were 0.34 s + 0.14 s of 0.8 s; the GPU kernel itself was 0.02 s).
+
+- Largest emax-14 channel (J=6, parity +, 4234 pairs, 7133 rows), warm: coefficient build 0.26 s, upload 0.02 s, contraction for
+  all three isospin cases 0.24 s (total 0.52 s); the first call compiles for ~7 s.
+- Whole run, emax 14 / e2max 28, warm caches, unprofiled, preallocation off, runs alternated old/new on the shared GPU
+  (other users were at 100% utilisation, so absolute times are noisy):
+
+| code | run 1 | run 2 |
+|---|---|---|
+| previous (host gather and accumulate) | 88.3 s | 85.0 s |
+| device-resident | 80.3 s | 75.0 s |
+
+  About 10% faster end to end (also 87.4 s and 79.3 s in two earlier single runs). The gain is smaller than the stage timing
+  suggests because most of the run is elsewhere: in the new profile (89.6 s, profiled) file writing is 41 s (formatting 14 s, tuple
+  assembly 7.7 s, the rest waiting on gzip), lab matrices 27 s, relative-space step and SRG flow 21 s (the SRG flow alone varied
+  between 2.9 s and 8.8 s between runs: shared GPU).
+- On the local CPU the change is neutral (emax 10: 19.8 s vs 18.5 s; emax 12: 49.6 s vs 48 s; output identical).

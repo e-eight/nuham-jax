@@ -108,7 +108,7 @@ End-to-end: imsrg++ on 4He with our file and with NuHamil's.
 ### Phase 4: GPU readiness — started (first GPU run done on ICRN, see docs/icrn-run.md: emax 14 in ~2 min cold, 566 tests pass)
 Done so far: Moshinsky brackets as exp(theta G) (`docs/study-moshinsky-rotation.md`): all tables for e2max 28 in ~15 s
 (was hours); full pipeline 3.2 s (emax 6), 8.2 s (8), 41 s (10), 302 s (12, 2.4 GB). Next: block contraction by
-tabulated 9j/6j, writer speed; then a Delta run. Contraction done (padded block stacks + one GEMM). Writer (threaded, gzip level 1) and JAX compile cache done: Vectorized 9j/6j done. CLI with warm caches: emax 10 in 18.5 s, emax 12 in 48 s.
+tabulated 9j/6j, writer speed; then a Delta run. Contraction done (padded block stacks + one GEMM, device-resident coefficients and accumulation; ~10% faster end to end on the H200). Writer (threaded, gzip level 1) and JAX compile cache done: Vectorized 9j/6j done. CLI with warm caches: emax 10 in 18.5 s, emax 12 in 48 s.
 Original description:
 Test on Delta at larger emax. Compare time and memory with Fortran. Tune bucketing and chunking.
 

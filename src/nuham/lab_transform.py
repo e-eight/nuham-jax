@@ -10,12 +10,13 @@ from dataclasses import dataclass
 
 import jax.numpy as jnp
 import numpy as np
+from jax import Array
 
 from nuham.angmom.moshinsky_table import MoshinskyTable
 from nuham.angmom.racah import ninej, sixj
 from nuham.angmom.racah_array import ninej_array, sixj_array
 from nuham.basis.lab import Orbits, ordered_pairs
-from nuham.kernels.lab import congruence_sum
+from nuham.kernels.lab import accumulate_blocks
 from nuham.relative_nn import RelativeChannel
 
 
@@ -321,21 +322,22 @@ def lab_matrix_reference(
 
 def _select(
     rows: RelCmRows,
-    t_raw: np.ndarray,
+    t_raw: np.ndarray | Array,
     pair_a: np.ndarray,
     pair_b: np.ndarray,
     j: int,
     tz: int,
-) -> tuple[np.ndarray, np.ndarray]:
-    """Columns of the pair basis for ``tz`` and the coefficients restricted and scaled to them."""
+) -> tuple[np.ndarray, np.ndarray | Array]:
+    """Columns of the pair basis for ``tz`` and the coefficients restricted and scaled to them.
+
+    Works on host or device arrays. For ``tz = 0`` every column is kept unscaled, so ``t_raw`` is
+    returned as it is.
+    """
     if tz == 0:
-        keep = np.ones(len(pair_a), dtype=bool)
-    else:
-        keep = (pair_a >= pair_b) & ~((pair_a == pair_b) & (j % 2 == 1))
+        return np.arange(len(pair_a)), t_raw
+    keep = (pair_a >= pair_b) & ~((pair_a == pair_b) & (j % 2 == 1))
     cols = np.flatnonzero(keep)
-    scale = (
-        np.where(pair_a[cols] == pair_b[cols], 1.0, math.sqrt(2.0)) if tz else np.ones(len(cols))
-    )
+    scale = np.where(pair_a[cols] == pair_b[cols], 1.0, math.sqrt(2.0))
     return cols, t_raw[:, cols] * scale[None, :]
 
 
@@ -365,12 +367,13 @@ def _blocks(
 
 
 _PAD_P = 128
+_PAD_ROWS = 256
 _MAX_BLOCK_BYTES = 512 * 2**20
 
 
 def lab_matrix(
     rows: RelCmRows,
-    t_raw: np.ndarray,
+    t_raw: np.ndarray | Array,
     pair_a: np.ndarray,
     pair_b: np.ndarray,
     j: int,
@@ -380,13 +383,16 @@ def lab_matrix(
 ) -> LabMatrix:
     """Contract the relative interaction of one ``Tz`` with the transformation coefficients.
 
-    Blocks are grouped by size, zero-padded into stacks of equal shape and contracted with
-    :func:`nuham.kernels.lab.congruence_sum`, so most of the work is a few large matrix products.
+    The coefficients live on the device (JAX default device) for the whole call. Blocks are
+    grouped by size and zero-padded into stacks of equal shape; each stack is gathered on the
+    device and added into a running sum by :func:`nuham.kernels.lab.accumulate_blocks`, so the
+    result crosses to the host once.
 
     Parameters
     ----------
     rows, t_raw
-        Output of :func:`enumerate_rows` and :func:`t_matrix` for this ``(J, parity)``.
+        Output of :func:`enumerate_rows` and :func:`t_matrix` for this ``(J, parity)``; ``t_raw``
+        may already be a device array, which avoids re-uploading it for each ``tz``.
     pair_a, pair_b
         The ordered pairs used to build ``t_raw``.
     j
@@ -408,26 +414,29 @@ def lab_matrix(
     if dim == 0:
         return LabMatrix(pair_a[cols], pair_b[cols], np.zeros((0, 0)))
     padded = -(-dim // _PAD_P) * _PAD_P
-    t_ext = np.zeros((len(rows.s) + 1, padded))
-    t_ext[:-1, :dim] = t
-    zero_row = len(rows.s)
+    n_rows = len(rows.s)
+    t_rows = (
+        jnp.zeros((-(-(n_rows + 1) // _PAD_ROWS) * _PAD_ROWS, padded))
+        .at[:n_rows, :dim]
+        .set(jnp.asarray(t))
+    )
     by_size: dict[int, list[tuple[list[int], np.ndarray]]] = {}
     for members, v_b in _blocks(rows, tz, relative):
         size = max(4, 1 << (len(members) - 1).bit_length())
         by_size.setdefault(size, []).append((members, v_b))
-    v_lab = np.zeros((padded, padded))
+    total = jnp.zeros((padded, padded))
     for size, group in by_size.items():
         chunk = max(1, _MAX_BLOCK_BYTES // (size * padded * 8))
         for start in range(0, len(group), chunk):
             part = group[start : start + chunk]
             n_pad = -(-len(part) // 64) * 64
-            idx = np.full((n_pad, size), zero_row, dtype=np.int64)
+            idx = np.full((n_pad, size), n_rows, dtype=np.int64)
             v_blocks = np.zeros((n_pad, size, size))
             for b, (members, v_b) in enumerate(part):
                 idx[b, : len(members)] = members
                 v_blocks[b, : len(members), : len(members)] = v_b
-            v_lab += np.asarray(congruence_sum(jnp.asarray(t_ext[idx]), jnp.asarray(v_blocks)))
-    return LabMatrix(pair_a[cols], pair_b[cols], v_lab[:dim, :dim])
+            total = accumulate_blocks(total, t_rows, jnp.asarray(idx), jnp.asarray(v_blocks))
+    return LabMatrix(pair_a[cols], pair_b[cols], np.asarray(total[:dim, :dim]))
 
 
 def lab_channel_matrices(
@@ -442,7 +451,7 @@ def lab_channel_matrices(
     jrel_max = max(k[0] for k in relative)
     pair_a, pair_b = ordered_pairs(orb, e2max, j, parity)
     rows = enumerate_rows(j, parity, e2max, jrel_max)
-    t_raw = t_matrix(rows, pair_a, pair_b, orb, j, mosh)
+    t_dev = jnp.asarray(t_matrix(rows, pair_a, pair_b, orb, j, mosh))
     return {
-        tz: lab_matrix(rows, t_raw, pair_a, pair_b, j, parity, tz, relative) for tz in (-1, 0, 1)
+        tz: lab_matrix(rows, t_dev, pair_a, pair_b, j, parity, tz, relative) for tz in (-1, 0, 1)
     }

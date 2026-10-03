@@ -1,5 +1,7 @@
 """Contraction of block-diagonal relative interactions with transformation coefficients."""
 
+from functools import partial
+
 import jax
 import jax.numpy as jnp
 from jax import Array
@@ -27,3 +29,31 @@ def congruence_sum(t_blocks: Array, v_blocks: Array) -> Array:
     """
     w = jnp.einsum("brs,bsq->brq", v_blocks, t_blocks)
     return jnp.einsum("brp,brq->pq", t_blocks, w)
+
+
+@partial(jax.jit, donate_argnums=0)
+def accumulate_blocks(total: Array, t_rows: Array, row_index: Array, v_blocks: Array) -> Array:
+    """Return ``total + sum_b T_b^T V_b T_b`` with the stacks gathered on the device.
+
+    ``T_b = t_rows[row_index[b]]``, so the coefficient matrix is uploaded once per channel and
+    only the small index and block arrays change between calls. ``total`` is donated and updated
+    in place.
+
+    Parameters
+    ----------
+    total
+        Running sum, shape ``(P, P)``; its buffer is reused for the result.
+    t_rows
+        Coefficients of all relative-CM rows, shape ``(n_rows, P)``; any row that padding indices
+        point at must be zero.
+    row_index
+        Integer array of shape ``(n_blocks, r)`` selecting the rows of each block.
+    v_blocks
+        Relative interaction blocks, shape ``(n_blocks, r, r)``.
+
+    Returns
+    -------
+    Array
+        The updated sum, shape ``(P, P)``.
+    """
+    return total + congruence_sum(t_rows[row_index], v_blocks)

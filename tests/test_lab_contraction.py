@@ -73,3 +73,35 @@ def test_vectorized_t_matrix_matches_scalar_reference(setup) -> None:
             t_matrix_reference(rows, a, b, orb, j, mosh),
             atol=1e-12,
         )
+
+
+def test_accumulate_blocks_matches_loop_and_updates_in_place() -> None:
+    from nuham.kernels.lab import accumulate_blocks
+
+    rng = np.random.default_rng(3)
+    t_rows = rng.normal(size=(40, 9))
+    t_rows[39] = 0.0  # the zero row that padding indices point at
+    index = rng.integers(0, 39, size=(6, 3))
+    index[2, 1:] = 39
+    index[5] = 39
+    v = rng.normal(size=(6, 3, 3))
+    start = rng.normal(size=(9, 9))
+    got = np.asarray(
+        accumulate_blocks(
+            jnp.asarray(start), jnp.asarray(t_rows), jnp.asarray(index), jnp.asarray(v)
+        )
+    )
+    want = start + sum(t_rows[index[b]].T @ v[b] @ t_rows[index[b]] for b in range(6))
+    np.testing.assert_allclose(got, want, atol=1e-12)
+
+
+def test_device_input_gives_the_same_lab_matrix(setup) -> None:
+    relative, orb, mosh = setup
+    e2max = 8
+    a, b = ordered_pairs(orb, e2max, 2, 1)
+    rows = enumerate_rows(2, 1, e2max, 8)
+    t = t_matrix(rows, a, b, orb, 2, mosh)
+    for tz in (-1, 0, 1):
+        host = lab_matrix(rows, t, a, b, 2, 1, tz, relative)
+        dev = lab_matrix(rows, jnp.asarray(t), a, b, 2, 1, tz, relative)
+        np.testing.assert_allclose(dev.v, host.v, atol=1e-13)
