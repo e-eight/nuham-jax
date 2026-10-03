@@ -112,3 +112,40 @@ raw record `benchmarks/baseline_cpu_scan_e8.json`). Seconds per point, `flow_set
   from coefficients and contraction only.
 - Per-point cost is nearly flat in batch size on CPU, as expected: there is little spare parallelism to fill. The open question for DeltaAI
   is whether a GPU gains from `flow_sets` > 1 and from larger `batch_size`; the benchmark has both knobs (`--flow-sets`, `--batch-sizes`).
+
+## DeltaAI GH200: 4c and 4d (job 3300961, 2026-10-03, commit b74e544, one GPU, ~4 min)
+
+Code was pushed from the local repo and pulled on DeltaAI (`git_commit` in the records is the pulled commit). Raw records:
+`benchmarks/baseline_gh200_4cd_*.json`. Seconds; N3LO EM500, hw 16, lambda 2.0 unless noted.
+
+**4c, single runs, warm (before = job 3300774 at commit 91099bd).**
+
+| case | write before | write after | assemble | total before | total after |
+|---|---|---|---|---|---|
+| emax 8 | 0.44 | 0.11 | 0.32 | 1.8 | 1.58 |
+| emax 10 | 2.16 | 0.70 | 0.98 | 4.8 | 3.4 |
+
+The vectorized formatter cuts `write` by 3-4x on the GH200 host as well (formatting was most of it; gzip level 1 is ~0.1 s per
+emax-8 file and ~0.7 s at emax 10). Writing is no longer the largest stage: at emax 10 `assemble` (host Python, 0.98 s) is now bigger
+than `write`, and `lab_coeffs` + `lab_contract` is 1.4 s.
+
+**4d, scan of 6 points (hw 12/16/20 x lambda 1.8/2.0), emax 8, e2max 16, second pass of two, seconds per point.**
+
+| batch size | flow_sets | mode | per point | project | srg | lab_coeffs | lab_contract | assemble | write |
+|---|---|---|---|---|---|---|---|---|---|
+| 0 (separate runs) | - | full | 1.58 | 1.07 | 0.42 | 1.67 | 3.55 | 1.89 | 0.68 |
+| 2 | 1 | full | 1.22 | 1.07 | 0.42 | 0.83 | 2.34 | 1.90 | 0.67 |
+| 6 | 1 | full | 0.98 | 1.06 | 0.42 | 0.28 | 1.53 | 1.87 | 0.68 |
+| 6 | 1 | compute-only | 0.56 | 1.08 | 0.42 | 0.28 | 1.54 | - | - |
+| 6 | 6 | compute-only | 0.53 | 1.09 | 0.20 | 0.28 | 1.55 | - | - |
+
+(Stage columns are totals over the 6 points; the per-point column is total / 6.)
+
+- A scan of 6 points costs 0.98 s per point against 1.58 s for separate runs (-38%); compute-only it is 0.56 s against ~1.1 s (the sum of the
+  separate-run compute stages), about 2x. The gain comes from building the coefficients once (`lab_coeffs` 1.67 -> 0.28 s) and
+  the batched contraction (3.55 -> 1.53 s).
+- **The GPU prefers larger flow batches, the opposite of the CPU:** `flow_sets` 6 halves the SRG stage (0.42 -> 0.20 s for 6 points; a single
+  set takes 0.06 s) while on the CPU it was 3x slower. At this size the stage is small either way (6% of a compute-only point).
+- What is left per point: `assemble` (0.31 s, host Python) is the largest stage of a full scan point, then `project` (0.18 s) and
+  `lab_contract` (0.26 s). `write` is 0.11 s. Peak GPU memory stayed below 0.33 GB and host RSS below 1.9 GB.
+- Only one job, one pass per case: no spread. Larger emax (where contraction and writing grow) was not scanned.

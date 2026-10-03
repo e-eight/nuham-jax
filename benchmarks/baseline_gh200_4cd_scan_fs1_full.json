@@ -1,0 +1,96 @@
+{
+  "env": {
+    "host": "gh077.hsn.cm.delta.internal.ncsa.edu",
+    "platform": "Linux-6.4.0-150600.23.53-64kb-aarch64-with-glibc2.38",
+    "cpu_count": 288,
+    "python": "3.12.11",
+    "jax": "0.11.2",
+    "backend": "gpu",
+    "device": "gpu:NVIDIA GH200 120GB",
+    "x64": true,
+    "git_commit": "b74e544"
+  },
+  "case": {
+    "nn_file": "/projects/bhhk/soham/nuham/cache/nuham/data/N3LO_EM500_kmax8_N100_Jmax8.bin",
+    "emax": 8,
+    "e2max": 16,
+    "grid": [
+      [
+        12.0,
+        1.8
+      ],
+      [
+        12.0,
+        2.0
+      ],
+      [
+        16.0,
+        1.8
+      ],
+      [
+        16.0,
+        2.0
+      ],
+      [
+        20.0,
+        1.8
+      ],
+      [
+        20.0,
+        2.0
+      ]
+    ],
+    "compute_only": false,
+    "flow_sets": 1
+  },
+  "runs": [
+    {
+      "batch_size": 0,
+      "n_sets": 6,
+      "total_s": 9.481313548982143,
+      "per_set_s": 1.5802189248303573,
+      "stages_s": {
+        "project": 1.0691127344034612,
+        "srg": 0.4188168002292514,
+        "lab_coeffs": 1.667329944204539,
+        "lab_contract": 3.5460288831964135,
+        "assemble": 1.8949356800876558,
+        "write": 0.6811576928012073
+      },
+      "peak_rss_gb": 1.131103515625,
+      "peak_device_gb": 0.09441536
+    },
+    {
+      "batch_size": 2,
+      "n_sets": 6,
+      "total_s": 7.301006900612265,
+      "per_set_s": 1.2168344834353775,
+      "stages_s": {
+        "project": 1.072197328787297,
+        "srg": 0.4200479690916836,
+        "lab_coeffs": 0.8314112760126591,
+        "lab_contract": 2.3366876300424337,
+        "assemble": 1.9023512373678386,
+        "write": 0.6734090903773904
+      },
+      "peak_rss_gb": 1.42535400390625,
+      "peak_device_gb": 0.211218944
+    },
+    {
+      "batch_size": 6,
+      "n_sets": 6,
+      "total_s": 5.870889464858919,
+      "per_set_s": 0.9784815774764866,
+      "stages_s": {
+        "project": 1.064873327035457,
+        "srg": 0.4172294307500124,
+        "lab_coeffs": 0.27696004789322615,
+        "lab_contract": 1.5290552470833063,
+        "assemble": 1.8729133293963969,
+        "write": 0.6809297474101186
+      },
+      "peak_rss_gb": 1.899658203125,
+      "peak_device_gb": 0.284470016
+    }
+  ]
+}
