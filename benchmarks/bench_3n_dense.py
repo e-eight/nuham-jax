@@ -10,6 +10,9 @@ Three independent measurements, chosen with a sub-command:
            products of :func:`nuham.nnn.tcoef.tcoef_nas_blocked` (host NumPy); ``--n 12`` is the
            N = 12 block of e3max 12, ``--reference`` adds the term-wise build and the difference.
 ``gemm``   float64 matrix-product rate for the shapes of the lab contraction ``T^T V T``.
+``flow``   the 3-body SRG flow (hw 16, lambda 2.0) of one ``(J, P, T)`` at ``Nmax = n`` for several
+           tolerances: Dopri8 steps, time, deviation of ``V3`` from the tightest tolerance,
+           stiffness estimate, optional eigenvalue drift; ``--genuine`` adds the local 3NF400.
 ``force``  the local N2LO 3N force of one ``(J, P, T)`` at ``N3max = n`` in the AS Jacobi basis
            (:func:`nuham.nnn.local_force.assembly.local_3nf_matrix`), with stage times: Jacobi
            basis, radial tables, Racah coefficients, radial sums, device projection, scatter,
@@ -18,6 +21,7 @@ Three independent measurements, chosen with a sub-command:
     uv run python benchmarks/bench_3n_dense.py qr --sizes 2000 5000 10400 --json qr.json
     uv run python benchmarks/bench_3n_dense.py tcoef --n 10 12 16 --json tcoef.json
     uv run python benchmarks/bench_3n_dense.py gemm --json gemm.json
+    uv run python benchmarks/bench_3n_dense.py flow --n 8 16 24 --genuine --json flow.json
     uv run python benchmarks/bench_3n_dense.py force --n 16 24 40 --workers 14 --json force.json
 """
 
@@ -32,12 +36,18 @@ import jax
 import numpy as np
 import scipy.linalg
 from run_nn import environment, peak_device_bytes
+from scipy.sparse.linalg import eigsh
 
 import nuham  # noqa: F401  sets JAX allocation defaults before the first device use
 from nuham.basis.lab import make_orbits
+from nuham.fetch import find_nn_file
+from nuham.kernels.srg import srg_alpha
+from nuham.nn.input_file import read_nn_mom
+from nuham.nnn.hamiltonian import isospin_nn, kinetic_jacobi, nn_jacobi
 from nuham.nnn.jacobi import build_channel
 from nuham.nnn.local_force.assembly import local_3nf_matrix
 from nuham.nnn.local_force.radial import nuhamil_meshes, radial_tables
+from nuham.nnn.srg3 import evolve_hamiltonian
 from nuham.nnn.tcoef import (
     jacobi_cm_rows,
     lab_states,
@@ -197,6 +207,65 @@ def force_record(n: int, j2: int, parity: int, t2: int, workers: int) -> dict:
     }  # fmt: skip
 
 
+_NN_CACHE: dict = {}
+
+
+def flow_record(
+    n: int, j2: int, parity: int, t2: int, genuine: bool, rtols: list[float], check_spectrum: bool
+) -> dict:
+    """Time the 3-body SRG flow of one channel at ``Nmax = n`` (hw 16, lambda 2.0) per tolerance.
+
+    The tightest tolerance is the reference: the others report their largest deviation of ``V3``
+    from it. ``genuine`` adds the bare local 3NF400 to H0. The spectrum check (a dense ``eigh``)
+    is only affordable for small ``n``.
+    """
+    hw, lam = 16.0, 2.0
+    timer = StageTimer()
+    if "nn" not in _NN_CACHE:
+        with timer.stage("nn_relative"):
+            _NN_CACHE["nn"] = isospin_nn(read_nn_mom(find_nn_file("N3LO_EM500")), hw, lam)
+    bare, evolved = _NN_CACHE["nn"]
+    with timer.stage("jacobi_basis"):
+        channel = build_channel(j2, parity, t2, n)
+    with timer.stage("embed"):
+        t = kinetic_jacobi(channel, hw)
+        h0 = t + nn_jacobi(channel, bare)
+        sub = nn_jacobi(channel, evolved)
+    if genuine:
+        meshes = nuhamil_meshes()
+        lecs = {"c1": -0.81, "c3": -3.2, "c4": 5.4, "cD": -0.2, "cE": 0.098}
+        with timer.stage("force"):
+            h0 = h0 + local_3nf_matrix(
+                channel, hw, meshes, radial_tables(meshes, 400.0, 2, n + 2), lecs
+            )
+    dim = len(h0)
+    rho = float(eigsh(h0, k=1, which="LA", return_eigenvectors=False)[0])
+    rows, reference = [], None
+    for rtol in sorted(rtols):
+        evolve_hamiltonian(h0, t, hw, lam, rtol=1e300, atol=1e300)  # compile for this shape
+        stats: dict[str, int] = {}
+        t0 = time.perf_counter()
+        h = evolve_hamiltonian(h0, t, hw, lam, rtol=rtol, atol=rtol, stats=stats)
+        seconds = time.perf_counter() - t0
+        v3 = h - t - sub
+        row = {"rtol": rtol, "steps": stats["steps"], "seconds": seconds, "v3": v3}
+        if check_spectrum and rtol == min(rtols):
+            row["eig_drift"] = float(np.abs(np.linalg.eigvalsh(h) - np.linalg.eigvalsh(h0)).max())
+        rows.append(row)
+    reference = rows[0]["v3"]
+    for row in rows:
+        row["v3_dev_from_tightest"] = float(np.abs(row.pop("v3") - reference).max())
+    return {
+        "n3max": n, "j2": j2, "parity": parity, "t2": t2, "genuine_3nf": genuine, "as": dim,
+        "alpha_mev-2": srg_alpha(lam), "rho_h0_mev": rho, "rho_alpha_hw": rho * srg_alpha(lam) * hw,
+        "stages": {k: round(x, 3) for k, x in timer.seconds.items()},
+        "flows": rows,
+        "trace_v3": float(np.trace(v3)), "frobenius_v3": float(np.linalg.norm(v3)),
+        "peak_host_rss_gb": resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1e6,
+        "peak_device_bytes": peak_device_bytes(),
+    }  # fmt: skip
+
+
 def main() -> None:
     """Run the chosen measurement and print and optionally save the record."""
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawTextHelpFormatter)
@@ -215,6 +284,14 @@ def main() -> None:
     f.add_argument("--parity", type=int, default=1)
     f.add_argument("--t2", type=int, default=1)
     f.add_argument("--workers", type=int, default=1)
+    fl = sub.add_parser("flow")
+    fl.add_argument("--n", type=int, nargs="+", default=[8, 12, 16])
+    fl.add_argument("--j2", type=int, default=1)
+    fl.add_argument("--parity", type=int, default=1)
+    fl.add_argument("--t2", type=int, default=1)
+    fl.add_argument("--genuine", action="store_true", help="add the bare local 3NF400 to H0")
+    fl.add_argument("--rtol", type=float, nargs="+", default=[1e-8, 1e-10, 1e-12])
+    fl.add_argument("--check-spectrum", action="store_true", help="dense eigh before/after")
     for sp in sub.choices.values():
         sp.add_argument("--json", default=None, help="also write the record to this file")
     args = p.parse_args()
@@ -224,6 +301,14 @@ def main() -> None:
         calls = [(tcoef_record, (n, args.reference)) for n in args.n]
     elif args.what == "force":
         calls = [(force_record, (n, args.j2, args.parity, args.t2, args.workers)) for n in args.n]
+    elif args.what == "flow":
+        calls = [
+            (
+                flow_record,
+                (n, args.j2, args.parity, args.t2, args.genuine, args.rtol, args.check_spectrum),
+            )
+            for n in args.n
+        ]
     else:
         calls = [(gemm_record, mk) for mk in GEMM_SHAPES]
     rows = []

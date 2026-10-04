@@ -1,0 +1,85 @@
+{
+ "benchmark": "flow",
+ "environment": {
+  "host": "darjeeling",
+  "platform": "Linux-7.1.13+deb13-amd64-x86_64-with-glibc2.41",
+  "cpu_count": 16,
+  "python": "3.12.9",
+  "jax": "0.11.2",
+  "backend": "cpu",
+  "device": "cpu:cpu",
+  "x64": true,
+  "git_commit": "c986549"
+ },
+ "rows": [
+  {
+   "n3max": 16,
+   "j2": 5,
+   "parity": 1,
+   "t2": 1,
+   "genuine_3nf": true,
+   "as": 792,
+   "alpha_mev-2": 3.6340369550686026e-05,
+   "rho_h0_mev": 275.4991227431882,
+   "rho_alpha_hw": 0.1601878389020363,
+   "stages": {
+    "nn_relative": 10.446,
+    "jacobi_basis": 2.092,
+    "embed": 0.16,
+    "force": 47.252
+   },
+   "flows": [
+    {
+     "rtol": 1e-10,
+     "steps": 6,
+     "seconds": 1.0634844540036283,
+     "v3_dev_from_tightest": 0.0
+    },
+    {
+     "rtol": 1e-08,
+     "steps": 4,
+     "seconds": 0.7030783470108872,
+     "v3_dev_from_tightest": 6.571891919548989e-10
+    }
+   ],
+   "trace_v3": 588.9869033250939,
+   "frobenius_v3": 78.5813340454841,
+   "peak_host_rss_gb": 0.93216,
+   "peak_device_bytes": null
+  },
+  {
+   "n3max": 24,
+   "j2": 5,
+   "parity": 1,
+   "t2": 1,
+   "genuine_3nf": true,
+   "as": 2548,
+   "alpha_mev-2": 3.6340369550686026e-05,
+   "rho_h0_mev": 415.37440608767207,
+   "rho_alpha_hw": 0.24151775070596368,
+   "stages": {
+    "jacobi_basis": 3.656,
+    "embed": 0.526,
+    "force": 160.869
+   },
+   "flows": [
+    {
+     "rtol": 1e-10,
+     "steps": 14,
+     "seconds": 68.60825994999323,
+     "v3_dev_from_tightest": 0.0
+    },
+    {
+     "rtol": 1e-08,
+     "steps": 9,
+     "seconds": 41.20158510400506,
+     "v3_dev_from_tightest": 4.315334756199718e-10
+    }
+   ],
+   "trace_v3": 974.6110615856036,
+   "frobenius_v3": 113.06983273528398,
+   "peak_host_rss_gb": 2.38778,
+   "peak_device_bytes": null
+  }
+ ]
+}

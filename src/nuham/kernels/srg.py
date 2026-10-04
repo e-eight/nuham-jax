@@ -54,8 +54,12 @@ def _integrate(
     rtol: float,
     atol: float,
     max_steps: int,
-) -> Array:
-    """Integrate ``dH/ds = rhs(H)`` from 0 to ``s_final`` with Dopri8 and a max-norm controller."""
+) -> tuple[Array, Array]:
+    """Integrate ``dH/ds = rhs(H)`` from 0 to ``s_final`` with Dopri8 and a max-norm controller.
+
+    Returns the final matrix and the number of steps taken (accepted and rejected); a Dopri8 step
+    evaluates the right-hand side 13 times.
+    """
     solution = diffrax.diffeqsolve(
         diffrax.ODETerm(lambda _t, h, _args: rhs(h)),
         diffrax.Dopri8(),
@@ -67,10 +71,32 @@ def _integrate(
         max_steps=max_steps,
         saveat=diffrax.SaveAt(t1=True),
     )
-    return solution.ys[0]
+    return solution.ys[0], solution.stats["num_steps"]
 
 
 @partial(jax.jit, static_argnames=("max_steps",))
+def srg_flow_dense_stats(
+    h0: Array,
+    g: Array,
+    s_final: float,
+    rtol: float = 1e-10,
+    atol: float = 1e-10,
+    max_steps: int = 100_000,
+) -> tuple[Array, Array]:
+    """Integrate ``dH/ds = [[G, H], H]`` for a dense symmetric generator ``G``; also count steps.
+
+    ``G`` is the kinetic energy of the 3N Jacobi space, block tridiagonal in N but dense inside
+    blocks, so the banded form of :func:`srg_flow` does not apply. Arguments and units are those
+    of :func:`srg_flow` with ``g`` of shape ``(n, n)`` in place of the two diagonals.
+
+    Returns
+    -------
+    tuple[Array, Array]
+        The evolved Hamiltonian and the number of integrator steps.
+    """
+    return _integrate(lambda h: _commutator_rhs_dense(h, g), h0, s_final, rtol, atol, max_steps)
+
+
 def srg_flow_dense(
     h0: Array,
     g: Array,
@@ -79,13 +105,8 @@ def srg_flow_dense(
     atol: float = 1e-10,
     max_steps: int = 100_000,
 ) -> Array:
-    """Integrate ``dH/ds = [[G, H], H]`` for a dense symmetric generator ``G`` (3N Jacobi space).
-
-    ``G`` is the kinetic energy there, block tridiagonal in N but dense inside blocks, so the
-    banded form of :func:`srg_flow` does not apply. Arguments and units are those of
-    :func:`srg_flow` with ``g`` of shape ``(n, n)`` in place of the two diagonals.
-    """
-    return _integrate(lambda h: _commutator_rhs_dense(h, g), h0, s_final, rtol, atol, max_steps)
+    """:func:`srg_flow_dense_stats` without the step count."""
+    return srg_flow_dense_stats(h0, g, s_final, rtol, atol, max_steps)[0]
 
 
 @partial(jax.jit, static_argnames=("max_steps",))
@@ -130,7 +151,7 @@ def srg_flow(
     e_low = jnp.concatenate([zero, t_off])
     return _integrate(
         lambda h: _commutator_rhs(h, t_diag, e_up, e_low), h0, s_final, rtol, atol, max_steps
-    )
+    )[0]
 
 
 @partial(jax.jit, static_argnames=("max_steps",))

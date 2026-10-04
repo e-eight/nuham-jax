@@ -1,0 +1,140 @@
+{
+ "benchmark": "flow",
+ "environment": {
+  "host": "darjeeling",
+  "platform": "Linux-7.1.13+deb13-amd64-x86_64-with-glibc2.41",
+  "cpu_count": 16,
+  "python": "3.12.9",
+  "jax": "0.11.2",
+  "backend": "cpu",
+  "device": "cpu:cpu",
+  "x64": true,
+  "git_commit": "c986549"
+ },
+ "rows": [
+  {
+   "n3max": 16,
+   "j2": 1,
+   "parity": 1,
+   "t2": 1,
+   "genuine_3nf": true,
+   "as": 351,
+   "alpha_mev-2": 3.6340369550686026e-05,
+   "rho_h0_mev": 303.87731718011474,
+   "rho_alpha_hw": 0.17668822407034243,
+   "stages": {
+    "nn_relative": 10.858,
+    "jacobi_basis": 1.656,
+    "embed": 0.107,
+    "force": 8.46
+   },
+   "flows": [
+    {
+     "rtol": 1e-12,
+     "steps": 15,
+     "seconds": 0.33485371600545477,
+     "eig_drift": 1.1368683772161603e-12,
+     "v3_dev_from_tightest": 0.0
+    },
+    {
+     "rtol": 1e-10,
+     "steps": 10,
+     "seconds": 0.2230453399970429,
+     "v3_dev_from_tightest": 1.6093681942663807e-11
+    },
+    {
+     "rtol": 1e-08,
+     "steps": 6,
+     "seconds": 0.13089103400125168,
+     "v3_dev_from_tightest": 1.7207455460521714e-09
+    }
+   ],
+   "trace_v3": 468.37504361285454,
+   "frobenius_v3": 80.48403770513987,
+   "peak_host_rss_gb": 0.819756,
+   "peak_device_bytes": null
+  },
+  {
+   "n3max": 24,
+   "j2": 1,
+   "parity": 1,
+   "t2": 1,
+   "genuine_3nf": true,
+   "as": 1033,
+   "alpha_mev-2": 3.6340369550686026e-05,
+   "rho_h0_mev": 445.42762244790947,
+   "rho_alpha_hw": 0.2589920705254477,
+   "stages": {
+    "jacobi_basis": 2.242,
+    "embed": 0.194,
+    "force": 21.49
+   },
+   "flows": [
+    {
+     "rtol": 1e-12,
+     "steps": 28,
+     "seconds": 11.033090027005528,
+     "eig_drift": 1.1937117960769683e-12,
+     "v3_dev_from_tightest": 0.0
+    },
+    {
+     "rtol": 1e-10,
+     "steps": 17,
+     "seconds": 6.711287904996425,
+     "v3_dev_from_tightest": 2.834010803809406e-12
+    },
+    {
+     "rtol": 1e-08,
+     "steps": 11,
+     "seconds": 4.391581626012339,
+     "v3_dev_from_tightest": 3.3329175530560917e-10
+    }
+   ],
+   "trace_v3": 680.0371071051491,
+   "frobenius_v3": 106.54126805577519,
+   "peak_host_rss_gb": 1.17864,
+   "peak_device_bytes": null
+  },
+  {
+   "n3max": 32,
+   "j2": 1,
+   "parity": 1,
+   "t2": 1,
+   "genuine_3nf": true,
+   "as": 2280,
+   "alpha_mev-2": 3.6340369550686026e-05,
+   "rho_h0_mev": 569.9326973182273,
+   "rho_alpha_hw": 0.3313850374330186,
+   "stages": {
+    "jacobi_basis": 3.379,
+    "embed": 0.415,
+    "force": 52.235
+   },
+   "flows": [
+    {
+     "rtol": 1e-12,
+     "steps": 37,
+     "seconds": 125.28600698200171,
+     "eig_drift": 2.7284841053187847e-12,
+     "v3_dev_from_tightest": 0.0
+    },
+    {
+     "rtol": 1e-10,
+     "steps": 22,
+     "seconds": 74.9317967449897,
+     "v3_dev_from_tightest": 1.2440326546681035e-12
+    },
+    {
+     "rtol": 1e-08,
+     "steps": 14,
+     "seconds": 47.862804170988966,
+     "v3_dev_from_tightest": 1.1367390362337915e-10
+    }
+   ],
+   "trace_v3": 695.5417450568336,
+   "frobenius_v3": 118.29268903865434,
+   "peak_host_rss_gb": 2.224288,
+   "peak_device_bytes": null
+  }
+ ]
+}

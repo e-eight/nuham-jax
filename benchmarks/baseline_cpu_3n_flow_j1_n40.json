@@ -1,0 +1,51 @@
+{
+ "benchmark": "flow",
+ "environment": {
+  "host": "darjeeling",
+  "platform": "Linux-7.1.13+deb13-amd64-x86_64-with-glibc2.41",
+  "cpu_count": 16,
+  "python": "3.12.9",
+  "jax": "0.11.2",
+  "backend": "cpu",
+  "device": "cpu:cpu",
+  "x64": true,
+  "git_commit": "c986549"
+ },
+ "rows": [
+  {
+   "n3max": 40,
+   "j2": 1,
+   "parity": 1,
+   "t2": 1,
+   "genuine_3nf": true,
+   "as": 4263,
+   "alpha_mev-2": 3.6340369550686026e-05,
+   "rho_h0_mev": 685.542477661251,
+   "rho_alpha_hw": 0.3986058716944445,
+   "stages": {
+    "nn_relative": 11.04,
+    "jacobi_basis": 8.507,
+    "embed": 0.936,
+    "force": 101.605
+   },
+   "flows": [
+    {
+     "rtol": 1e-10,
+     "steps": 26,
+     "seconds": 547.9676664629951,
+     "v3_dev_from_tightest": 0.0
+    },
+    {
+     "rtol": 1e-08,
+     "steps": 16,
+     "seconds": 322.7972142840008,
+     "v3_dev_from_tightest": 1.5373706788949365e-10
+    }
+   ],
+   "trace_v3": 683.0361914794967,
+   "frobenius_v3": 126.50694403220191,
+   "peak_host_rss_gb": 4.776312,
+   "peak_device_bytes": null
+  }
+ ]
+}

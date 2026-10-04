@@ -9,7 +9,7 @@ tolerances are well scaled, as in the NN flow.
 import jax.numpy as jnp
 import numpy as np
 
-from nuham.kernels.srg import srg_alpha, srg_flow_dense
+from nuham.kernels.srg import srg_alpha, srg_flow_dense_stats
 from nuham.nnn.hamiltonian import IsospinNN, kinetic_jacobi, nn_jacobi
 from nuham.nnn.jacobi import JacobiChannel
 
@@ -21,11 +21,17 @@ def evolve_hamiltonian(
     lam: float,
     rtol: float = 1e-10,
     atol: float = 1e-10,
+    stats: dict[str, int] | None = None,
 ) -> np.ndarray:
-    """Flow ``h0`` to the cutoff ``lam`` (fm^-1) with generator ``t``; all matrices in MeV."""
-    out = srg_flow_dense(
+    """Flow ``h0`` to the cutoff ``lam`` (fm^-1) with generator ``t``; all matrices in MeV.
+
+    If ``stats`` is given it receives the number of integrator steps as ``stats["steps"]``.
+    """
+    out, steps = srg_flow_dense_stats(
         jnp.asarray(h0 / hw), jnp.asarray(t / hw), srg_alpha(lam) * hw**2, rtol, atol / hw
     )
+    if stats is not None:
+        stats["steps"] = int(steps)
     return np.asarray(out) * hw
 
 
