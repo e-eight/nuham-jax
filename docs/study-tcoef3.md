@@ -208,6 +208,11 @@ for 20 270 lab states. Scaling to the 70 production channels by lab states squar
 4-11 core-hours; a few core-minutes on 16 processes. At N = 16 the time splits about evenly between the dense products
 plus index/scatter (7 s) and the 6j evaluation (7.5 s).
 
+On the GH200's Grace cores (DeltaAI job 3304345, commit 195a2bc, one core, `benchmarks/baseline_gh200_3n_tcoef_blocked.json`)
+the blocked build takes 3.3 s at N = 12 (term-wise 15.6 s) and **13.8 s at N = 16 (term-wise 217 s, 16x)**, equal to the
+term-wise result to 5.6e-17 at every size including the 26 829 x 9 273 block; peak host memory 8.7 GB with both builds
+resident. A Grace core is as fast as this machine's for this work, so the production estimate above holds.
+
 Consequence for 5.4: **`T_NAS` is cheap on the host and does not need the device.** Build it per channel on the host
 (in parallel over channels), apply `cfp`, and put the device to work on the contraction `6 sum T^T V T` (41-56 TFLOP/s
 fp64 measured, section 6a), which is the dominant flop count (5e14). A device version of the blocked products would

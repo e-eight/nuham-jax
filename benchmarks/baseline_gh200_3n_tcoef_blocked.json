@@ -1,0 +1,70 @@
+{
+ "benchmark": "tcoef",
+ "environment": {
+  "host": "gh113.hsn.cm.delta.internal.ncsa.edu",
+  "platform": "Linux-6.4.0-150600.23.53-64kb-aarch64-with-glibc2.38",
+  "cpu_count": 288,
+  "python": "3.12.11",
+  "jax": "0.11.2",
+  "backend": "gpu",
+  "device": "gpu:NVIDIA GH200 120GB",
+  "x64": true,
+  "git_commit": "195a2bc"
+ },
+ "rows": [
+  {
+   "n": 10,
+   "rows": 4263,
+   "cols": 1528,
+   "blocked": {
+    "seconds": 3.8769480190239847,
+    "nonzeros": 2849724,
+    "valid_fraction": 0.3903966919102115,
+    "products": 407,
+    "elements": 8233392,
+    "valid": 3214289
+   },
+   "termwise": {
+    "seconds": 2.854558147955686,
+    "max_difference": 5.551115123125783e-17
+   },
+   "peak_host_rss_gb": 1.08384
+  },
+  {
+   "n": 12,
+   "rows": 8540,
+   "cols": 2995,
+   "blocked": {
+    "seconds": 3.315588760888204,
+    "nonzeros": 11378369,
+    "valid_fraction": 0.35407775141395936,
+    "products": 769,
+    "elements": 35656612,
+    "valid": 12625213
+   },
+   "termwise": {
+    "seconds": 15.638504252070561,
+    "max_difference": 5.551115123125783e-17
+   },
+   "peak_host_rss_gb": 1.495296
+  },
+  {
+   "n": 16,
+   "rows": 26829,
+   "cols": 9273,
+   "blocked": {
+    "seconds": 13.770825758110732,
+    "nonzeros": 113140092,
+    "valid_fraction": 0.3081900674312898,
+    "products": 1706,
+    "elements": 398336293,
+    "valid": 122763289
+   },
+   "termwise": {
+    "seconds": 217.07241056091152,
+    "max_difference": 5.551115123125783e-17
+   },
+   "peak_host_rss_gb": 8.699456
+  }
+ ]
+}
