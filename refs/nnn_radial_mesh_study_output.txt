@@ -1,0 +1,24 @@
+=== Lambda = 400 MeV, reference n_p=1600 n_cos=240 pmax=5.07
+NuHamil (100p to 8, 80cos)         z0=1.2e-13 fk=1.2e-13 zx=1.2e-13 fkx0=1.2e-13 fkx1=1.2e-13 fkx2=1.2e-13  (1.6 s)
+converged n_p=200 n_cos=120        z0=1.2e-13 fk=1.2e-13 zx=1.2e-13 fkx0=1.2e-13 fkx1=1.2e-13 fkx2=1.2e-13  (2.1 s)
+converged n_p=300 n_cos=120        z0=1.1e-13 fk=1.1e-13 zx=1.2e-13 fkx0=1.2e-13 fkx1=1.1e-13 fkx2=1.1e-13  (2.3 s)
+converged n_p=400 n_cos=160        z0=9.6e-14 fk=9.5e-14 zx=9.7e-14 fkx0=9.6e-14 fkx1=9.6e-14 fkx2=9.5e-14  (3.1 s)
+converged n_p=600 n_cos=160        z0=1.4e-13 fk=1.4e-13 zx=1.4e-13 fkx0=1.4e-13 fkx1=1.4e-13 fkx2=1.4e-13  (4.1 s)
+=== Lambda = 500 MeV, reference n_p=1600 n_cos=240 pmax=6.34
+NuHamil (100p to 8, 80cos)         z0=1.2e-13 fk=1.2e-13 zx=1.2e-13 fkx0=1.2e-13 fkx1=1.2e-13 fkx2=1.2e-13  (0.5 s)
+converged n_p=200 n_cos=120        z0=1.2e-13 fk=1.2e-13 zx=1.2e-13 fkx0=1.2e-13 fkx1=1.2e-13 fkx2=1.2e-13  (1.2 s)
+converged n_p=300 n_cos=120        z0=1.1e-13 fk=1.1e-13 zx=1.2e-13 fkx0=1.2e-13 fkx1=1.2e-13 fkx2=1.2e-13  (1.6 s)
+converged n_p=400 n_cos=160        z0=9.6e-14 fk=9.5e-14 zx=9.7e-14 fkx0=9.7e-14 fkx1=9.7e-14 fkx2=9.5e-14  (2.4 s)
+converged n_p=600 n_cos=160        z0=1.4e-13 fk=1.4e-13 zx=1.4e-13 fkx0=1.4e-13 fkx1=1.4e-13 fkx2=1.4e-13  (3.4 s)
+=== Lambda = 650 MeV, reference n_p=1600 n_cos=240 pmax=8.24
+NuHamil (100p to 8, 80cos)         z0=1.2e-13 fk=1.2e-13 zx=1.2e-13 fkx0=1.2e-13 fkx1=1.2e-13 fkx2=1.2e-13  (0.5 s)
+converged n_p=200 n_cos=120        z0=1.2e-13 fk=1.2e-13 zx=1.2e-13 fkx0=1.2e-13 fkx1=1.2e-13 fkx2=1.2e-13  (1.2 s)
+converged n_p=300 n_cos=120        z0=1.1e-13 fk=1.1e-13 zx=1.2e-13 fkx0=1.2e-13 fkx1=1.1e-13 fkx2=1.1e-13  (1.6 s)
+converged n_p=400 n_cos=160        z0=9.5e-14 fk=9.5e-14 zx=9.7e-14 fkx0=9.6e-14 fkx1=9.6e-14 fkx2=9.5e-14  (2.5 s)
+converged n_p=600 n_cos=160        z0=1.4e-13 fk=1.4e-13 zx=1.4e-13 fkx0=1.4e-13 fkx1=1.4e-13 fkx2=1.4e-13  (3.5 s)
+=== Lambda = 1000 MeV, reference n_p=1600 n_cos=240 pmax=12.68
+NuHamil (100p to 8, 80cos)         z0=1.0e-03 fk=1.0e-03 zx=1.0e-03 fkx0=1.0e-03 fkx1=1.0e-03 fkx2=3.7e-03  (0.6 s)
+converged n_p=200 n_cos=120        z0=1.2e-13 fk=1.2e-13 zx=1.2e-13 fkx0=1.2e-13 fkx1=1.2e-13 fkx2=1.2e-13  (1.2 s)
+converged n_p=300 n_cos=120        z0=1.1e-13 fk=1.1e-13 zx=1.2e-13 fkx0=1.2e-13 fkx1=1.1e-13 fkx2=1.1e-13  (1.6 s)
+converged n_p=400 n_cos=160        z0=9.5e-14 fk=9.5e-14 zx=9.6e-14 fkx0=9.6e-14 fkx1=9.5e-14 fkx2=9.5e-14  (2.5 s)
+converged n_p=600 n_cos=160        z0=1.4e-13 fk=1.4e-13 zx=1.4e-13 fkx0=1.4e-13 fkx1=1.4e-13 fkx2=1.4e-13  (3.6 s)

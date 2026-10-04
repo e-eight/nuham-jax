@@ -35,3 +35,26 @@ Findings:
 
 Not done: c3 and c4 (checked later against the oracle files; c4 needs the cross-product spin algebra), the pre-SRG antisymmetric
 matrix gate (NuHamil stores only the post-SRG `NNN-full`; use `CFP^T (3 V LEC) CFP` eigenvalues against the log instead, in 5.2.4).
+
+# Phase 5.2.2: radial layer (`nuham.kernels.nnn_radial`, `nuham.local3n`)
+
+`kernels/nnn_radial.py` holds the pure kernels (regulator, spherical Bessel functions of all orders by Miller's downward
+recurrence with overflow rescaling, closed forms with a series near zero for orders 0-2, Legendre table, the p-sum transforms and the Legendre
+projection of `f1/r`, `f2/r^2`). `local3n.py` builds the meshes (`nuhamil_meshes()` = NuHamil's 80 xi points to 15 fm, 100 p points to
+8 fm^-1, 80 cosines; `converged_meshes(cutoff)` = p mesh to where the regulator is 1e-17, 300 p points, 120 cosines) and
+`radial_tables` returns `z0, fk(0..2), zx(x), fkx(0..2, x)` on the xi x xi mesh. Differences from NuHamil's `precalculations`:
+`f1` and `f2` are not recomputed for every x (the Legendre projection is one pass), and the p sums are batched on the device.
+Timing at N3max 40 (x up to 42), CPU: 1.6 s cold, 0.5-1.2 s warm.
+
+Gates (`tests/test_nnn_radial.py`):
+- spherical `j_n` against SciPy to 1e-14 (n <= 45, x up to 300), small-argument forms to 5e-14 relative;
+- Yukawa closed forms (`f1 = e^{-mu r}(1 + mu r)/(4 pi r^2)`, `f0 = -mu^2 e^{-mu r}/(4 pi r)`) at Lambda 3000 MeV: only the (m_pi/Lambda)^4 = 4.5e-6 regulator residue remains;
+- addition theorem: `sum_x (2x+1) zx_x P_x(cos)` and the same for `fkx0` reproduce the transform at `|a - s|` to 1e-13 (so `zx` and `fkx0` carry no hidden `(-1)^x`);
+- Legendre reconstruction of `fkx1` and `fkx2` to 1e-13;
+- agreement with the independent Cartesian-check tables in `refs/nnn_cartesian.py` to 1e-10 absolute (those agree with NuHamil at N <= 2, section above).
+
+Mesh convergence (`refs/nnn_radial_mesh_study.py`, output next to it; x up to 42, errors relative to the largest table value, reference 1600 p points and 240 cosines):
+- NuHamil's meshes are converged to 1e-13 for Lambda = 400, 500 and 650 MeV, so the 80-point cosine and 100-point p meshes are not a limitation for the radial tables at N3max 40;
+- at Lambda = 1000 MeV NuHamil's 8 fm^-1 p cut-off leaves 1e-3 (`exp(-(8 hc/1000)^4)` = 2e-3), as predicted in spec 5b;
+- converged meshes with 200-600 p points and 120-160 cosines all reach the 1e-13 noise floor, so 300 and 120 are the defaults.
+The xi mesh (80 points to 15 fm) only enters through the HO projection and is studied in 5.2.4 and 5.2.5.
