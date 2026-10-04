@@ -144,6 +144,24 @@ traces and norms) and, at the end, the lab `me3j` values. Reference run: `3NF400
 | 5.4 | Jacobi-to-lab transformation with e3max truncation (two dense GEMMs per block) and the `me3j.gz` writer (same loop order as NuHamil, un-normalised, 10 values per line), device-resident lab matrices, reusing the device assembly, formatter and threaded compression of Phase 4. | All 24 890 values of the reference file; then the dev sizes (emax 6-8); then imsrg++ reads the file (`file3e1max=emax`, `file3e3max=e3max` must be passed, wrong values misalign the stream silently). | Stage times at dev sizes, then a production-size estimate before any big job. |
 | 5.5 | imsrg++ validation on 4He and 16O: NN done for 4He (emax 4, 8 and 12, plus Boost decoding of emax 14 streams, docs/imsrg-check.md), 16O and converged larger emax still open; then NN+3N with the local force. | Energies match the NuHamil-based run. | none |
 
+**5.2 plan (agreed with the user, 2026-10-03).** Each term factorises as `V(alpha, alpha') = sum_a C_a(alpha, alpha') B_a[(n12 n3), (n45 n6)]`: `g_a(r)` are universal radial
+tables (depend on Lambda, regulator power, m_pi only), `B_a` are their HO projections (depend on hw and the four orbital l only; batched GEMMs), `C_a` are Racah/CG coefficients
+(hw and LEC independent). Store the five LEC-free terms and combine with the LECs afterwards (LEC and Lambda scans reuse everything, an hw scan redoes `B_a`); compute the tables
+once, not per block as NuHamil does. Decisions: (1) the angular algebra in `src/` comes from the published Navratil 2007 paper (Few-Body Syst. 41, 117, arXiv:0707.4680), also checked
+against the NuHamil paper (arXiv:2302.07962); NuHamil's Fortran-derived formulas (spec 5b) go in `refs/` as a slow cross-check; (2) radial meshes: converged by default, NuHamil's hard-coded
+meshes (80 points to 15 fm, 100 p-points to 8 fm^-1) available as an option to verify agreement at 1e-8; (3) independent brute-force Cartesian check for cE, cD and c1 only (c3, c4 by the oracle files).
+
+| Sub-step | Work | Gate |
+|---|---|---|
+| 5.2.0 | Oracle data: NuHamil with `save_3nf_before_lec` for 3NF400 at N3max 6 and 8, and the 500 MeV set (cD 0.83, cE -0.052) at N3max 6; commit the N3max 6 set (about 10 MB). | Files parse; NuHamil's `3 V LEC` and cfp reproduce its stored AS matrix. |
+| 5.2.1 | Brute-force Cartesian check (`refs/`) of cE, cD, c1 at the lowest l: settles factor 3 vs 6, signs, `(-1)^x`, NuHamil's constants. | cE and cD agree for the lowest J=1/2 states; c1 in one channel. |
+| 5.2.2 | Radial layer in JAX: `z0, zx, fk, fkx, f1, f2` (f1/f2 as a 1D table in r). | Lambda -> infinity cE limit (spec 5b 7.2), Yukawa closed forms, mesh-convergence study. |
+| 5.2.3 | Angular layer `C_a` per term (host NumPy on `racah_array`), from Nav07; NuHamil's formulas in `refs/`. | Each term equals NuHamil's NAS lower triangle to 1e-8 relative, N3max 6 then 8. |
+| 5.2.4 | Projection and assembly: batched `B_a` GEMMs, blocks by (N, N'), then `C V C^T` with the 5.1 cfp. | `C^T V_AS C` equals NuHamil's `cfp^T work cfp` (factor 3 included). |
+| 5.2.5 | Scaling to N = 16, 24, 40 (production ramp is 40 for J <= 5/2); time and memory on the GH200 against NuHamil. | Mesh-convergence verdict at large N (NuHamil's 15 fm edge sits at the N = 40 turning point). |
+
+5.2.0, 5.2.1 and 5.2.2 are independent and can run in parallel; 5.2.3 needs 5.2.0; 5.2.4 needs 5.2.3 and 5.1.
+
 Order: 5.1 and 5.1b first and in parallel (5.1b decides the riskiest design question early), then 5.2 and 5.3 (independent of each other, both need 5.1), then 5.4, then 5.5. 5.0's numpy oracle is built incrementally as each step needs
 it, in `refs/` (provenance rule: nothing transcribed from NuHamil in `src/`). Known open items from the specs: sign phases `(-1)^x` and factor 3 vs six permutations for cD (5b), the lab factor 6 and the T_NAS phases (5d), the antisymmetrizer
 threshold at Nmax 40 (5a), the number of flow steps at 3N size (5c), the `hw_target` conversion and non-kinetic generators (not analysed).
