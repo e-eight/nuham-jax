@@ -6,7 +6,7 @@ from cfp_reader import read_cfp
 from conftest import REF_WORK
 
 from nuham.angmom.moshinsky_table import MoshinskyTable
-from nuham.jacobi3 import (
+from nuham.nnn.jacobi import (
     antisymmetrizer,
     build_channel,
     jacobi_channels,

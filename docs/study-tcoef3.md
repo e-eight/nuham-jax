@@ -1,6 +1,6 @@
 # Study: Jacobi-to-lab T-coefficients of three nucleons (step 5.1b)
 
-Code: `src/nuham/tcoef3.py` (NumPy, host). Tests: `tests/test_tcoef3.py`, helpers `tests/ref3n.py`.
+Code: `src/nuham/nnn/tcoef.py` (NumPy, host). Tests: `tests/test_tcoef3.py`, helpers `tests/ref3n.py`.
 Throwaway oracles: `refs/tcoef3_reference.py` (element-wise transcription of the nested sums),
 `refs/tcoef3_gemm_prototype.py` (the sums as dense products; removed once `tcoef_nas_blocked` replaced it, see section 6b). Spec: `docs/spec-5d`, sections 4-5.
 
@@ -9,7 +9,7 @@ Throwaway oracles: `refs/tcoef3_reference.py` (element-wise transcription of the
 The coefficients of spec 5d 4.2 are correct as written. With NuHamil's own Jacobi operator and `cfp`
 as input, `6 sum T^T V_jac T` reproduces **all 24 890 values** of the 4/8/4 `me3j` reference to the
 print rounding (max difference 5.0e-9, file has 8 decimals), including the file order, the factor 6
-and the phases. With our own antisymmetriser basis (`nuham.jacobi3`), `6 T_AS^T T_AS` equals the
+and the phases. With our own antisymmetriser basis (`nuham.nnn.jacobi`), `6 T_AS^T T_AS` equals the
 lab-basis matrix of `sum_P sgn(P) P` computed independently in the m-scheme (explicit Clebsch-Gordan
 coefficients, tensor permutations) to 1e-14 for every block checked. The d = 2 Moshinsky bracket
 needs no new code. The host NumPy build costs about 1-3 microseconds per matrix element of `T_NAS`,
@@ -39,7 +39,7 @@ For a lab channel `(J, P, T)` and block `N`:
 - `lab_states`: lab states in the order of spec 5d 2.3 (reproduces the table of 2.4: 22 channels,
   715 states, largest 99 at 4/8/4; 70 channels, 687 352 states, largest 32 259 at 14/28/16).
 - `jacobi_cm_rows`: NAS Jacobi x centre-of-mass rows `(n12 l12 s12 j12 t12 n3 l3 j3 jrel ncm lcm)`
-  built from `jacobi3.nas_states`.
+  built from `nnn.jacobi.nas_states`.
 - `tcoef_nas`: the dense `T_NAS`. The sum over `(lab, lit, Lam, lam)` is split into a left factor
   `L[(a b jab), (n12 l12 s12 j12); lit]` (sum over `lab`), a right factor
   `R[c, (n3 l3 j3 ncm lcm jrel); lit, Lam]` (sum over `lam`) and the two recoupling factors
@@ -146,7 +146,7 @@ nothing was run on a GPU.
 
 ## 6a. GH200 measurements (DeltaAI job 3303832, commit 41a3a3f, `benchmarks/bench_3n_dense.py`)
 
-Records: `benchmarks/baseline_gh200_3n_{gemm,qr,tcoef}.json`. Tests of `jacobi3` and `tcoef3`: 27 passed on the GPU backend.
+Records: `benchmarks/baseline_gh200_3n_{gemm,qr,tcoef}.json`. Tests of `nnn.jacobi` and `nnn.tcoef`: 27 passed on the GPU backend.
 
 - **fp64 products** at lab-contraction shapes (m x m times m x 32 259, m up to 10 400): 41-56 TFLOP/s.
 - **T_NAS product form** (J=3/2+, T=1/2 block, warm second call; host NumPy term-wise form in brackets for the same
@@ -181,7 +181,7 @@ shape, each compiled once. The host NumPy path has the same split (index 18 s, s
 Energy conservation on both sides (lab: `e1 + e2 + e3 = N`; Jacobi: `E12 + E3 + 2 Ncm + Lcm = N`) shrinks
 the product to the valid blocks, with fixed block shapes (few compilations) and index arrays built once per channel.
 
-## 6b. Energy-blocked build (`nuham.tcoef3.tcoef_nas_blocked`)
+## 6b. Energy-blocked build (`nuham.nnn.tcoef.tcoef_nas_blocked`)
 
 Energy conservation ties the labels: a lab pair of energy `e_ab` and a Jacobi pair of energy `e12` fix
 `2 nit + lit = e_ab - e12`, the energy `N - e_ab` of `c` and the energy `N - e12` of `(n3, l3, Ncm, Lcm)`. For each

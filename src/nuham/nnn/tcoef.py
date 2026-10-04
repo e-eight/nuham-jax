@@ -14,7 +14,7 @@ Multiplying with the antisymmetriser's ``cfp`` rows gives the antisymmetric coef
 :func:`tcoef_as`.
 
 Angular momenta named ``j2``, ``t2``, ``j3``, ``jc``, ``jrel`` and the orbit's ``j2`` are doubled;
-``l``, ``s12``, ``j12``, ``jab`` are true values, as in :mod:`nuham.jacobi3`.
+``l``, ``s12``, ``j12``, ``jab`` are true values, as in :mod:`nuham.nnn.jacobi`.
 """
 
 from dataclasses import dataclass
@@ -25,7 +25,7 @@ import numpy as np
 from nuham.angmom.moshinsky_table import MoshinskyTable
 from nuham.angmom.racah_array import ninej_array, sixj_array
 from nuham.basis.lab import Orbits
-from nuham.jacobi3 import JacobiChannel, build_channel, nas_states
+from nuham.nnn.jacobi import JacobiChannel, build_channel, nas_states
 
 _CUT = 1e-16
 _CHUNK = 4_000_000
@@ -55,7 +55,7 @@ def make_brackets(cache_dir: str | None = None) -> Brackets:
 
 @cache
 def _nas(j2: int, parity: int, t2: int, n: int) -> np.ndarray:
-    """Return :func:`nuham.jacobi3.nas_states`, cached."""
+    """Return :func:`nuham.nnn.jacobi.nas_states`, cached."""
     return nas_states(j2, parity, t2, n)
 
 

@@ -5,7 +5,7 @@ the non-antisymmetrised Jacobi matrix element of the representative term ``W_1``
 
     V(alpha, alpha'; n12 n3, n45 n6) = sum_a C_a(alpha, alpha') <n12 l12 n3 l3| g_a |n45 l45 n6 l6>
 
-where ``g_a(xi1, xi2)`` are the universal radial functions of :mod:`nuham.local3n` and the
+where ``g_a(xi1, xi2)`` are the radial functions of :mod:`nuham.nnn.local_force.radial` and the
 coefficients ``C_a`` below hold all Racah algebra, spin-isospin factors and constants (LECs = 1;
 multiply c1, c3, c4 by their value in GeV^-1). The formulas are Eqs. (15), (38), (42), (47) and (49)
 of P. Navratil, Few-Body Syst. 41, 117 (2007), in that paper's notation: pair quantum numbers
@@ -137,7 +137,7 @@ def _lec_free_constants() -> dict[str, float]:
 
 
 def radial_keys(term: str, x_max: int) -> list[tuple[int, ...]]:
-    """Labels of the radial functions ``g_a`` of ``term`` (see ``local3n.radial_function``)."""
+    """Labels of the radial functions ``g_a`` of ``term`` (see ``local_force.radial.radial_function``)."""
     xs = range(x_max + 1)
     if term == "cE":
         return [(x,) for x in xs]

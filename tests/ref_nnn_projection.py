@@ -1,17 +1,17 @@
 """Slow reference projection of the local-3NF angular coefficients onto NAS HO states (test helper).
 
 Builds the non-antisymmetrised Jacobi matrix of one term for one ``(J, P, T)`` by plain Gauss
-quadrature on the mesh, channel pair by channel pair, in the order of ``jacobi3.nas_states``.
+quadrature on the mesh, channel pair by channel pair, in the order of ``nnn.jacobi.nas_states``.
 """
 
 import numpy as np
 
 import nuham  # noqa: F401  (enables float64)
 from nuham.constants import HBARC, M_REDUCED_PN
-from nuham.jacobi3 import nas_states
 from nuham.kernels.ho import radial_functions
-from nuham.local3n import LocalMeshes, RadialTables, radial_function
-from nuham.local3n_angular import Channel, coefficients
+from nuham.nnn.jacobi import nas_states
+from nuham.nnn.local_force.angular import Channel, coefficients
+from nuham.nnn.local_force.radial import LocalMeshes, RadialTables, radial_function
 
 
 def nas_term_matrix(
@@ -89,3 +89,10 @@ def nas_blocks_in_file(j2: int, parity: int, t2: int, nmax: int, dim: int) -> li
             if sum(sizes[n] for n in sub) == dim:
                 return list(sub)
     raise ValueError("no block subset matches the file dimension")
+
+
+def read_jacobi_matrix(path: str) -> np.ndarray:
+    """Read a NuHamil ``NNN-full`` or ``NNN-ind`` file: ``int32 n`` then ``n x n`` doubles."""
+    raw = open(path, "rb").read()
+    n = int(np.frombuffer(raw[:4], dtype=np.int32)[0])
+    return np.frombuffer(raw[4:], dtype=np.float64).reshape(n, n)

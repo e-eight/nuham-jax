@@ -18,9 +18,9 @@ from nuham.angmom.moshinsky_table import MoshinskyTable
 from nuham.angmom.racah import ninej, sixj
 from nuham.angmom.racah_array import ninej_array, sixj_array
 from nuham.basis.lab import Orbits, ordered_pairs
-from nuham.kernels.lab import accumulate_blocks_multi
+from nuham.kernels.nn.lab import accumulate_blocks_multi
 from nuham.kernels.transfer import to_host
-from nuham.relative_nn import RelativeChannel
+from nuham.nn.relative import RelativeChannel
 from nuham.timing import StageTimer, stage
 
 
@@ -417,7 +417,7 @@ def lab_matrix_many(
     The coefficients live on the device (JAX default device) for the whole call. Blocks are
     grouped by size and zero-padded into stacks of equal shape; each stack is gathered on the
     device and added into running sums for all sets by
-    :func:`nuham.kernels.lab.accumulate_blocks_multi`, so every result crosses to the host once.
+    :func:`nuham.kernels.nn.lab.accumulate_blocks_multi`, so every result crosses to the host once.
     The block structure depends only on the channel, so all sets must have the same relative
     channels (they do when they come from the same interaction file).
 
@@ -438,7 +438,7 @@ def lab_matrix_many(
         One dict of relative channels per set, keyed by ``(j, parity, s, tz)``.
     on_device
         Keep the matrices as device arrays instead of copying them to the host; the device
-        assembly (:func:`nuham.me2j.assemble_device`) then never moves them.
+        assembly (:func:`nuham.nn.me2j.assemble_device`) then never moves them.
 
     Returns
     -------

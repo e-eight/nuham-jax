@@ -1,0 +1,181 @@
+
+############################################################
+#          NuHamil (Tokyo) code
+############################################################
+
+# Version is main:4d310c14970d9b47fa6f40dfde78d03b61afb526
+# OpenMP number of threads=  16
+
+################### Input Parameters #####################
+# hw =  16.00 MeV
+# renorm: bare
+# 
+# Parameters for two-body system
+# N2max = 100,  Jmax =  12, Jmax(NNint) =   8
+# NN interaction: N3LO_EM500
+# Maximum momentum =   8.00 fm-1,  Number of gauss-legendre mesh points 100
+# input_nn_file = /root/NuHamil-public/input_nn_files/N3LO_EM500_kmax8_N100_Jmax8.bin
+# N3max =   6,  Jmax =  11
+# 
+################### For Output Files #####################
+# emax =   4, e2max =   8, e3max =   4
+# file name: nnn.me3j.gz
+# double precision
+# Calculations will be done for Operators:
+# hamil, 
+# directory for temporary files: ./
+############################################################
+           Calculations for NNN sector
+############################################################
+
+You are trying to calcule three-body matrix element in Laboratory frame.
+Then, 'coul' is turned to false.
+Creating directory,  .//cfp 
+Creating directory,  .//ops 
+myrank=   0,  :Calculating for J =  1/2,   P =  1,   T =  1/2, Nmax =  6
+myrank=   0, J=  1/2, P= 1, T= 1/2, Number of physical and orthonormal states:      100      34
+Not found .//NNint_A2_rel_N3LO_EM500_bare_Nmax100_hw16.gz
+Calculating NN interaction in relative coordinate:
+NNint = N3LO_EM500, Nmax =  100, Jmax =   8, hw =  16.00 MeV
+myrank=   0, Eigen values of original 3-body H:       -0.148292   13.655245   17.325970   19.279133   23.662767
+myrank=   0,  :Calculating for J =  1/2,   P = -1,   T =  1/2, Nmax =  6
+myrank=   0, J=  1/2, P=-1, T= 1/2, Number of physical and orthonormal states:       68      23
+myrank=   0, Eigen values of original 3-body H:       10.931728   13.372580   26.395543   30.778516   31.760719
+myrank=   0,  :Calculating for J =  3/2,   P =  1,   T =  1/2, Nmax =  6
+myrank=   0, J=  3/2, P= 1, T= 1/2, Number of physical and orthonormal states:      151      50
+myrank=   0, Eigen values of original 3-body H:       15.859349   16.860455   19.038441   20.076957   23.489402
+myrank=   0,  :Calculating for J =  3/2,   P = -1,   T =  1/2, Nmax =  6
+myrank=   0, J=  3/2, P=-1, T= 1/2, Number of physical and orthonormal states:      100      33
+myrank=   0, Eigen values of original 3-body H:       11.816260   12.846685   26.273510   29.711886   31.877786
+myrank=   0,  :Calculating for J =  5/2,   P =  1,   T =  1/2, Nmax =  6
+myrank=   0, J=  5/2, P= 1, T= 1/2, Number of physical and orthonormal states:      156      52
+myrank=   0, Eigen values of original 3-body H:       16.975547   18.901461   19.950291   35.917688   36.411833
+myrank=   0,  :Calculating for J =  5/2,   P = -1,   T =  1/2, Nmax =  6
+myrank=   0, J=  5/2, P=-1, T= 1/2, Number of physical and orthonormal states:       96      32
+myrank=   0, Eigen values of original 3-body H:       11.167888   29.328810   30.148919   30.708776   31.117502
+myrank=   0,  :Calculating for J =  7/2,   P =  1,   T =  1/2, Nmax =  6
+myrank=   0, J=  7/2, P= 1, T= 1/2, Number of physical and orthonormal states:      131      44
+myrank=   0, Eigen values of original 3-body H:       18.728540   35.161155   35.927398   36.581833   37.145005
+myrank=   0,  :Calculating for J =  7/2,   P = -1,   T =  1/2, Nmax =  6
+myrank=   0, J=  7/2, P=-1, T= 1/2, Number of physical and orthonormal states:       74      25
+myrank=   0, Eigen values of original 3-body H:       29.167993   30.004479   30.746416   34.619164   36.278478
+myrank=   0,  :Calculating for J =  9/2,   P =  1,   T =  1/2, Nmax =  6
+myrank=   0, J=  9/2, P= 1, T= 1/2, Number of physical and orthonormal states:       94      31
+myrank=   0, Eigen values of original 3-body H:       36.036795   36.791330   37.259520   39.808956   41.506135
+myrank=   0,  :Calculating for J =  9/2,   P = -1,   T =  1/2, Nmax =  6
+myrank=   0, J=  9/2, P=-1, T= 1/2, Number of physical and orthonormal states:       46      15
+myrank=   0, Eigen values of original 3-body H:       29.719363   56.944033   58.082378   58.478846   58.833932
+myrank=   0,  :Calculating for J = 11/2,   P =  1,   T =  1/2, Nmax =  6
+myrank=   0, J= 11/2, P= 1, T= 1/2, Number of physical and orthonormal states:       56      19
+myrank=   0, Eigen values of original 3-body H:       36.738317   40.722576   64.930312   65.557764   66.411373
+myrank=   0,  :Calculating for J = 11/2,   P = -1,   T =  1/2, Nmax =  6
+myrank=   0, J= 11/2, P=-1, T= 1/2, Number of physical and orthonormal states:       22       7
+myrank=   0, Eigen values of original 3-body H:       57.245075   58.430309   58.465100   60.789317   62.880243
+myrank=   0,  :Calculating for J =  1/2,   P =  1,   T =  3/2, Nmax =  6
+myrank=   0, J=  1/2, P= 1, T= 3/2, Number of physical and orthonormal states:       49      16
+myrank=   0, Eigen values of original 3-body H:       17.326909   23.407320   37.602351   40.359751   42.153402
+myrank=   0,  :Calculating for J =  1/2,   P = -1,   T =  3/2, Nmax =  6
+myrank=   0, J=  1/2, P=-1, T= 3/2, Number of physical and orthonormal states:       34      11
+myrank=   0, Eigen values of original 3-body H:       12.721823   32.125219   34.335369   34.927116   59.746988
+myrank=   0,  :Calculating for J =  3/2,   P =  1,   T =  3/2, Nmax =  6
+myrank=   0, J=  3/2, P= 1, T= 3/2, Number of physical and orthonormal states:       74      24
+myrank=   0, Eigen values of original 3-body H:       19.305174   22.033815   36.713761   39.978414   40.383735
+myrank=   0,  :Calculating for J =  3/2,   P = -1,   T =  3/2, Nmax =  6
+myrank=   0, J=  3/2, P=-1, T= 3/2, Number of physical and orthonormal states:       50      17
+myrank=   0, Eigen values of original 3-body H:       12.282332   31.940117   33.584672   33.679453   35.634049
+myrank=   0,  :Calculating for J =  5/2,   P =  1,   T =  3/2, Nmax =  6
+myrank=   0, J=  5/2, P= 1, T= 3/2, Number of physical and orthonormal states:       78      26
+myrank=   0, Eigen values of original 3-body H:       19.233821   22.264955   36.271837   40.278073   40.375707
+myrank=   0,  :Calculating for J =  5/2,   P = -1,   T =  3/2, Nmax =  6
+myrank=   0, J=  5/2, P=-1, T= 3/2, Number of physical and orthonormal states:       47      16
+myrank=   0, Eigen values of original 3-body H:       29.644684   33.130675   33.891613   36.372244   59.968653
+myrank=   0,  :Calculating for J =  7/2,   P =  1,   T =  3/2, Nmax =  6
+myrank=   0, J=  7/2, P= 1, T= 3/2, Number of physical and orthonormal states:       63      20
+myrank=   0, Eigen values of original 3-body H:       36.783402   39.677349   40.465380   41.057626   42.522228
+myrank=   0,  :Calculating for J =  7/2,   P = -1,   T =  3/2, Nmax =  6
+myrank=   0, J=  7/2, P=-1, T= 3/2, Number of physical and orthonormal states:       37      12
+myrank=   0, Eigen values of original 3-body H:       29.656200   35.525348   59.488536   61.111295   61.874144
+myrank=   0,  :Calculating for J =  9/2,   P =  1,   T =  3/2, Nmax =  6
+myrank=   0, J=  9/2, P= 1, T= 3/2, Number of physical and orthonormal states:       47      16
+myrank=   0, Eigen values of original 3-body H:       36.771703   40.461129   41.781603   67.246754   69.766629
+myrank=   0,  :Calculating for J =  9/2,   P = -1,   T =  3/2, Nmax =  6
+myrank=   0, J=  9/2, P=-1, T= 3/2, Number of physical and orthonormal states:       23       8
+myrank=   0, Eigen values of original 3-body H:       33.765837   57.357183   61.370692   62.168050   62.822745
+myrank=   0,  :Calculating for J = 11/2,   P =  1,   T =  3/2, Nmax =  6
+myrank=   0, J= 11/2, P= 1, T= 3/2, Number of physical and orthonormal states:       25       8
+myrank=   0, Eigen values of original 3-body H:       65.733987   68.536017   69.693465   70.404690   71.052580
+myrank=   0,  :Calculating for J = 11/2,   P = -1,   T =  3/2, Nmax =  6
+myrank=   0, J= 11/2, P=-1, T= 3/2, Number of physical and orthonormal states:       11       4
+myrank=   0, Eigen values of original 3-body H:       57.340903   62.378175   62.690883   66.899918
+# Calculating Transformation coefficient ...
+calculating T-Coefs channel:    1/  22
+calculating T-Coefs channel:    2/  22
+calculating T-Coefs channel:    3/  22
+calculating T-Coefs channel:    4/  22
+calculating T-Coefs channel:    5/  22
+calculating T-Coefs channel:    6/  22
+calculating T-Coefs channel:    7/  22
+calculating T-Coefs channel:    8/  22
+calculating T-Coefs channel:    9/  22
+calculating T-Coefs channel:   10/  22
+calculating T-Coefs channel:   11/  22
+calculating T-Coefs channel:   12/  22
+calculating T-Coefs channel:   13/  22
+calculating T-Coefs channel:   14/  22
+calculating T-Coefs channel:   15/  22
+calculating T-Coefs channel:   16/  22
+calculating T-Coefs channel:   17/  22
+calculating T-Coefs channel:   18/  22
+calculating T-Coefs channel:   19/  22
+calculating T-Coefs channel:   20/  22
+calculating T-Coefs channel:   21/  22
+calculating T-Coefs channel:   22/  22
+# hamil in Antisymmetrized 3-body basis:     0.000013 GB
+    Set three-body operator in jacobi basis ...
+
+############################################################
+    Doing transformaion to sp basis tuned using DGEMM ...
+    Block number is 400
+############################################################
+
+myrank=   0,  :Calculating for J =  1/2,   P =  1,   T =  1/2
+myrank=   0,  :Calculating for J =  1/2,   P = -1,   T =  1/2
+myrank=   0,  :Calculating for J =  3/2,   P =  1,   T =  1/2
+myrank=   0,  :Calculating for J =  3/2,   P = -1,   T =  1/2
+myrank=   0,  :Calculating for J =  5/2,   P =  1,   T =  1/2
+myrank=   0,  :Calculating for J =  5/2,   P = -1,   T =  1/2
+myrank=   0,  :Calculating for J =  7/2,   P =  1,   T =  1/2
+myrank=   0,  :Calculating for J =  7/2,   P = -1,   T =  1/2
+myrank=   0,  :Calculating for J =  9/2,   P =  1,   T =  1/2
+myrank=   0,  :Calculating for J =  9/2,   P = -1,   T =  1/2
+myrank=   0,  :Calculating for J = 11/2,   P =  1,   T =  1/2
+myrank=   0,  :Calculating for J =  1/2,   P =  1,   T =  3/2
+myrank=   0,  :Calculating for J =  1/2,   P = -1,   T =  3/2
+myrank=   0,  :Calculating for J =  3/2,   P =  1,   T =  3/2
+myrank=   0,  :Calculating for J =  3/2,   P = -1,   T =  3/2
+myrank=   0,  :Calculating for J =  5/2,   P =  1,   T =  3/2
+myrank=   0,  :Calculating for J =  5/2,   P = -1,   T =  3/2
+myrank=   0,  :Calculating for J =  7/2,   P =  1,   T =  3/2
+myrank=   0,  :Calculating for J =  7/2,   P = -1,   T =  3/2
+myrank=   0,  :Calculating for J =  9/2,   P =  1,   T =  3/2
+myrank=   0,  :Calculating for J =  9/2,   P = -1,   T =  3/2
+myrank=   0,  :Calculating for J = 11/2,   P =  1,   T =  3/2
+Number of three-body matrix elements is         24890
+
+    summary of time, total =     0:00:08
+
+                                     time,    ncall, time/ncall,   ratio 
+         Storing 6-j couplings       0.002        27     0.00007   0.0002
+         Storing 9-j couplings       0.030        25     0.00118   0.0034
+       InitThreeBodyJacIsoChan       0.033        24     0.00138   0.0038
+                 Write to file       0.349        74     0.00472   0.0398
+                Read from file       7.423       137     0.05418   0.8457
+        SetTwoBodyRelOpChannel       0.062       912     0.00007   0.0071
+   SetThreeBodyJacOpChanScalar       0.015        72     0.00021   0.0017
+Storing Talmi-Moshinsky bracke       0.001         2     0.00031   0.0001
+       T coefficient (NAS|Lab)       0.002        35     0.00005   0.0002
+       T coefficient ( AS|Lab)       0.002        35     0.00004   0.0002
+MPI parent-child, set three-bo       0.000         1     0.00000   0.0000
+                TMTransChannel       0.068        22     0.00311   0.0078
+                          misc       0.791                         0.0902
+

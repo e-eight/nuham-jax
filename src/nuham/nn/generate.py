@@ -5,10 +5,10 @@ from pathlib import Path
 
 from nuham.angmom.moshinsky_table import MoshinskyTable
 from nuham.basis.lab import lab_channels, make_orbits
-from nuham.interactions.nn_file import MomentumNN, read_nn_mom
-from nuham.lab_transform import lab_channel_matrices
-from nuham.me2j import LabChannel, write_channels
-from nuham.relative_nn import evolve_relative_nn
+from nuham.nn.input_file import MomentumNN, read_nn_mom
+from nuham.nn.lab_transform import lab_channel_matrices
+from nuham.nn.me2j import LabChannel, write_channels
+from nuham.nn.relative import evolve_relative_nn
 from nuham.runtime import (
     WriterOptions,
     add_writer_arguments,
@@ -86,7 +86,7 @@ def generate_me2j(
 
 
 def main() -> None:
-    """Command-line entry point: ``python -m nuham.generate --help``."""
+    """Command-line entry point: ``python -m nuham.nn.generate --help``."""
     p = argparse.ArgumentParser(description="Generate an NN me2j file (EM500 etc.) for imsrg++.")
     p.add_argument("nn_file", help="NuHamil momentum-space *.bin file")
     p.add_argument("output", help="output file, e.g. NN_hw16_emax14_e2max28.me2j.gz")

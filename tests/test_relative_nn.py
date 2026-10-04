@@ -4,9 +4,9 @@ import numpy as np
 import pytest
 
 import nuham  # noqa: F401
-from nuham.interactions.nn_file import read_nn_mom
-from nuham.kernels.relative import kinetic_matrix
-from nuham.relative_nn import RelativeChannel, evolve_relative_nn
+from nuham.kernels.nn.relative import kinetic_matrix
+from nuham.nn.input_file import read_nn_mom
+from nuham.nn.relative import RelativeChannel, evolve_relative_nn
 
 GOLDEN = np.load(Path(__file__).parent / "data" / "srg_golden.npz")
 CASES = [(16.0, 2.0), (24.0, 1.8)]

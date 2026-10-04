@@ -18,8 +18,8 @@ from ref_nnn_projection import (
 from sympy.physics.wigner import clebsch_gordan
 
 import nuham  # noqa: F401  (enables float64)
-from nuham.local3n import nuhamil_meshes, radial_tables
-from nuham.local3n_angular import cg0, radial_keys, tau2_dot_tau3, tau_cross
+from nuham.nnn.local_force.angular import cg0, radial_keys, tau2_dot_tau3, tau_cross
+from nuham.nnn.local_force.radial import nuhamil_meshes, radial_tables
 
 DATA = Path(__file__).resolve().parents[1] / "refs" / "work" / "nnn3f"
 

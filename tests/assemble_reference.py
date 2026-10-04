@@ -1,4 +1,4 @@
-"""The per-pair ``assemble`` that the batched one in ``nuham.me2j`` replaced, kept as a check."""
+"""The per-pair ``assemble`` that the batched one in ``nuham.nn.me2j`` replaced, kept as a check."""
 
 import math
 from collections.abc import Iterator
@@ -6,7 +6,7 @@ from collections.abc import Iterator
 import numpy as np
 
 from nuham.basis.lab import Orbits
-from nuham.me2j import LabChannel, _phase, tuple_chunks
+from nuham.nn.me2j import LabChannel, _phase, tuple_chunks
 
 
 def assemble_per_pair(

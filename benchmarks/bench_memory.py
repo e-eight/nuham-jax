@@ -21,11 +21,11 @@ import jax
 import nuham  # noqa: F401  sets JAX allocation defaults before the first device use
 from nuham.angmom.moshinsky_table import MoshinskyTable
 from nuham.basis.lab import lab_channels, make_orbits
-from nuham.interactions.nn_file import read_nn_mom
 from nuham.kernels.transfer import use_pinned_by_default
-from nuham.lab_transform import lab_channel_matrices_many
-from nuham.me2j import LabChannel
-from nuham.relative_nn import evolve_relative_nn_many
+from nuham.nn.input_file import read_nn_mom
+from nuham.nn.lab_transform import lab_channel_matrices_many
+from nuham.nn.me2j import LabChannel
+from nuham.nn.relative import evolve_relative_nn_many
 from nuham.runtime import enable_compilation_cache
 
 

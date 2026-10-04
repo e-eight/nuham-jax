@@ -67,7 +67,7 @@ factor of ~7 per two units of emax suggests tens of minutes.
 
 ## Update: contraction (done)
 
-The per-block rank update of the full `P x P` matrix was replaced by `kernels/lab.congruence_sum`: blocks are
+The per-block rank update of the full `P x P` matrix was replaced by `kernels/nn/lab.congruence_sum`: blocks are
 zero-padded into stacks of equal shape (sizes 4, 8, 16, ...; stacks capped at ~0.5 GB) and
 `sum_b T_b^T V_b T_b` is two einsums, i.e. one dense GEMM of size `P x (n_blocks r) x P` plus small batched products.
 The old routine is kept as `lab_matrix_reference` and tested against the new one in every channel at emax 4 (1e-11).

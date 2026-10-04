@@ -6,9 +6,9 @@ import pytest
 import nuham  # noqa: F401
 from nuham.angmom.moshinsky_table import MoshinskyTable
 from nuham.basis.lab import make_orbits
-from nuham.generate import generate_me2j
-from nuham.interactions.nn_file import read_nn_mom
-from nuham.me2j import read_me2j, tuple_chunks
+from nuham.nn.generate import generate_me2j
+from nuham.nn.input_file import read_nn_mom
+from nuham.nn.me2j import read_me2j, tuple_chunks
 
 REF = Path(__file__).parent.parent / "refs" / "work"
 

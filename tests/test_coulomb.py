@@ -5,7 +5,7 @@ import pytest
 
 import nuham  # noqa: F401
 from nuham.constants import ALPHA_EM, HBARC, M_PROTON
-from nuham.kernels.coulomb import coulomb_matrix
+from nuham.kernels.nn.coulomb import coulomb_matrix
 
 
 def test_ground_state_expectation_is_analytic() -> None:

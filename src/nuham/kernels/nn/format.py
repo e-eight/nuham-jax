@@ -1,7 +1,7 @@
 """Device-side text formatting of ``me2j`` values as fixed-width ``f16.8`` fields.
 
 The integer arithmetic and lookup tables are those of the host formatter
-(:func:`nuham.me2j._format_lines`), so away from rounding ties the text is identical to Python's
+(:func:`nuham.nn.me2j._format_lines`), so away from rounding ties the text is identical to Python's
 ``%16.8f``. Values whose scaled fraction is within a few ulp of 0.5 are returned as a short list
 for the host to format with Python itself.
 """

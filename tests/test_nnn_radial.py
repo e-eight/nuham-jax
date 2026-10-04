@@ -6,7 +6,7 @@ from scipy.special import spherical_jn as scipy_jn
 
 import nuham  # noqa: F401  (enables float64)
 from nuham.constants import HBARC, M_PI
-from nuham.kernels.nnn_radial import (
+from nuham.kernels.nnn.radial import (
     bilocal_transform,
     jn_over_xn,
     legendre_projected_over_r,
@@ -16,7 +16,7 @@ from nuham.kernels.nnn_radial import (
     radial_transform_over_r,
     spherical_jn,
 )
-from nuham.local3n import converged_meshes, nuhamil_meshes, radial_tables
+from nuham.nnn.local_force.radial import converged_meshes, nuhamil_meshes, radial_tables
 
 MU = M_PI / HBARC
 

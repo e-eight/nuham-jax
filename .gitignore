@@ -19,3 +19,10 @@ refs/work/nnn3f/*/NNint_*.gz
 refs/work/nnn3f/*/*.me3j.gz
 refs/work/nnn3f/*/ops/NNN-full*
 refs/work/nnn3f/*/ops/UT_*
+# ... except the bare N3max 6 references used by tests/test_local3n_assembly.py
+!refs/work/nnn3f/n400_N6_bare/ops/NNN-full*
+!refs/work/nnn3f/n400_N6_bare_ind/ops/NNN-ind*
+refs/work/nnn3f/n400_N6_bare/ops/N2LO_3NF_HOPW*
+refs/work/nnn3f/n400_N6_bare_ind/ops/N2LO_3NF_HOPW*
+refs/work/nnn3f/n400_N8_bare*/
+refs/work/nnn3f/n400_N6_bare*/cfp/

@@ -17,8 +17,8 @@ from pathlib import Path
 
 import nuham  # noqa: F401  sets JAX allocation defaults before the first device use
 from nuham.angmom.moshinsky_table import MoshinskyTable
-from nuham.generate import generate_me2j
-from nuham.interactions.nn_file import read_nn_mom
+from nuham.nn.generate import generate_me2j
+from nuham.nn.input_file import read_nn_mom
 from nuham.runtime import enable_compilation_cache
 
 

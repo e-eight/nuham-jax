@@ -8,8 +8,8 @@ from synthetic import synthetic_nn
 
 import nuham  # noqa: F401
 from nuham.angmom.moshinsky_table import MoshinskyTable
-from nuham.generate import generate_me2j
-from nuham.me2j import read_me2j
+from nuham.nn.generate import generate_me2j
+from nuham.nn.me2j import read_me2j
 from nuham.timing import StageTimer, stage
 
 

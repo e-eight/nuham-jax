@@ -13,10 +13,10 @@ from pathlib import Path
 
 from nuham.angmom.moshinsky_table import MoshinskyTable
 from nuham.basis.lab import lab_channels, make_orbits
-from nuham.interactions.nn_file import MomentumNN, read_nn_mom
-from nuham.lab_transform import lab_channel_matrices_many
-from nuham.me2j import LabChannel, write_channels
-from nuham.relative_nn import evolve_relative_nn_many
+from nuham.nn.input_file import MomentumNN, read_nn_mom
+from nuham.nn.lab_transform import lab_channel_matrices_many
+from nuham.nn.me2j import LabChannel, write_channels
+from nuham.nn.relative import evolve_relative_nn_many
 from nuham.runtime import (
     WriterOptions,
     add_writer_arguments,
@@ -68,7 +68,7 @@ def generate_scan(
     file is written, so ``batch_size`` trades speed against memory (about 4 GB of matrices per
     point at emax 14, plus roughly 2 GB fixed; plan on ~6 GB per point, measured on DeltaAI).
     Each file equals the one a separate
-    :func:`nuham.generate.generate_me2j` call would write, up to the flow tolerances.
+    :func:`nuham.nn.generate.generate_me2j` call would write, up to the flow tolerances.
 
     Parameters
     ----------
@@ -77,11 +77,11 @@ def generate_scan(
     points
         The parameter sets and their output files.
     emax, e2max, lmax, coulomb, mosh, n2max, options
-        As in :func:`nuham.generate.generate_me2j`.
+        As in :func:`nuham.nn.generate.generate_me2j`.
     batch_size
         Number of points processed together.
     timer
-        Optional stage timer with the stages of :func:`nuham.generate.generate_me2j`.
+        Optional stage timer with the stages of :func:`nuham.nn.generate.generate_me2j`.
     flow_sets
         Points whose SRG flows share a batch; ``None`` takes :func:`nuham.runtime.default_flow_sets`
         (1 on a CPU, all points of a batch on an accelerator).
@@ -127,7 +127,7 @@ def generate_scan(
 
 
 def main() -> None:
-    """Command-line entry point: ``python -m nuham.scan --help``."""
+    """Command-line entry point: ``python -m nuham.nn.scan --help``."""
     p = argparse.ArgumentParser(description="Generate NN me2j files for a grid of hw and lambda.")
     p.add_argument("nn_file", help="NuHamil momentum-space *.bin file")
     p.add_argument(

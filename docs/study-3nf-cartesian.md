@@ -36,11 +36,11 @@ Findings:
 Not done: c3 and c4 (checked later against the oracle files; c4 needs the cross-product spin algebra), the pre-SRG antisymmetric
 matrix gate (NuHamil stores only the post-SRG `NNN-full`; use `CFP^T (3 V LEC) CFP` eigenvalues against the log instead, in 5.2.4).
 
-# Phase 5.2.2: radial layer (`nuham.kernels.nnn_radial`, `nuham.local3n`)
+# Phase 5.2.2: radial layer (`nuham.kernels.nnn.radial`, `nuham.nnn.local_force.radial`)
 
-`kernels/nnn_radial.py` holds the pure kernels (regulator, spherical Bessel functions of all orders by Miller's downward
+`kernels/nnn/radial.py` holds the pure kernels (regulator, spherical Bessel functions of all orders by Miller's downward
 recurrence with overflow rescaling, closed forms with a series near zero for orders 0-2, Legendre table, the p-sum transforms and the Legendre
-projection of `f1/r`, `f2/r^2`). `local3n.py` builds the meshes (`nuhamil_meshes()` = NuHamil's 80 xi points to 15 fm, 100 p points to
+projection of `f1/r`, `f2/r^2`). `nnn/local_force/radial.py` builds the meshes (`nuhamil_meshes()` = NuHamil's 80 xi points to 15 fm, 100 p points to
 8 fm^-1, 80 cosines; `converged_meshes(cutoff)` = p mesh to where the regulator is 1e-17, 300 p points, 120 cosines) and
 `radial_tables` returns `z0, fk(0..2), zx(x), fkx(0..2, x)` on the xi x xi mesh. Differences from NuHamil's `precalculations`:
 `f1` and `f2` are not recomputed for every x (the Legendre projection is one pass), and the p sums are batched on the device.
@@ -59,11 +59,11 @@ Mesh convergence (`refs/nnn_radial_mesh_study.py`, output next to it; x up to 42
 - converged meshes with 200-600 p points and 120-160 cosines all reach the 1e-13 noise floor, so 300 and 120 are the defaults.
 The xi mesh (80 points to 15 fm) only enters through the HO projection and is studied in 5.2.4 and 5.2.5.
 
-# Phase 5.2.3: angular layer (`nuham.local3n_angular`, `tests/test_local3n_angular.py`)
+# Phase 5.2.3: angular layer (`nuham.nnn.local_force.angular`, `tests/test_local3n_angular.py`)
 
-`local3n_angular.coefficients(term, bra, ket, j2, t2, x_max)` returns, for two pair-antisymmetric channels
+`nnn.local_force.angular.coefficients(term, bra, ket, j2, t2, x_max)` returns, for two pair-antisymmetric channels
 `(l12, s12, j12, t12; l3, j3)`, the coefficients `C_a` of the radial functions `g_a` (keys `(X)` for cE, `(K, X)` for
-cD, `(K3, X)` for c1, `(K1, K2, K3, X)` for c3 and c4; `local3n.radial_function` builds `g_a` from the 5.2.2 tables). All
+cD, `(K3, X)` for c1, `(K1, K2, K3, X)` for c3 and c4; `local_force.radial.radial_function` builds `g_a` from the 5.2.2 tables). All
 constants are in (LEC = 1, MeV, fm), c1, c3, c4 for 1 GeV^-1. The formulas are Eqs. (15), (38), (42), (47) and (49) of Navratil
 (Few-Body Syst. 41, 117), read from the arXiv text; a hand check shows they are the same sums as NuHamil's
 `NNNForceLocal.F90` (same 6j and 9j triads; Nav07's `[C(2K2+1, 2K3)]^(1/2) hat(K2-K3)` equals NuHamil's `fk3k4`). Because
@@ -80,3 +80,24 @@ garbled in the arXiv text; the Fortran's `(-1)^((Jtot-j3)/2 + s12 + j45)` (c4: `
 Cost: the loops are scalar Python over cached 6j/9j symbols (0.3 s per N3max 6 channel for all terms, a minute for the 24 channels at
 N3max 8). That is fine for validation, not for N3max 40: 5.2.4 and 5.2.5 vectorise it on `racah_array` and group the intermediate
 sums (the `(v, r, y, z)` loops factor over the bra and ket orbital labels).
+
+# Phase 5.2.4: projection and assembly (`nuham.nnn.local_force.assembly`, `kernels/nnn_projection.py`)
+
+`nas_matrix` sums, for every pair of channels, the five terms times `3 LEC` into one grid `sum_a C_a g_a(xi1, xi2)` and projects it once
+with `kernels.nnn.projection.project_pair` (two einsums over weighted HO orbital tables, static shapes: orbitals are padded to
+`n_max + 1`). `antisymmetrize` then forms `cfp W cfp^T` block by block in N, with the 5.1 `cfp` or NuHamil's.
+`local_3nf_matrix(channel, hw, meshes, tables, lecs)` returns the bare genuine V3 in the AS Jacobi basis, MeV.
+
+Reference for the AS-matrix gate: NuHamil with `renorm="bare"` stores `H - T - 3 V_NN`, which is the bare genuine 3NF
+(`n400_N6_bare`). The same run without the genuine force (`n400_N6_bare_ind`) shows that the subtraction itself is not exactly zero:
+all channels are at 1e-14 except 1/2+ T1/2, where one element is 4.7e-6 (a NuHamil artefact of the 3 V_NN embedding, independent of the 3NF).
+The 3NF matrix is therefore `NNN-full - NNN-ind`.
+
+Results, N3max 6, hw 16, 3NF400 (LECs of the `3NF400` set):
+- with NuHamil's `cfp` the matrix equals the stored one element by element to <= 2e-12 MeV (1/2+ T1/2, 1/2+ T3/2, 3/2- T1/2,
+  5/2+ T1/2, 11/2- T3/2; matrix elements up to 0.83): this also fixes the factor 3 inside the AS matrix;
+- with our own `cfp` (a different orthonormal basis of the same space) the eigenvalues agree to 4e-12 and the trace to 4e-12.
+At N3max 8 (`n400_N8_bare` and `_ind`, kept local, not committed) eight channels (1/2+, 1/2-, 3/2+, 5/2+, 7/2+, 11/2+ at T1/2; 1/2+ and
+3/2- at T3/2; AS dimensions 31 to 113) agree element by element with NuHamil's cfp to <= 1.5e-12 MeV; our scalar code takes 0.3 to 6 s per channel.
+The Lambda -> infinity cE check planned for this step is not needed: the Cartesian check (5.2.1) already derives the cE normalisation from the
+physics formula alone at finite Lambda to 1e-10.

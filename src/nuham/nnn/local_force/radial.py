@@ -11,7 +11,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from nuham.constants import HBARC, M_PI
-from nuham.kernels.nnn_radial import (
+from nuham.kernels.nnn.radial import (
     bilocal_transform,
     legendre_projected_over_r,
     local_regulator,
@@ -113,7 +113,7 @@ def radial_function(
 ) -> np.ndarray:
     """Radial function ``g_a(xi1, xi2)`` of ``term`` on the mesh, shape ``(n_xi, n_xi)``.
 
-    The key is the one used by :func:`nuham.local3n_angular.radial_keys`: ``(X,)`` for cE,
+    The key is the one used by :func:`nuham.nnn.local_force.angular.radial_keys`: ``(X,)`` for cE,
     ``(K, X)`` for cD, ``(K3, X)`` for c1 and ``(K1, K2, K3, X)`` for c3 and c4.
     ``s = xi1 / sqrt2`` and
     ``a = sqrt(3/2) xi2`` are the two vectors whose distance enters the pion and contact functions.

@@ -1,7 +1,7 @@
 import numpy as np
 
 from nuham.basis.lab import lab_channels, make_orbits, ordered_pairs
-from nuham.me2j import tuple_chunks
+from nuham.nn.me2j import tuple_chunks
 
 
 def test_orbit_order_emax4() -> None:

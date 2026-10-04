@@ -7,7 +7,7 @@ Three independent measurements, chosen with a sub-command:
            (largest block at Nmax 40: about 10 400 states). Also checks that the device pivot order
            equals SciPy's, which keeps ``jacobi3.antisymmetric_basis`` deterministic.
 ``tcoef``  one ``T_NAS`` block of the J=3/2+, T=1/2 lab channel from the energy-blocked dense
-           products of :func:`nuham.tcoef3.tcoef_nas_blocked` (host NumPy); ``--n 12`` is the
+           products of :func:`nuham.nnn.tcoef.tcoef_nas_blocked` (host NumPy); ``--n 12`` is the
            N = 12 block of e3max 12, ``--reference`` adds the term-wise build and the difference.
 ``gemm``   float64 matrix-product rate for the shapes of the lab contraction ``T^T V T``.
 
@@ -30,7 +30,7 @@ from run_nn import environment, peak_device_bytes
 
 import nuham  # noqa: F401  sets JAX allocation defaults before the first device use
 from nuham.basis.lab import make_orbits
-from nuham.tcoef3 import (
+from nuham.nnn.tcoef import (
     jacobi_cm_rows,
     lab_states,
     make_brackets,
@@ -124,7 +124,7 @@ def qr_record(n: int) -> dict:
 def tcoef_record(n: int, reference: bool = False) -> dict:
     """Time the energy-blocked ``T_NAS`` build of one block (quanta ``n``) of the J=3/2+ channel.
 
-    With ``reference`` the term-wise :func:`nuham.tcoef3.tcoef_nas` is timed and compared too.
+    With ``reference`` the term-wise :func:`nuham.nnn.tcoef.tcoef_nas` is timed and compared too.
     """
     orb = make_orbits(n)
     br = make_brackets()

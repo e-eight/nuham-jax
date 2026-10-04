@@ -11,7 +11,7 @@ from pathlib import Path
 import numpy as np
 
 from nuham.basis.relative import allowed_l
-from nuham.interactions.nn_file import MomentumChannel, MomentumNN
+from nuham.nn.input_file import MomentumChannel, MomentumNN
 
 _TERMS = ((1.5, -120.0), (3.0, 80.0))  # (width in fm^-1, strength in MeV fm^3)
 

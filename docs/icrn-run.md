@@ -21,7 +21,7 @@ uv sync
 uv pip install --python /tmp/nuham-venv/bin/python "jax[cuda12]==0.11.2"   # same version as uv.lock
 export XDG_CACHE_HOME=/tmp/nuham-cache
 /tmp/nuham-venv/bin/python -m nuham.fetch                                # EM500 input, checksum verified
-/tmp/nuham-venv/bin/python -m nuham.generate $XDG_CACHE_HOME/nuham/data/N3LO_EM500_kmax8_N100_Jmax8.bin out.me2j.gz \
+/tmp/nuham-venv/bin/python -m nuham.nn.generate $XDG_CACHE_HOME/nuham/data/N3LO_EM500_kmax8_N100_Jmax8.bin out.me2j.gz \
     --hw 16 --lam 2.0 --emax 14 --e2max 28 --bracket-cache $XDG_CACHE_HOME/brackets
 ```
 
@@ -73,7 +73,7 @@ total GPU memory seen during the emax 12 and 14 runs was 62.3 GB while others us
 ## Update: device-resident contraction
 
 `lab_matrix` now uploads the coefficients once per channel (`lab_channel_matrices` shares one device copy across `tz`), gathers the
-block stacks on the device and accumulates into a donated running total (`kernels/lab.accumulate_blocks`), so the P x P result
+block stacks on the device and accumulates into a donated running total (`kernels/nn/lab.accumulate_blocks`), so the P x P result
 crosses to the host once. Before, each chunk gathered on the host, copied up, copied the P x P result back and added on the host
 (for the largest emax-14 channel the copies back and the host sum were 0.34 s + 0.14 s of 0.8 s; the GPU kernel itself was 0.02 s).
 

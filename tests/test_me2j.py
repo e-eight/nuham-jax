@@ -4,7 +4,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from nuham.me2j import _format_lines, _format_lines_python, read_me2j, write_me2j
+from nuham.nn.me2j import _format_lines, _format_lines_python, read_me2j, write_me2j
 
 REF = Path(__file__).parent.parent / "refs" / "work"
 
@@ -33,7 +33,7 @@ def test_reads_nuhamil_file() -> None:
 def test_threaded_writer_matches_direct_formatting_across_flushes(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr("nuham.me2j._FLUSH_VALUES", 50)
+    monkeypatch.setattr("nuham.nn.me2j._FLUSH_VALUES", 50)
     rng = np.random.default_rng(1)
     chunks = [rng.normal(scale=5, size=(int(k), 4)) for k in rng.integers(1, 40, size=30)]
     flat = np.concatenate([c.ravel() for c in chunks])
@@ -105,7 +105,7 @@ def test_isal_output_is_standard_gzip_with_the_same_text(tmp_path: Path) -> None
 def test_auto_falls_back_to_gzip_without_isal(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr("nuham.me2j._igzip", lambda: None)
+    monkeypatch.setattr("nuham.nn.me2j._igzip", lambda: None)
     values = np.linspace(-2.0, 2.0, 30)
     write_me2j(tmp_path / "a.me2j.gz", iter([values]), compressor="auto")
     np.testing.assert_allclose(read_me2j(tmp_path / "a.me2j.gz"), values, atol=5e-9)

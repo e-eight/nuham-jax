@@ -9,9 +9,9 @@ from reference import read_rel_cache
 import nuham  # noqa: F401
 from nuham.basis.relative import relative_states
 from nuham.constants import oscillator_length_sq
-from nuham.interactions.nn_file import read_nn_mom
-from nuham.kernels.projection import project_channel
-from nuham.kernels.relative import kinetic_matrix
+from nuham.kernels.nn.projection import project_channel
+from nuham.kernels.nn.relative import kinetic_matrix
+from nuham.nn.input_file import read_nn_mom
 
 HW = 16.0
 N2MAX = 100

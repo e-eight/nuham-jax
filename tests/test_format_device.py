@@ -10,12 +10,12 @@ from synthetic import synthetic_nn
 from test_me2j import _adversarial_values
 
 import nuham  # noqa: F401
-import nuham.me2j as me2j
+import nuham.nn.me2j as me2j
 from nuham.angmom.moshinsky_table import MoshinskyTable
 from nuham.basis.lab import lab_channels, make_orbits
-from nuham.kernels.format import format_fields, tables
-from nuham.lab_transform import lab_channel_matrices
-from nuham.me2j import (
+from nuham.kernels.nn.format import format_fields, tables
+from nuham.nn.lab_transform import lab_channel_matrices
+from nuham.nn.me2j import (
     LabChannel,
     _format_lines_python,
     assemble,
@@ -24,7 +24,7 @@ from nuham.me2j import (
     write_me2j,
     write_me2j_fields,
 )
-from nuham.relative_nn import evolve_relative_nn
+from nuham.nn.relative import evolve_relative_nn
 from nuham.runtime import WriterOptions
 
 EMAX, E2MAX = 3, 6

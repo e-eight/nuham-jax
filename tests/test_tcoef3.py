@@ -13,8 +13,8 @@ from ref3n import (
 
 from nuham.angmom.moshinsky_table import MoshinskyTable
 from nuham.basis.lab import make_orbits
-from nuham.jacobi3 import JacobiBlock, JacobiChannel
-from nuham.tcoef3 import (
+from nuham.nnn.jacobi import JacobiBlock, JacobiChannel
+from nuham.nnn.tcoef import (
     jacobi_channels_for,
     jacobi_cm_rows,
     lab_scalar,

@@ -30,8 +30,8 @@ def assemble_values(
 ) -> Array:
     """Return the ``T = 0``, nn, pn ``T = 1`` and pp values of a batch of tuples, shape ``(N, 4)``.
 
-    The arithmetic follows :func:`nuham.me2j.assemble`: the four ``Tz = 0`` elements combined with
-    the exchange phases, and the nn and pp elements scaled by the normalisation factors.
+    The arithmetic follows :func:`nuham.nn.me2j.assemble`: the four ``Tz = 0`` elements combined
+    with the exchange phases, and the nn and pp elements scaled by the normalisation factors.
 
     Parameters
     ----------

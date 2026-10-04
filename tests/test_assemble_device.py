@@ -7,9 +7,9 @@ from synthetic import synthetic_nn
 import nuham  # noqa: F401
 from nuham.angmom.moshinsky_table import MoshinskyTable
 from nuham.basis.lab import lab_channels, make_orbits
-from nuham.lab_transform import lab_channel_matrices
-from nuham.me2j import LabChannel, assemble, assemble_device
-from nuham.relative_nn import evolve_relative_nn
+from nuham.nn.lab_transform import lab_channel_matrices
+from nuham.nn.me2j import LabChannel, assemble, assemble_device
+from nuham.nn.relative import evolve_relative_nn
 from nuham.runtime import WriterOptions
 
 EMAX, E2MAX = 3, 6
@@ -46,8 +46,8 @@ def test_windows_have_the_requested_size(setup) -> None:
 
 
 def test_generate_with_device_assembler_writes_the_same_file(tmp_path) -> None:
-    from nuham.generate import generate_me2j
-    from nuham.me2j import read_me2j
+    from nuham.nn.generate import generate_me2j
+    from nuham.nn.me2j import read_me2j
 
     nn, mosh = synthetic_nn(), MoshinskyTable()
     generate_me2j(nn, tmp_path / "a.me2j", 16.0, 2.0, EMAX, E2MAX, mosh=mosh, n2max=24)
@@ -66,8 +66,8 @@ def test_generate_with_device_assembler_writes_the_same_file(tmp_path) -> None:
 
 
 def test_scan_with_device_assembler_matches(tmp_path) -> None:
-    from nuham.me2j import read_me2j
-    from nuham.scan import ScanPoint, generate_scan
+    from nuham.nn.me2j import read_me2j
+    from nuham.nn.scan import ScanPoint, generate_scan
 
     nn, mosh = synthetic_nn(), MoshinskyTable()
     pts = [ScanPoint(16.0, 2.0, tmp_path / "n.me2j"), ScanPoint(20.0, 1.8, tmp_path / "m.me2j")]

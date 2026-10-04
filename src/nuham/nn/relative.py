@@ -9,11 +9,11 @@ import numpy as np
 
 from nuham.basis.relative import relative_states
 from nuham.constants import oscillator_length_sq
-from nuham.interactions.nn_file import MomentumNN
-from nuham.kernels.coulomb import coulomb_matrix
-from nuham.kernels.projection import project_channel
-from nuham.kernels.relative import kinetic_matrix
+from nuham.kernels.nn.coulomb import coulomb_matrix
+from nuham.kernels.nn.projection import project_channel
+from nuham.kernels.nn.relative import kinetic_matrix
 from nuham.kernels.srg import srg_alpha, srg_evolve_batch
+from nuham.nn.input_file import MomentumNN
 from nuham.timing import StageTimer, stage
 
 

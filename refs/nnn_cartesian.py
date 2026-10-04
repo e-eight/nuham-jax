@@ -326,7 +326,7 @@ if __name__ == "__main__":
     ap.add_argument("--nr", type=int, default=30)
     ap.add_argument("--nth", type=int, default=20)
     a = ap.parse_args()
-    from nuham.jacobi3 import nas_states
+    from nuham.nnn.jacobi import nas_states
 
     f = sorted(glob.glob(f"{a.dir}/ops/N2LO_3NF_HOPW_J{a.j2}P{'+' if a.par > 0 else '-'}T{a.t2}_*.bin"))[0]
     hdr, data = read_terms(f)

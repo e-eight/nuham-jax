@@ -16,10 +16,10 @@ import numpy as np
 from jax import Array
 
 from nuham.basis.lab import Orbits
-from nuham.kernels.assemble import assemble_values
-from nuham.kernels.format import format_fields
-from nuham.kernels.format import tables as format_tables
-from nuham.lab_transform import LabMatrix
+from nuham.kernels.nn.assemble import assemble_values
+from nuham.kernels.nn.format import format_fields
+from nuham.kernels.nn.format import tables as format_tables
+from nuham.nn.lab_transform import LabMatrix
 from nuham.runtime import WriterOptions
 from nuham.timing import StageTimer
 

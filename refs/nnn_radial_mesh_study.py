@@ -9,7 +9,7 @@ import time
 import numpy as np
 
 import nuham  # noqa: F401
-from nuham.local3n import LocalMeshes, converged_meshes, gauss_legendre, nuhamil_meshes, radial_tables
+from nuham.nnn.local_force.radial import LocalMeshes, converged_meshes, gauss_legendre, nuhamil_meshes, radial_tables
 
 X_MAX = 42
 

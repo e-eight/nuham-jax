@@ -7,15 +7,15 @@ import pytest
 import nuham  # noqa: F401
 from nuham.angmom.moshinsky_table import MoshinskyTable
 from nuham.basis.lab import lab_channels, make_orbits, ordered_pairs
-from nuham.interactions.nn_file import read_nn_mom
-from nuham.kernels.lab import congruence_sum
-from nuham.lab_transform import (
+from nuham.kernels.nn.lab import congruence_sum
+from nuham.nn.input_file import read_nn_mom
+from nuham.nn.lab_transform import (
     enumerate_rows,
     lab_matrix,
     lab_matrix_reference,
     t_matrix,
 )
-from nuham.relative_nn import evolve_relative_nn
+from nuham.nn.relative import evolve_relative_nn
 
 
 def test_congruence_sum_matches_loop_with_padding() -> None:
@@ -61,7 +61,7 @@ def test_empty_pair_basis_gives_empty_matrix(setup) -> None:
 
 
 def test_vectorized_t_matrix_matches_scalar_reference(setup) -> None:
-    from nuham.lab_transform import t_matrix_reference
+    from nuham.nn.lab_transform import t_matrix_reference
 
     _, orb, mosh = setup
     e2max = 8
@@ -76,7 +76,7 @@ def test_vectorized_t_matrix_matches_scalar_reference(setup) -> None:
 
 
 def test_accumulate_blocks_matches_loop_and_updates_in_place() -> None:
-    from nuham.kernels.lab import accumulate_blocks
+    from nuham.kernels.nn.lab import accumulate_blocks
 
     rng = np.random.default_rng(3)
     t_rows = rng.normal(size=(40, 9))

@@ -8,10 +8,10 @@ from synthetic import synthetic_nn
 
 import nuham  # noqa: F401
 from nuham.angmom.moshinsky_table import MoshinskyTable
-from nuham.generate import generate_me2j
-from nuham.me2j import read_me2j
-from nuham.relative_nn import evolve_relative_nn, evolve_relative_nn_many
-from nuham.scan import ScanPoint, generate_scan
+from nuham.nn.generate import generate_me2j
+from nuham.nn.me2j import read_me2j
+from nuham.nn.relative import evolve_relative_nn, evolve_relative_nn_many
+from nuham.nn.scan import ScanPoint, generate_scan
 from nuham.timing import StageTimer
 
 EMAX, E2MAX = 3, 6

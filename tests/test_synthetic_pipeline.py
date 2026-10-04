@@ -16,13 +16,13 @@ from nuham.angmom.moshinsky_table import MoshinskyTable
 from nuham.basis.lab import lab_channels, make_orbits
 from nuham.basis.relative import allowed_l, relative_states
 from nuham.constants import HBARC, M_REDUCED_PN, oscillator_length_sq
-from nuham.generate import generate_me2j
-from nuham.interactions.nn_file import read_nn_mom
-from nuham.kernels.projection import project_channel
-from nuham.kernels.relative import kinetic_matrix
-from nuham.lab_transform import lab_channel_matrices
-from nuham.me2j import read_me2j, tuple_chunks
-from nuham.relative_nn import RelativeChannel, evolve_relative_nn
+from nuham.kernels.nn.projection import project_channel
+from nuham.kernels.nn.relative import kinetic_matrix
+from nuham.nn.generate import generate_me2j
+from nuham.nn.input_file import read_nn_mom
+from nuham.nn.lab_transform import lab_channel_matrices
+from nuham.nn.me2j import read_me2j, tuple_chunks
+from nuham.nn.relative import RelativeChannel, evolve_relative_nn
 
 HW = 16.0
 EMAX, E2MAX = 3, 6
@@ -161,7 +161,7 @@ def test_batched_assemble_equals_per_pair_reference(
 ) -> None:
     from assemble_reference import assemble_per_pair
 
-    from nuham.me2j import LabChannel, assemble
+    from nuham.nn.me2j import LabChannel, assemble
 
     relative = {(c.j, c.parity, c.s, c.tz): c for c in evolve_relative_nn(nn, HW, 2.0, n2max=24)}
     orb = make_orbits(EMAX)
@@ -173,6 +173,6 @@ def test_batched_assemble_equals_per_pair_reference(
     got = np.concatenate(list(assemble(orb, E2MAX, channels)))
     np.testing.assert_array_equal(got, want)
     # Tiny batches must give the same values as one big batch.
-    monkeypatch.setattr("nuham.me2j._BATCH_TUPLES", 50)
+    monkeypatch.setattr("nuham.nn.me2j._BATCH_TUPLES", 50)
     small = np.concatenate(list(assemble(orb, E2MAX, channels)))
     np.testing.assert_array_equal(small, want)

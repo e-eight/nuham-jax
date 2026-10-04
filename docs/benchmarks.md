@@ -57,7 +57,7 @@ node's 288, not the allocation; `git_commit` is null because the code was upload
 
 ## Phase 4c: writer (CPU, 2026-10-03)
 
-**Vectorized formatter** (`nuham.me2j._format_lines`). Python's `%16.8f` ran at ~5 M values/s, 71 MB/s, in the calling thread, and
+**Vectorized formatter** (`nuham.nn.me2j._format_lines`). Python's `%16.8f` ran at ~5 M values/s, 71 MB/s, in the calling thread, and
 threads cannot help it (the GIL). The values are now scaled by 1e8, rounded as integers and turned into text through lookup tables
 (`_tables`: four-digit groups for the fraction, a signed right-aligned integer part plus the point for the head). It runs at
 ~27 M values/s, 5.6x faster. The output is byte-identical to Python's: scaling is only reliable away from half-way cases, so values whose scaled
@@ -85,7 +85,7 @@ alternating runs) and changed the output bytes (summation order flips a last-dig
 
 ## Phase 4d: parameter scans (CPU part, 2026-10-03)
 
-`nuham.scan.generate_scan` writes one `me2j` per `(hw, lambda)` point (CLI `python -m nuham.scan`). Per batch of `batch_size` points:
+`nuham.nn.scan.generate_scan` writes one `me2j` per `(hw, lambda)` point (CLI `python -m nuham.nn.scan`). Per batch of `batch_size` points:
 the SRG flows of `flow_sets` points share a batch (`evolve_relative_nn_many`, per-entry `hw` and flow parameter in
 `srg_evolve_batch`); the lab coefficients of each `(J, parity)` are built and uploaded once and contracted with every point's relative
 interaction in one kernel (`accumulate_blocks_multi`, a single GEMM `P x (blocks*r) x (K*P)` instead of K). Brackets were already shared.
@@ -206,7 +206,7 @@ to emax 14 (write 12 s per point now) gives about 3.5 s per point. An aarch64 wh
 `/projects/bhhk/soham/nuham/pylibs` with `PYTHONPATH`, the venv was not changed). Not yet in the package: it would be an optional dependency used
 when importable, with `gzip` as the fallback; output bytes would differ from the `gzip` module's.
 
-**`assemble`, batched** (`nuham.me2j.assemble`). Profile at emax 10 (local CPU): 1.37 s for 12.7 M values, 45% of it in 75 000 tiny `element()` calls, i.e.
+**`assemble`, batched** (`nuham.nn.me2j.assemble`). Profile at emax 10 (local CPU): 1.37 s for 12.7 M values, 45% of it in 75 000 tiny `element()` calls, i.e.
 numpy call overhead, not memory. It now batches consecutive `(a, b)` pairs into chunks of ~260 k tuples and handles each `(J, parity)` with one set of array
 operations per chunk. Result: 0.69 s (2.0x), bit-identical to the old per-pair version (`tests/test_synthetic_pipeline.py` against
 `tests/assemble_reference.py`, including tiny batches; the NuHamil reference comparisons pass unchanged). I expected the same on the GH200; it did not happen, see the next section.
@@ -257,7 +257,7 @@ matrices already are, and copying only the values back.
 
 ## Device-side assembly: CPU prototype (2026-10-03)
 
-`nuham.me2j.assemble_device` (kernel `nuham.kernels.assemble.assemble_values`) builds the four values per tuple with JAX instead of numpy, selected with
+`nuham.nn.me2j.assemble_device` (kernel `nuham.kernels.nn.assemble.assemble_values`) builds the four values per tuple with JAX instead of numpy, selected with
 `assembler="device"` (`--assembler device` in the CLIs and benchmark runners; `"numpy"` is still the default). All matrices of a run go into three flat arrays
 (one per `Tz`) with per-group offsets and sizes, so the kernel has a static shape and compiles once per run; the host cuts the tuple stream into fixed windows of
 `batch_tuples` (default 2^20) and prepares the next window while the device works on the current one.
@@ -310,7 +310,7 @@ isal rows of job 3301348 (same code, same numbers within 1%).
 
 ## Device formatter and threaded compression: CPU prototype (2026-10-03)
 
-`nuham.kernels.format.format_fields` formats the `(N, 4)` values of an assembled window as 16-byte `f16.8` fields on the device with the host formatter's integer
+`nuham.kernels.nn.format.format_fields` formats the `(N, 4)` values of an assembled window as 16-byte `f16.8` fields on the device with the host formatter's integer
 arithmetic and lookup tables (`formatter="device"`, `--formatter device`; needs `assembler="device"`). The values never leave the device: only the fields (16 bytes
 per value) come back, and `write_me2j_fields` does the line layout (ten fields and a newline). Values whose scaled fraction is within 8 ulp of 0.5 are returned as a list
 (capacity 4096 per window, redone with room for all if exceeded) and formatted on the host with Python's `%`, so the text is identical; a value that is not finite or has
@@ -373,6 +373,6 @@ Scans, 6 points (hw 12/16/20 x lambda 1.8/2.0) at batch 6 and 12 points (hw 12..
 The five writer settings (`compresslevel`, `compressor`, `compress_threads`, `assembler`, `formatter`) are one frozen dataclass, `nuham.runtime.WriterOptions`, taken by
 `generate_me2j`, `generate_scan` and `write_channels` as `options=`. A field left `None` is filled by `resolve()` for the JAX backend: on the CPU the numpy assembler, the host
 formatter and 1 compression thread; on an accelerator the device assembler, the device formatter and 4 compression threads (4 matched 8 on the GH200, 16 cores). The CLIs
-(`python -m nuham.generate`, `python -m nuham.scan`) and the benchmark runners share the flags through `add_writer_arguments`; the runners store the resolved options
+(`python -m nuham.nn.generate`, `python -m nuham.nn.scan`) and the benchmark runners share the flags through `add_writer_arguments`; the runners store the resolved options
 under `case.writer` in their JSON, so a record states what ran. Explicit choices always win, and `formatter="device"` requires `assembler="device"`.
 Accelerator defaults were measured on the GH200 only (jobs 3301636 and 3301673); other devices are untested.
