@@ -1,0 +1,112 @@
+{
+ "benchmark": "qr",
+ "environment": {
+  "host": "gh032.hsn.cm.delta.internal.ncsa.edu",
+  "platform": "Linux-6.4.0-150600.23.53-64kb-aarch64-with-glibc2.38",
+  "cpu_count": 288,
+  "python": "3.12.11",
+  "jax": "0.11.2",
+  "backend": "gpu",
+  "device": "gpu:NVIDIA GH200 120GB",
+  "x64": true,
+  "git_commit": "41a3a3f"
+ },
+ "rows": [
+  {
+   "n": 1000,
+   "rank": 333,
+   "host_scipy_pivoted_qr": {
+    "seconds": 0.03876950079575181,
+    "range_error": 1.609823385706477e-15
+   },
+   "device_pivoted_qr_default": {
+    "seconds": 0.025275408290326595,
+    "first_call_seconds": 0.20500589720904827,
+    "same_pivots_as_scipy": true,
+    "range_error": 1.27675647831893e-15
+   },
+   "device_pivoted_qr_magma": {
+    "error": "JaxRuntimeError: INTERNAL: Unable to dlopen a MAGMA shared library that defines a magma_init symbol. Use the JAX_GPU_MAGMA_PATH environment variable to specify an explicit path to the library. [executable_name='jit_qr']"
+   },
+   "device_eigh": {
+    "seconds": 0.009425992146134377,
+    "unit_eigenvalues": 333,
+    "range_error": 6.661338147750939e-16
+   },
+   "peak_device_bytes": 155299584,
+   "peak_host_rss_gb": 0.830848
+  },
+  {
+   "n": 2000,
+   "rank": 666,
+   "host_scipy_pivoted_qr": {
+    "seconds": 0.1688475487753749,
+    "range_error": 3.164135620181696e-15
+   },
+   "device_pivoted_qr_default": {
+    "seconds": 0.1062089023180306,
+    "first_call_seconds": 0.34974091593176126,
+    "same_pivots_as_scipy": true,
+    "range_error": 3.219646771412954e-15
+   },
+   "device_pivoted_qr_magma": {
+    "error": "JaxRuntimeError: INTERNAL: MAGMA initialization was unsuccessful. [executable_name='jit_qr']"
+   },
+   "device_eigh": {
+    "seconds": 0.023539203219115734,
+    "unit_eigenvalues": 666,
+    "range_error": 8.881784197001252e-16
+   },
+   "peak_device_bytes": 272629760,
+   "peak_host_rss_gb": 0.96416
+  },
+  {
+   "n": 5000,
+   "rank": 1666,
+   "host_scipy_pivoted_qr": {
+    "seconds": 1.613573492038995,
+    "range_error": 5.218048215738236e-15
+   },
+   "device_pivoted_qr_default": {
+    "seconds": 1.0656436211429536,
+    "first_call_seconds": 1.2172071891836822,
+    "same_pivots_as_scipy": true,
+    "range_error": 5.10702591327572e-15
+   },
+   "device_pivoted_qr_magma": {
+    "error": "JaxRuntimeError: INTERNAL: MAGMA initialization was unsuccessful. [executable_name='jit_qr']"
+   },
+   "device_eigh": {
+    "seconds": 0.17839943896979094,
+    "unit_eigenvalues": 1666,
+    "range_error": 1.7208456881689926e-15
+   },
+   "peak_device_bytes": 1742257920,
+   "peak_host_rss_gb": 2.105664
+  },
+  {
+   "n": 10400,
+   "rank": 3466,
+   "host_scipy_pivoted_qr": {
+    "seconds": 15.789351153653115,
+    "range_error": 6.494804694057166e-15
+   },
+   "device_pivoted_qr_default": {
+    "seconds": 11.241300847847015,
+    "first_call_seconds": 12.361097093205899,
+    "same_pivots_as_scipy": true,
+    "range_error": 6.994405055138486e-15
+   },
+   "device_pivoted_qr_magma": {
+    "error": "JaxRuntimeError: INTERNAL: MAGMA initialization was unsuccessful. [executable_name='jit_qr']"
+   },
+   "device_eigh": {
+    "seconds": 1.0421388829126954,
+    "unit_eigenvalues": 3466,
+    "range_error": 2.7200464103316335e-15
+   },
+   "peak_device_bytes": 6933237504,
+   "peak_host_rss_gb": 6.52064
+  }
+ ]
+}

@@ -1,0 +1,48 @@
+{
+ "benchmark": "gemm",
+ "environment": {
+  "host": "gh032.hsn.cm.delta.internal.ncsa.edu",
+  "platform": "Linux-6.4.0-150600.23.53-64kb-aarch64-with-glibc2.38",
+  "cpu_count": 288,
+  "python": "3.12.11",
+  "jax": "0.11.2",
+  "backend": "gpu",
+  "device": "gpu:NVIDIA GH200 120GB",
+  "x64": true,
+  "git_commit": "41a3a3f"
+ },
+ "rows": [
+  {
+   "m": 2000,
+   "k": 8000,
+   "vt_seconds": 0.0012886328622698784,
+   "vt_tflops": 49.665037943597376,
+   "ttvt_seconds": 0.004841967951506376,
+   "ttvt_tflops": 52.87106452663659
+  },
+  {
+   "m": 4000,
+   "k": 16000,
+   "vt_seconds": 0.009094673674553633,
+   "vt_tflops": 56.29668730529015,
+   "ttvt_seconds": 0.0420495318248868,
+   "ttvt_tflops": 48.70446616454126
+  },
+  {
+   "m": 8000,
+   "k": 32259,
+   "vt_seconds": 0.09944628784433007,
+   "vt_tflops": 41.52142920069212,
+   "ttvt_seconds": 0.4095318070612848,
+   "ttvt_tflops": 40.656889181524186
+  },
+  {
+   "m": 10400,
+   "k": 32259,
+   "vt_seconds": 0.16791231278330088,
+   "vt_tflops": 41.558994479492384,
+   "ttvt_seconds": 0.5302777169272304,
+   "ttvt_tflops": 40.8189433458136
+  }
+ ]
+}

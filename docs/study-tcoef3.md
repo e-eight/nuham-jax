@@ -144,6 +144,25 @@ nothing was run on a GPU.
 4. Optimise the host path only if a CPU-only production run is wanted (cache 6j arrays, process
    pool over channels); no algorithmic risk remains.
 
+## 6a. GH200 measurements (DeltaAI job 3303832, commit 41a3a3f, `benchmarks/bench_3n_dense.py`)
+
+Records: `benchmarks/baseline_gh200_3n_{gemm,qr,tcoef}.json`. Tests of `jacobi3` and `tcoef3`: 27 passed on the GPU backend.
+
+- **fp64 products** at lab-contraction shapes (m x m times m x 32 259, m up to 10 400): 41-56 TFLOP/s.
+- **T_NAS product form** (J=3/2+, T=1/2 block, warm second call; host NumPy term-wise form in brackets for the same
+  dense-product code on the Grace CPU): N=8 1.0 s (3.3 s), N=10 5.5 s (5.7 s), **N=12 28.5 s (25.8 s)**. The
+  78.6 GFlop of the N=12 block would take about 2 ms at the measured product rate, but the whole call takes 25-28 s
+  (3 GFlop/s), so the time is not in the products: it is host index construction, per-(j12, jc) uploads, eager
+  dispatch and the scatter. First call on the device adds 14-36 s of compilation/dispatch per new shape. **The gate is
+  answered for this implementation only: no gain on the GH200.** A device version needs the index arrays
+  precomputed once, the factors batched, and the scatter done inside one jitted function; that has not been tried.
+- **Pivoted QR of a rank n/3 projector** (n = 1 000 / 2 000 / 5 000 / 10 400): host SciPy 0.04 / 0.17 / 1.6 / 15.8 s,
+  `jax.lax.linalg.qr(pivoting=True)` on the device 0.03 / 0.11 / 1.1 / 11.2 s with the same pivot order as SciPy
+  (basis equal); the MAGMA path (`use_magma=True`) fails here (no MAGMA library in the CUDA wheel); device `eigh`
+  0.01 / 0.02 / 0.18 / 1.0 s (arbitrary basis). Pivoted QR is not worth moving to the device (1.4x); the largest block
+  costs 16 s on the host, once per channel and N, and the result is hw independent and cacheable. `eigh` is 15x faster
+  if a gauge-independent pipeline is ever wanted.
+
 ## 6. What was not done
 
 No JAX/GPU measurement (no accelerator on this machine). The e3max 14 and 16 cost is extrapolated

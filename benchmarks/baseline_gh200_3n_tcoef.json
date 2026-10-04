@@ -1,0 +1,121 @@
+{
+ "benchmark": "tcoef",
+ "environment": {
+  "host": "gh032.hsn.cm.delta.internal.ncsa.edu",
+  "platform": "Linux-6.4.0-150600.23.53-64kb-aarch64-with-glibc2.38",
+  "cpu_count": 288,
+  "python": "3.12.11",
+  "jax": "0.11.2",
+  "backend": "gpu",
+  "device": "gpu:NVIDIA GH200 120GB",
+  "x64": true,
+  "git_commit": "41a3a3f"
+ },
+ "rows": [
+  {
+   "n": 8,
+   "rows": 1887,
+   "cols": 682,
+   "numpy": [
+    {
+     "total_seconds": 3.311295446008444,
+     "host_factors": 2.862800844013691,
+     "product": 0.4484168440103531,
+     "flops": 930064560,
+     "nonzeros": 551858,
+     "checksum": 9127.943444933742
+    }
+   ],
+   "jax": [
+    {
+     "total_seconds": 14.81653346400708,
+     "host_factors": 0.5905686928890646,
+     "product": 14.225839687045664,
+     "flops": 930064560,
+     "nonzeros": 551858,
+     "checksum": 9127.943444933742
+    },
+    {
+     "total_seconds": 1.0284117092378438,
+     "host_factors": 0.5062858671881258,
+     "product": 0.522035124246031,
+     "flops": 930064560,
+     "nonzeros": 551858,
+     "checksum": 9127.943444933742
+    }
+   ],
+   "peak_device_bytes": 185450240,
+   "peak_host_rss_gb": 0.831872
+  },
+  {
+   "n": 10,
+   "rows": 4263,
+   "cols": 1528,
+   "numpy": [
+    {
+     "total_seconds": 5.69503431301564,
+     "host_factors": 2.124271130654961,
+     "product": 3.570114560890943,
+     "flops": 10421802160,
+     "nonzeros": 2837681,
+     "checksum": 29356.738020863304
+    }
+   ],
+   "jax": [
+    {
+     "total_seconds": 29.690538076218218,
+     "host_factors": 1.4724301239475608,
+     "product": 28.217502176761627,
+     "flops": 10421802160,
+     "nonzeros": 2837681,
+     "checksum": 29356.738020863304
+    },
+    {
+     "total_seconds": 5.505552038084716,
+     "host_factors": 1.4087727619335055,
+     "product": 4.0962184919044375,
+     "flops": 10421802160,
+     "nonzeros": 2837681,
+     "checksum": 29356.738020863304
+    }
+   ],
+   "peak_device_bytes": 283761664,
+   "peak_host_rss_gb": 1.182208
+  },
+  {
+   "n": 12,
+   "rows": 8540,
+   "cols": 2995,
+   "numpy": [
+    {
+     "total_seconds": 25.83800979098305,
+     "host_factors": 4.500528174918145,
+     "product": 21.33661553123966,
+     "flops": 78602115592,
+     "nonzeros": 11339679,
+     "checksum": 79620.5043554716
+    }
+   ],
+   "jax": [
+    {
+     "total_seconds": 65.09520264295861,
+     "host_factors": 3.750774488784373,
+     "product": 61.343549428042024,
+     "flops": 78602115592,
+     "nonzeros": 11339679,
+     "checksum": 79620.5043554716
+    },
+    {
+     "total_seconds": 28.498788838274777,
+     "host_factors": 3.6402930971235037,
+     "product": 24.85759000806138,
+     "flops": 78602115592,
+     "nonzeros": 11339679,
+     "checksum": 79620.5043554716
+    }
+   ],
+   "peak_device_bytes": 575114240,
+   "peak_host_rss_gb": 2.06432
+  }
+ ]
+}
