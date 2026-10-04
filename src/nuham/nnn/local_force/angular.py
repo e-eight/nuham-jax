@@ -137,7 +137,7 @@ def _lec_free_constants() -> dict[str, float]:
 
 
 def radial_keys(term: str, x_max: int) -> list[tuple[int, ...]]:
-    """Labels of the radial functions ``g_a`` of ``term`` (see ``local_force.radial.radial_function``)."""
+    """Labels of the radial functions ``g_a`` of ``term`` (see ``radial.radial_function``)."""
     xs = range(x_max + 1)
     if term == "cE":
         return [(x,) for x in xs]

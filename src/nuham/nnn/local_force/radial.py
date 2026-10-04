@@ -10,7 +10,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from nuham.constants import HBARC, M_PI
+from nuham.constants import HBARC, M_PI, M_REDUCED_PN
 from nuham.kernels.nnn.radial import (
     bilocal_transform,
     legendre_projected_over_r,
@@ -59,6 +59,21 @@ def nuhamil_meshes() -> LocalMeshes:
     p, p_w = gauss_legendre(100, 0.0, 8.0)
     c, c_w = gauss_legendre(80, -1.0, 1.0)
     return LocalMeshes(xi, xi_w, p, p_w, c, c_w)
+
+
+def xi_mesh_size(
+    n3max: int, hw: float, margin: float = 1.22, per_fm: float = 7.0
+) -> tuple[int, float]:
+    """Return ``(n_xi, xi_max)`` for a radial mesh that holds all HO states up to ``n3max``.
+
+    The outer turning point of a state with ``2n + l = N`` is ``sqrt((2N + 3) / nu)`` with
+    ``nu = 2 m hw / (hbar c)^2``; a mesh ending 22% beyond it with 7 points per fm reproduces the
+    matrix elements to 1e-14 (``docs/study-local-3nf.md``). NuHamil's fixed 80 points to 15 fm fall
+    short of this beyond about ``n3max * hw`` = 600 MeV (an error of order 1e-9 MeV).
+    """
+    nu = 2.0 * M_REDUCED_PN * hw / HBARC**2
+    xi_max = margin * np.sqrt((2 * n3max + 3) / nu)
+    return int(np.ceil(per_fm * xi_max)), float(xi_max)
 
 
 def converged_meshes(

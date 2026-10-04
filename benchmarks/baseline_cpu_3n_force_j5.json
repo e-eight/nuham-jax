@@ -1,0 +1,126 @@
+{
+ "benchmark": "force",
+ "environment": {
+  "host": "darjeeling",
+  "platform": "Linux-7.1.13+deb13-amd64-x86_64-with-glibc2.41",
+  "cpu_count": 16,
+  "python": "3.12.9",
+  "jax": "0.11.2",
+  "backend": "cpu",
+  "device": "cpu:cpu",
+  "x64": true,
+  "git_commit": "01a7ee2"
+ },
+ "rows": [
+  {
+   "n3max": 8,
+   "j2": 5,
+   "parity": 1,
+   "t2": 1,
+   "workers": 14,
+   "nas": 340,
+   "as": 113,
+   "assembly_seconds": 1.5577778449951438,
+   "stages": {
+    "jacobi_basis": 0.595,
+    "radial_tables": 1.718,
+    "coefficients": 0.08,
+    "grids": 0.315,
+    "projection": 0.801,
+    "scatter": 0.051,
+    "antisymmetrize": 0.001
+   },
+   "peak_host_rss_gb": 0.526948,
+   "peak_device_bytes": null,
+   "trace": 0.22291540498587398
+  },
+  {
+   "n3max": 12,
+   "j2": 5,
+   "parity": 1,
+   "t2": 1,
+   "workers": 14,
+   "nas": 1050,
+   "as": 350,
+   "assembly_seconds": 4.911957281001378,
+   "stages": {
+    "jacobi_basis": 0.773,
+    "radial_tables": 0.883,
+    "coefficients": 0.091,
+    "grids": 2.24,
+    "projection": 1.936,
+    "scatter": 0.174,
+    "antisymmetrize": 0.003
+   },
+   "peak_host_rss_gb": 0.626368,
+   "peak_device_bytes": null,
+   "trace": 0.25785302234492946
+  },
+  {
+   "n3max": 16,
+   "j2": 5,
+   "parity": 1,
+   "t2": 1,
+   "workers": 14,
+   "nas": 2376,
+   "as": 792,
+   "assembly_seconds": 10.96968925499823,
+   "stages": {
+    "jacobi_basis": 1.381,
+    "radial_tables": 0.909,
+    "coefficients": 0.071,
+    "grids": 5.82,
+    "projection": 4.082,
+    "scatter": 0.465,
+    "antisymmetrize": 0.015
+   },
+   "peak_host_rss_gb": 0.766944,
+   "peak_device_bytes": null,
+   "trace": 0.08231074457414957
+  },
+  {
+   "n3max": 24,
+   "j2": 5,
+   "parity": 1,
+   "t2": 1,
+   "workers": 14,
+   "nas": 7644,
+   "as": 2548,
+   "assembly_seconds": 39.73788445300306,
+   "stages": {
+    "jacobi_basis": 3.638,
+    "radial_tables": 0.901,
+    "coefficients": 0.025,
+    "grids": 17.037,
+    "projection": 18.475,
+    "scatter": 2.979,
+    "antisymmetrize": 0.21
+   },
+   "peak_host_rss_gb": 1.397736,
+   "peak_device_bytes": null,
+   "trace": -1.2880453528422424
+  },
+  {
+   "n3max": 32,
+   "j2": 5,
+   "parity": 1,
+   "t2": 1,
+   "workers": 14,
+   "nas": 17680,
+   "as": 5893,
+   "assembly_seconds": 104.7014227519976,
+   "stages": {
+    "jacobi_basis": 14.091,
+    "radial_tables": 0.889,
+    "coefficients": 0.153,
+    "grids": 32.953,
+    "projection": 58.629,
+    "scatter": 10.11,
+    "antisymmetrize": 1.586
+   },
+   "peak_host_rss_gb": 3.789052,
+   "peak_device_bytes": null,
+   "trace": -4.2006131496712085
+  }
+ ]
+}

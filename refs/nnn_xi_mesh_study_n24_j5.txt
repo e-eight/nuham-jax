@@ -1,0 +1,17 @@
+N3max 24 2J=5 P=+1 2T=1: AS 2548, NAS 7644, basis 5 s
+/home/soham/.local/share/uv/python/cpython-3.12.9-linux-x86_64-gnu/lib/python3.12/multiprocessing/popen_fork.py:66: RuntimeWarning: os.fork() was called. os.fork() is incompatible with multithreaded code, and JAX is multithreaded, so this will likely lead to a deadlock.
+  self.pid = os.fork()
+  NuHamil (80, 15 fm; p100 to 8): overlap defect 1.9e-10, built in 47 s
+  80, 15 fm (converged p, cos): overlap defect 1.9e-10, built in 44 s
+  120, 15 fm: overlap defect 1.9e-10, built in 49 s
+  120, 18 fm: overlap defect 1.8e-14, built in 48 s
+  160, 18 fm: overlap defect 1.4e-14, built in 61 s
+  200, 22 fm (reference): overlap defect 1.8e-14, built in 77 s
+difference from the reference mesh (max element / max eigenvalue; matrix scale 0.24):
+  NuHamil (80, 15 fm; p100 to 8)     9.05e-15  2.74e-13
+  80, 15 fm (converged p, cos)       4.50e-15  1.39e-13
+  120, 15 fm                         6.22e-15  1.81e-13
+  120, 18 fm                         6.72e-15  1.79e-13
+  160, 18 fm                         1.02e-14  3.66e-13
+  200, 22 fm (reference)             0.00e+00  0.00e+00
+DONE

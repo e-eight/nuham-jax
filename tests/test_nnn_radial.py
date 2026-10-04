@@ -16,7 +16,12 @@ from nuham.kernels.nnn.radial import (
     radial_transform_over_r,
     spherical_jn,
 )
-from nuham.nnn.local_force.radial import converged_meshes, nuhamil_meshes, radial_tables
+from nuham.nnn.local_force.radial import (
+    converged_meshes,
+    nuhamil_meshes,
+    radial_tables,
+    xi_mesh_size,
+)
 
 MU = M_PI / HBARC
 
@@ -115,3 +120,12 @@ def test_table_shapes() -> None:
     assert t.fk.shape == (3, 10)
     assert t.zx.shape == (6, 10, 10)
     assert t.fkx.shape == (3, 6, 10, 10)
+
+
+def test_xi_mesh_size_follows_the_turning_point() -> None:
+    n_xi, xi_max = xi_mesh_size(40, 16.0)
+    assert 17.0 < xi_max < 19.0  # 1.22 x 14.7 fm
+    assert n_xi == int(np.ceil(7.0 * xi_max))
+    assert (
+        xi_mesh_size(24, 8.0)[1] > xi_mesh_size(24, 16.0)[1]
+    )  # a softer oscillator reaches farther

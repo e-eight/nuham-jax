@@ -101,3 +101,56 @@ At N3max 8 (`n400_N8_bare` and `_ind`, kept local, not committed) eight channels
 3/2- at T3/2; AS dimensions 31 to 113) agree element by element with NuHamil's cfp to <= 1.5e-12 MeV; our scalar code takes 0.3 to 6 s per channel.
 The Lambda -> infinity cE check planned for this step is not needed: the Cartesian check (5.2.1) already derives the cE normalisation from the
 physics formula alone at finite Lambda to 1e-10.
+
+# Phase 5.2.5: scaling and the xi mesh at large N
+
+Assembly was restructured for scale (`nas_matrix`): the Racah coefficients of each channel pair stay host scalar code but run in `workers` forked processes
+(pure Python and NumPy, no JAX in the children; the fork warning JAX prints is about its own threads); the weighted sum over radial functions is one matrix
+product per chunk of 64 pairs; the HO projection is `kernels.nnn.projection.project_pairs` (a `vmap` of `project_pair`), batched on the device. Results
+are bit-identical with 1 and 2 workers and unchanged by a larger `x_max` (`tests/test_local3n_assembly.py`).
+
+Agreement with NuHamil at larger N (3NF400, hw 16, NuHamil's cfp, `n400_N16_bare` and `_ind`, kept local): J = 1/2, P = +-, T = 1/2 and 3/2 at N3max 16: max element
+difference <= 1.5e-12 MeV (matrix elements up to 2.2).
+
+Timing (CPU only, this 16-core machine, 14 worker processes; `benchmarks/bench_3n_dense.py force`, records `benchmarks/baseline_cpu_3n_force_j1.json` and `_j5.json`;
+stage times exclude the Jacobi basis (5.7 s at N3max 40, J=1/2) and the radial tables (0.9 s)):
+
+| N3max | J=1/2+ T=1/2: NAS / AS states | assembly | peak RSS | J=5/2+ T=1/2: NAS / AS | assembly | peak RSS |
+|---|---|---|---|---|---|---|
+| 8 | 190 / 64 | 0.7 s | 0.5 GB | 340 / 113 | 1.6 s | 0.5 GB |
+| 12 | 504 / 169 | 1.1 s | 0.6 GB | 1050 / 350 | 4.9 s | 0.6 GB |
+| 16 | 1050 / 351 | 1.9 s | 0.8 GB | 2376 / 792 | 11.0 s | 0.8 GB |
+| 24 | 3094 / 1033 | 6.1 s | 1.0 GB | 7644 / 2548 | 39.7 s | 1.4 GB |
+| 32 | 6834 / 2280 | 14.6 s | 1.5 GB | 17680 / 5893 | 104.7 s | 3.8 GB |
+| 40 | 12782 / 4263 | 30.5 s | 2.7 GB | (34020 / about 11 340: dense NAS matrix 9.3 GB, not run here) | | |
+
+Where the time goes at N3max 40 (J=1/2): projection 19.1 s, radial sums 6.5 s, scatter 3.5 s, antisymmetrisation 0.6 s; the coefficients are hidden behind
+them (0.16 s of waiting) because the workers run ahead. A single core needs about 8 ms per channel pair at N3max 40 (J=5/2: 108 811 pairs, about 14 core-minutes), so
+the projection and the radial sums (both GEMM-shaped and device-friendly) are the remaining cost on the CPU.
+
+NuHamil on the same machine (16 threads, first block of the log, J=1/2+ T=1/2, `precalculations` plus the five `set`s): N3max 8: 8.8 s; N3max 16: 26.5 s; N3max 24: 91.8 s
+(22.3 + 12.4 + 21.3 + 12.4 + 14.0 + 9.3), i.e. our assembly is 12x, 14x and 15x faster at 8, 16 and 24 (NuHamil's time roughly triples with each added 8 in N3max). The N3max 24 and 40 NuHamil
+matrices were not generated (only timed, and stopped after the first block).
+
+Memory: the NAS matrix is dense in `nas_matrix`: 9.3 GB for the largest production channel (J = 5/2 at N3max 40), 3.7 GB at N3max 32 (measured peak 3.8 GB). That fits the
+GH200 (480 GB host) but not comfortably this machine (19 GB); a block-wise accumulation of `cfp W cfp^T` is the way to shrink it if needed.
+
+xi mesh (`refs/nnn_xi_mesh_study.py`, outputs `refs/nnn_xi_mesh_study_*.txt`; AS matrix against a 200-point mesh to 22 fm; p and cosine meshes converged):
+
+| channel | mesh | HO overlap defect on the mesh | max element difference | max eigenvalue difference |
+|---|---|---|---|---|
+| J=1/2+, N3max 24, hw 16 | NuHamil (80 points, 15 fm) | 2e-10 | 4e-14 | 1e-12 |
+| J=5/2+, N3max 24, hw 16 | NuHamil | 2e-10 | 9e-15 | 3e-13 |
+| J=1/2+, N3max 40, hw 16 | NuHamil | 1.2e-2 | 1.2e-9 | 2.7e-11 |
+| same | 120 points, 18 fm | 9e-11 | 3e-14 | 2e-12 |
+| J=1/2+, N3max 24, hw 8 | NuHamil | 0.26 | 6.3e-9 | 1.5e-9 |
+| same | 120 points, 20 fm | 2e-7 | 1e-14 | 5e-13 |
+
+Verdict: NuHamil's mesh is converged to 1e-14 up to N3max 24 at hw 16. Beyond that its 15 fm edge cuts the outer part of the HO states (overlap defect 1% at N3max 40, 26% at hw 8, N3max 24),
+but the 3NF is short ranged, so the matrix elements stay within 1.2e-9 MeV (hw 16, N3max 40) and 6e-9 MeV (hw 8, N3max 24): physically irrelevant, but not roundoff. The mesh must
+end beyond the outer turning point `sqrt((2N + 3) / nu)`, `nu = 2 m hw / (hbar c)^2` (14.7 fm for N 40 at hw 16, 16.3 fm for N 24 at hw 8); 22% beyond with 7 points per fm gives
+1e-14 in all three cases (`nuham.nnn.local_force.radial.xi_mesh_size`). The 80-point mesh is kept as the NuHamil-compatible option; production defaults should use `xi_mesh_size`.
+The p and cosine meshes are converged at Lambda 400 to 650 with NuHamil's sizes (5.2.2).
+
+Open: the same timings on the GH200 (job script and a go-ahead are needed; the GPU takes over the projection and the radial sums, the host keeps the coefficients), and the J=5/2, N3max 40 run
+(NAS 34 020 states).

@@ -64,3 +64,14 @@ def test_spectrum_with_our_cfp(tables: tuple, j2: int, parity: int, t2: int) -> 
     v = local_3nf_matrix(build_channel(j2, parity, t2, 6), 16.0, meshes, tab, LECS)
     assert np.abs(np.linalg.eigvalsh(v) - np.linalg.eigvalsh(ref)).max() < 1e-10
     assert np.abs(v - v.T).max() < 1e-12
+
+
+def test_workers_and_extra_ranks_change_nothing(tables: tuple) -> None:
+    """Worker processes and a larger ``x_max`` (no silent rank truncation) change nothing."""
+    meshes, tab = tables
+    channel = build_channel(1, 1, 1, 6)
+    base = local_3nf_matrix(channel, 16.0, meshes, tab, LECS)
+    parallel = local_3nf_matrix(channel, 16.0, meshes, tab, LECS, workers=2)
+    assert np.abs(parallel - base).max() == 0.0
+    wide = local_3nf_matrix(channel, 16.0, meshes, radial_tables(meshes, 400.0, 2, 12), LECS)
+    assert np.abs(wide - base).max() < 1e-13

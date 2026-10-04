@@ -10,10 +10,15 @@ Three independent measurements, chosen with a sub-command:
            products of :func:`nuham.nnn.tcoef.tcoef_nas_blocked` (host NumPy); ``--n 12`` is the
            N = 12 block of e3max 12, ``--reference`` adds the term-wise build and the difference.
 ``gemm``   float64 matrix-product rate for the shapes of the lab contraction ``T^T V T``.
+``force``  the local N2LO 3N force of one ``(J, P, T)`` at ``N3max = n`` in the AS Jacobi basis
+           (:func:`nuham.nnn.local_force.assembly.local_3nf_matrix`), with stage times: Jacobi
+           basis, radial tables, Racah coefficients, radial sums, device projection, scatter,
+           antisymmetrisation. ``--workers`` spreads the coefficients over processes.
 
     uv run python benchmarks/bench_3n_dense.py qr --sizes 2000 5000 10400 --json qr.json
     uv run python benchmarks/bench_3n_dense.py tcoef --n 10 12 16 --json tcoef.json
     uv run python benchmarks/bench_3n_dense.py gemm --json gemm.json
+    uv run python benchmarks/bench_3n_dense.py force --n 16 24 40 --workers 14 --json force.json
 """
 
 import argparse
@@ -30,6 +35,9 @@ from run_nn import environment, peak_device_bytes
 
 import nuham  # noqa: F401  sets JAX allocation defaults before the first device use
 from nuham.basis.lab import make_orbits
+from nuham.nnn.jacobi import build_channel
+from nuham.nnn.local_force.assembly import local_3nf_matrix
+from nuham.nnn.local_force.radial import nuhamil_meshes, radial_tables
 from nuham.nnn.tcoef import (
     jacobi_cm_rows,
     lab_states,
@@ -37,6 +45,7 @@ from nuham.nnn.tcoef import (
     tcoef_nas,
     tcoef_nas_blocked,
 )
+from nuham.timing import StageTimer
 
 jax.config.update("jax_enable_x64", True)
 import jax.numpy as jnp  # noqa: E402
@@ -166,6 +175,28 @@ def gemm_record(m: int, k: int) -> dict:
     }  # fmt: skip
 
 
+def force_record(n: int, j2: int, parity: int, t2: int, workers: int) -> dict:
+    """Time the local 3N force of one channel at ``N3max = n`` (3NF400, hw 16, NuHamil's meshes)."""
+    lecs = {"c1": -0.81, "c3": -3.2, "c4": 5.4, "cD": -0.2, "cE": 0.098}
+    timer = StageTimer()
+    with timer.stage("jacobi_basis"):
+        channel = build_channel(j2, parity, t2, n)
+    meshes = nuhamil_meshes()
+    with timer.stage("radial_tables"):
+        tables = radial_tables(meshes, 400.0, 2, n + 2)
+    t0 = time.perf_counter()
+    v = local_3nf_matrix(channel, 16.0, meshes, tables, lecs, workers=workers, timer=timer)
+    return {
+        "n3max": n, "j2": j2, "parity": parity, "t2": t2, "workers": workers,
+        "nas": channel.n_nas, "as": channel.n_as,
+        "assembly_seconds": time.perf_counter() - t0,
+        "stages": {k: round(x, 3) for k, x in timer.seconds.items()},
+        "peak_host_rss_gb": resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1e6,
+        "peak_device_bytes": peak_device_bytes(),
+        "trace": float(np.trace(v)),
+    }  # fmt: skip
+
+
 def main() -> None:
     """Run the chosen measurement and print and optionally save the record."""
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawTextHelpFormatter)
@@ -178,6 +209,12 @@ def main() -> None:
         "--reference", action="store_true", help="also time and compare the term-wise tcoef_nas"
     )
     sub.add_parser("gemm")
+    f = sub.add_parser("force")
+    f.add_argument("--n", type=int, nargs="+", default=[8, 12, 16])
+    f.add_argument("--j2", type=int, default=1)
+    f.add_argument("--parity", type=int, default=1)
+    f.add_argument("--t2", type=int, default=1)
+    f.add_argument("--workers", type=int, default=1)
     for sp in sub.choices.values():
         sp.add_argument("--json", default=None, help="also write the record to this file")
     args = p.parse_args()
@@ -185,6 +222,8 @@ def main() -> None:
         calls = [(qr_record, (n,)) for n in args.sizes]
     elif args.what == "tcoef":
         calls = [(tcoef_record, (n, args.reference)) for n in args.n]
+    elif args.what == "force":
+        calls = [(force_record, (n, args.j2, args.parity, args.t2, args.workers)) for n in args.n]
     else:
         calls = [(gemm_record, mk) for mk in GEMM_SHAPES]
     rows = []
