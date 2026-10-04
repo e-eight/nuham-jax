@@ -40,21 +40,30 @@ class LabMatrix3:
     Attributes
     ----------
     keys
-        Sorted state labels (:func:`_key`); the row of a state is its position here.
+        Sorted state labels (:func:`_key`).
+    rows
+        Row of ``m`` of each sorted label.
     m
-        The matrix, shape ``(n, n)``.
+        The matrix, shape ``(n, n)``, in the row order given to :meth:`make`.
     """
 
     keys: np.ndarray
+    rows: np.ndarray
     m: np.ndarray
 
     @staticmethod
-    def make(lab: LabBlock, m: np.ndarray, n_orbits: int) -> "LabMatrix3":
-        """Pair the matrix ``m`` with the labels of the states ``lab`` (in channel order)."""
+    def make(
+        lab: LabBlock, m: np.ndarray, n_orbits: int, order: np.ndarray | None = None
+    ) -> "LabMatrix3":
+        """Pair the matrix ``m`` with the labels of the states ``lab``.
+
+        ``order`` gives the state of each row of ``m`` (``None``: the rows are in channel order),
+        as returned by :func:`nuham.nnn.lab_transform.lab_scalar_device`.
+        """
         keys = _key(lab.i1, lab.i2, lab.i3, lab.j12, lab.t12, n_orbits)
-        if len(keys) > 1 and not (np.diff(keys) > 0).all():
-            raise ValueError("lab states are not in channel order")
-        return LabMatrix3(keys, m)
+        keys = keys if order is None else keys[order]
+        rows = np.argsort(keys)
+        return LabMatrix3(keys[rows], rows, m)
 
 
 def triples(
@@ -160,7 +169,7 @@ def me3j_values(
             rb, rk = np.searchsorted(lab.keys, kb), np.searchsorted(lab.keys, kk)
             ok = (rb < len(lab.keys)) & (rk < len(lab.keys))
             ok[ok] = (lab.keys[rb[ok]] == kb[ok]) & (lab.keys[rk[ok]] == kk[ok])
-            out[sel[ok]] = lab.m[rb[ok], rk[ok]]
+            out[sel[ok]] = lab.m[lab.rows[rb[ok]], lab.rows[rk[ok]]]
         return out
 
     for bra in range(len(i1)):

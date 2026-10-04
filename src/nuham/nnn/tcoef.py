@@ -686,6 +686,41 @@ def jacobi_channels_for(
     return out
 
 
+def lab_t_blocks(
+    j2: int,
+    parity: int,
+    t2: int,
+    orb: Orbits,
+    e2max: int,
+    e3max: int,
+    channels: dict[tuple[int, int], JacobiChannel],
+    brackets: Brackets,
+) -> tuple[
+    LabBlock, dict[int, tuple[np.ndarray, np.ndarray, list[tuple[int, int, int, int, int]]]]
+]:
+    """Antisymmetric coefficients of every ``N`` block of one lab channel.
+
+    Returns
+    -------
+    tuple
+        The lab states, and for each ``N = e1 + e2 + e3`` the lab-state indices of the block, the
+        coefficient matrix ``T_as`` (rows ``(e, i, jrel, ncm, lcm)``, columns those states) and
+        the row labels.
+    """
+    lab = lab_states(orb, j2, parity, t2, e2max, e3max)
+    blocks: dict[int, tuple[np.ndarray, np.ndarray, list[tuple[int, int, int, int, int]]]] = {}
+    for n in range(e3max + 1):
+        if (-1) ** n != parity:
+            continue
+        cols = lab.select(n)
+        rows = jacobi_cm_rows(j2, parity, t2, n)
+        t_as, labels = tcoef_as(
+            tcoef_nas_blocked(rows, cols, j2, orb, brackets), rows, channels, t2
+        )
+        blocks[n] = (np.nonzero(lab.n == n)[0], t_as, labels)
+    return lab, blocks
+
+
 def lab_scalar(
     j2: int,
     parity: int,
@@ -713,7 +748,7 @@ def lab_scalar(
         The lab states and the dense symmetric matrix over them (a block diagonal in nothing:
         different ``N`` blocks couple through ``V``).
     """
-    lab = lab_states(orb, j2, parity, t2, e2max, e3max)
+    lab, blocks = lab_t_blocks(j2, parity, t2, orb, e2max, e3max, channels, brackets)
     offs = {}
     for key, ch in channels.items():
         o, off = {}, 0
@@ -721,16 +756,6 @@ def lab_scalar(
             o[blk.n_quanta] = (off, off + len(blk.cfp))
             off += len(blk.cfp)
         offs[key] = o
-    blocks: dict[int, tuple[np.ndarray, np.ndarray, list[tuple[int, int, int, int, int]]]] = {}
-    for n in range(e3max + 1):
-        if (-1) ** n != parity:
-            continue
-        cols = lab.select(n)
-        rows = jacobi_cm_rows(j2, parity, t2, n)
-        t_as, labels = tcoef_as(
-            tcoef_nas_blocked(rows, cols, j2, orb, brackets), rows, channels, t2
-        )
-        blocks[n] = (np.nonzero(lab.n == n)[0], t_as, labels)
     out = np.zeros((len(lab), len(lab)))
     for n_bra, (c_bra, t_bra, lb_bra) in blocks.items():
         for c_ket, t_ket, lb_ket in blocks.values():
