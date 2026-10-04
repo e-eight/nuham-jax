@@ -1,0 +1,104 @@
+{
+ "benchmark": "force",
+ "environment": {
+  "host": "gh136.hsn.cm.delta.internal.ncsa.edu",
+  "platform": "Linux-6.4.0-150600.23.53-64kb-aarch64-with-glibc2.38",
+  "cpu_count": 288,
+  "python": "3.12.11",
+  "jax": "0.11.2",
+  "backend": "gpu",
+  "device": "gpu:NVIDIA GH200 120GB",
+  "x64": true,
+  "git_commit": "3946614"
+ },
+ "rows": [
+  {
+   "n3max": 16,
+   "j2": 1,
+   "parity": 1,
+   "t2": 1,
+   "workers": 30,
+   "nas": 1050,
+   "as": 351,
+   "assembly_seconds": 2.0289912009993714,
+   "stages": {
+    "jacobi_basis": 4.69,
+    "radial_tables": 5.424,
+    "coefficients": 0.037,
+    "grids": 0.298,
+    "projection": 1.336,
+    "scatter": 0.021,
+    "antisymmetrize": 0.005
+   },
+   "peak_host_rss_gb": 0.727488,
+   "peak_device_bytes": 424017920,
+   "trace": -19.989613633449697
+  },
+  {
+   "n3max": 24,
+   "j2": 1,
+   "parity": 1,
+   "t2": 1,
+   "workers": 30,
+   "nas": 3094,
+   "as": 1033,
+   "assembly_seconds": 3.06576425700041,
+   "stages": {
+    "jacobi_basis": 3.116,
+    "radial_tables": 2.174,
+    "coefficients": 0.042,
+    "grids": 0.921,
+    "projection": 1.588,
+    "scatter": 0.095,
+    "antisymmetrize": 0.065
+   },
+   "peak_host_rss_gb": 0.9216,
+   "peak_device_bytes": 437780480,
+   "trace": -30.96685589976406
+  },
+  {
+   "n3max": 32,
+   "j2": 1,
+   "parity": 1,
+   "t2": 1,
+   "workers": 30,
+   "nas": 6834,
+   "as": 2280,
+   "assembly_seconds": 6.251261236000573,
+   "stages": {
+    "jacobi_basis": 4.752,
+    "radial_tables": 2.363,
+    "coefficients": 0.047,
+    "grids": 2.168,
+    "projection": 2.743,
+    "scatter": 0.427,
+    "antisymmetrize": 0.478
+   },
+   "peak_host_rss_gb": 1.487808,
+   "peak_device_bytes": 437780480,
+   "trace": -41.630362957690366
+  },
+  {
+   "n3max": 40,
+   "j2": 1,
+   "parity": 1,
+   "t2": 1,
+   "workers": 30,
+   "nas": 12782,
+   "as": 4263,
+   "assembly_seconds": 13.440001776999452,
+   "stages": {
+    "jacobi_basis": 7.764,
+    "radial_tables": 2.341,
+    "coefficients": 0.053,
+    "grids": 4.226,
+    "projection": 4.756,
+    "scatter": 1.468,
+    "antisymmetrize": 2.47
+   },
+   "peak_host_rss_gb": 2.828288,
+   "peak_device_bytes": 476854528,
+   "trace": -52.188162759972315
+  }
+ ]
+}

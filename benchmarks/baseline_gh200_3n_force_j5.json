@@ -1,0 +1,82 @@
+{
+ "benchmark": "force",
+ "environment": {
+  "host": "gh136.hsn.cm.delta.internal.ncsa.edu",
+  "platform": "Linux-6.4.0-150600.23.53-64kb-aarch64-with-glibc2.38",
+  "cpu_count": 288,
+  "python": "3.12.11",
+  "jax": "0.11.2",
+  "backend": "gpu",
+  "device": "gpu:NVIDIA GH200 120GB",
+  "x64": true,
+  "git_commit": "3946614"
+ },
+ "rows": [
+  {
+   "n3max": 16,
+   "j2": 5,
+   "parity": 1,
+   "t2": 1,
+   "workers": 30,
+   "nas": 2376,
+   "as": 792,
+   "assembly_seconds": 5.105886547999944,
+   "stages": {
+    "jacobi_basis": 5.107,
+    "radial_tables": 5.352,
+    "coefficients": 0.031,
+    "grids": 2.109,
+    "projection": 2.353,
+    "scatter": 0.141,
+    "antisymmetrize": 0.049
+   },
+   "peak_host_rss_gb": 0.74144,
+   "peak_device_bytes": 426598400,
+   "trace": 0.0823107445741669
+  },
+  {
+   "n3max": 24,
+   "j2": 5,
+   "parity": 1,
+   "t2": 1,
+   "workers": 30,
+   "nas": 7644,
+   "as": 2548,
+   "assembly_seconds": 13.583884642999692,
+   "stages": {
+    "jacobi_basis": 6.722,
+    "radial_tables": 2.202,
+    "coefficients": 0.037,
+    "grids": 7.075,
+    "projection": 4.349,
+    "scatter": 0.709,
+    "antisymmetrize": 0.952
+   },
+   "peak_host_rss_gb": 1.286016,
+   "peak_device_bytes": 437780480,
+   "trace": -1.288045352842193
+  },
+  {
+   "n3max": 32,
+   "j2": 5,
+   "parity": 1,
+   "t2": 1,
+   "workers": 30,
+   "nas": 17680,
+   "as": 5893,
+   "assembly_seconds": 39.78043402899948,
+   "stages": {
+    "jacobi_basis": 21.143,
+    "radial_tables": 2.36,
+    "coefficients": 0.044,
+    "grids": 17.224,
+    "projection": 10.358,
+    "scatter": 3.159,
+    "antisymmetrize": 8.357
+   },
+   "peak_host_rss_gb": 3.928832,
+   "peak_device_bytes": 437780480,
+   "trace": -4.200613149671106
+  }
+ ]
+}

@@ -80,3 +80,9 @@ Reading: the cache fix is a clear win. The pinned copy is correct and 16x faster
 run, so the end-to-end difference is below noise and it costs ~0.5 GB of pinned host memory. It stays on by default for accelerator
 backends (it will matter more when the matrices get larger, as in 3N); `NUHAM_PINNED_COPY=0` turns it off. The same A/B on ICRN's
 PCIe H200 was not run because that server had been shut down (the token cannot start it).
+
+## Phase 5.2.5 (2026-10-04, job 3308734 on `gh136`, 8 min wall, 32 CPUs, 96 GB)
+
+Local N2LO 3N force on one GH200: 48 tests pass on the GPU backend (the worker processes of the coefficient stage are forked after CUDA is initialised and run fine), and the
+force at N3max 16-40 for J=1/2+ and J=5/2+ (T=1/2) takes 2-13 s and 5-119 s of assembly respectively; full table, stage times and memory in `docs/study-local-3nf.md`.
+Job script `job18.sbatch` (same pattern as before; `REPO` is the checkout `/work/hdd/bhhk/soham/nuham-repo`, pulled to `3946614` first), records in `benchmarks/baseline_gh200_3n_force_*.json`.

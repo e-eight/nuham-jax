@@ -152,5 +152,21 @@ end beyond the outer turning point `sqrt((2N + 3) / nu)`, `nu = 2 m hw / (hbar c
 1e-14 in all three cases (`nuham.nnn.local_force.radial.xi_mesh_size`). The 80-point mesh is kept as the NuHamil-compatible option; production defaults should use `xi_mesh_size`.
 The p and cosine meshes are converged at Lambda 400 to 650 with NuHamil's sizes (5.2.2).
 
-Open: the same timings on the GH200 (job script and a go-ahead are needed; the GPU takes over the projection and the radial sums, the host keeps the coefficients), and the J=5/2, N3max 40 run
-(NAS 34 020 states).
+GH200 (DeltaAI job 3308734, node `gh136`, commit `3946614`, 32 CPUs and 30 worker processes, 7 min 56 s wall, about 0.13 GPU-hours; records
+`benchmarks/baseline_gh200_3n_force_{j1,j5,j5_n40}.json`). The 48 radial, angular, assembly and Jacobi tests pass on the GPU backend, including the forked worker
+pool after CUDA initialisation (JAX's fork warning appears but nothing hangs). Assembly time, the stage times behind it and the peak memory:
+
+| N3max | J=1/2+ T=1/2: assembly (CPU, this machine) | GH200 | J=5/2+ T=1/2: assembly (CPU) | GH200 | GH200 stages for J=5/2+ (basis / sums / projection / scatter / cfp) | peak host RSS |
+|---|---|---|---|---|---|---|
+| 16 | 1.9 s | 2.0 s | 11.0 s | 5.1 s | 5.1 / 2.1 / 2.4 / 0.1 / 0.05 s | 0.7 GB |
+| 24 | 6.1 s | 3.1 s | 39.7 s | 13.6 s | 6.7 / 7.1 / 4.3 / 0.7 / 1.0 s | 1.3 GB |
+| 32 | 14.6 s | 6.3 s | 104.7 s | 39.8 s | 21.1 / 17.2 / 10.4 / 3.2 / 8.4 s | 3.9 GB |
+| 40 | 30.5 s | 13.4 s | (not run) | 118.6 s | 90.3 / 34.5 / 26.0 / 10.8 / 46.3 s | 11.7 GB |
+
+"Assembly" is the work of `local_3nf_matrix` and excludes the Jacobi basis (J=1/2+: 7.8 s at N3max 40; J=5/2+: 90 s) and the radial tables (2-5 s). The largest production channel (J = 5/2, N3max 40,
+34 020 NAS and 11 340 AS states) therefore takes 118.6 s plus 90 s for its basis, with 11.7 GB of host memory (the dense 9.3 GB NAS matrix) and only 0.44 GB of device memory. Totals for the J=1/2
+channel at N3max 40: 13.4 s plus 7.8 s of basis. Against NuHamil (91.8 s for the J=1/2+ block at N3max 24 on 16 CPU threads, the same block takes 3.1 s here: 30x).
+
+The GPU runs the projection (4.8 s at N3max 40 for J=1/2) but the radial sums (a host NumPy product), the scatter into the dense matrix and the `cfp W cfp^T` products (46 s for the largest
+channel) still run on the host, so the speed-up over the CPU run is only 2.3x for J=1/2 and about 2.6x for J=5/2 at N3max 32. The next steps if more speed is wanted are the radial sums and
+the antisymmetrisation as device products (the dense matrix then also lives in the 98 GB of device memory).
