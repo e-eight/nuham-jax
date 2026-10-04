@@ -37,3 +37,16 @@ n = 11 340): 5.8e12 flop per call, about 0.15 s on the GH200 and 30-50 s for the
 than J=1/2). The assembly of the 3NF (119 s for J=5/2) and its Jacobi basis (90 s) then dominate the channel, not the
 flow. The GH200 time of the two largest channels (n = 8080 and 11 340) is the one number still to measure; it needs
 about 16 GB of device memory and a few minutes.
+
+## GH200 (DeltaAI job 3309244, node `gh012`, commit `844a230`; records `benchmarks/baseline_gh200_3n_flow_j{3,5}_n40.json`)
+
+Both of the large channels at Nmax 40, hw 16, lambda 2.0, with the 3NF400, tolerance rtol = atol = 1e-8 (units of hw):
+
+| channel | n_AS | steps | flow time | device memory | V3 error against rtol 1e-10 |
+|---|---|---|---|---|---|
+| J=3/2+ T=1/2 | 8078 | 15 (25 at 1e-10) | 11.1 s (18.1 s at 1e-10) | 11.0 GB | 8.8e-11 |
+| J=5/2+ T=1/2 | 11 340 | 15 | 27.6 s | 22.8 GB | not run |
+
+The flow of the largest channel takes 28 s, as estimated (30-50 s), and the step count (15) did not grow beyond J=1/2 (16). 22.8 GB of device memory is well within the 98 GB. Over all 72 channels the flows
+come to a few minutes. The setup of the same channels is far larger (J=5/2: Jacobi basis 93 s, the three embeddings 31 s, the NN projection once 24 s) and the force took 652 s because that run used one
+process for the angular coefficients (the earlier 119 s used 30; a second run meant to repeat it with 30 workers passed no worker count by mistake, a benchmark bug fixed afterwards).

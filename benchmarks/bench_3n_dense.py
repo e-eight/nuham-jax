@@ -313,7 +313,16 @@ def main() -> None:
         calls = [
             (
                 flow_record,
-                (n, args.j2, args.parity, args.t2, args.genuine, args.rtol, args.check_spectrum),
+                (
+                    n,
+                    args.j2,
+                    args.parity,
+                    args.t2,
+                    args.genuine,
+                    args.rtol,
+                    args.check_spectrum,
+                    args.workers,
+                ),
             )
             for n in args.n
         ]

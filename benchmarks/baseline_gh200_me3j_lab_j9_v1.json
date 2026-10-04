@@ -1,0 +1,35 @@
+{
+ "benchmark": "lab",
+ "environment": {
+  "host": "gh012.hsn.cm.delta.internal.ncsa.edu",
+  "platform": "Linux-6.4.0-150600.23.53-64kb-aarch64-with-glibc2.38",
+  "cpu_count": 288,
+  "python": "3.12.11",
+  "jax": "0.11.2",
+  "backend": "gpu",
+  "device": "gpu:NVIDIA GH200 120GB",
+  "x64": true,
+  "git_commit": "844a230"
+ },
+ "rows": [
+  {
+   "emax": 14,
+   "e2max": 28,
+   "e3max": 16,
+   "j2": 9,
+   "parity": 1,
+   "t2": 1,
+   "lab_states": 32259,
+   "matrix_gb": 4.162572324,
+   "lab_seconds": 85.15644050389528,
+   "stages": {
+    "jacobi_bases": 22.037,
+    "brackets": 0.0,
+    "tcoef": 44.023,
+    "contract": 41.126
+   },
+   "peak_host_rss_gb": 12.640064,
+   "peak_device_bytes": 25830706688
+  }
+ ]
+}

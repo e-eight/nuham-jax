@@ -56,3 +56,40 @@ first thing to do:
 3. The device-side assembly adds device memory pressure (the dense NAS matrix) next to the flow and the lab matrices, and two more kernels to maintain.
 
 Recommendation: measure the production chain on the GH200 as it is (basis cached, 8-16 writer workers), then decide on the device-side assembly from the measured stage shares.
+
+## GH200 measurements (DeltaAI jobs 3309244 and 3309469, 2026-10-04; records `benchmarks/baseline_gh200_me3j_*.json`)
+
+One GH200, 32 CPUs, 30 worker processes, `OMP_NUM_THREADS=1`.
+
+**Lab transform of the largest channel** (J=9/2+ T=1/2, 14/28/16, 32 259 lab states, random Jacobi operators): T coefficients on the host 44 s, upload 0.5 s, device products and copies 4.2 s when every
+kernel is compiled, but 46 s in a fresh process: compiling about 90 shape-specific kernels (0.4-0.5 s each) was 90% of the "contraction". The small channel J=1/2+ T=3/2 shows the same (7.8 s cold, 0.1 s warm).
+The padding ladder (`lab_transform._rung`) did not cut it for a single channel (41 s before, 46 s after) because the block pairs of one channel have too many different sizes; the compiled shapes are shared between
+channels of one process and, with the persistent compile cache (`--compile-cache`, on by default in the CLI), between runs. Peak device memory 14.6 GB, host 20 GB. The contraction itself is not a cost
+(4.2 s for the largest channel against the 0.8 s flop estimate, the rest being copies and padding).
+
+**Writer**, 6/28/16 (a prefix of the production file, 6.93e8 values, 4.1 GB of gzip):
+
+| formatting | compression threads | workers | lookup | whole write | values/s |
+|---|---|---|---|---|---|
+| main process | 1 | 8 / 16 / 30 | 15.2 / 9.2 / 6.6 s | 43.7 / 43.6 / 44.1 s | 15.8 M |
+| workers | 4 | 30 | 6.6 s | 14.5 s | 48 M |
+| workers | 8 | 30 | 6.6 s | 9.8 s | 71 M |
+
+With the formatting in the workers and 8 compression threads the production file (6.37e9 values) takes about 90 s.
+
+**End to end**, 10/20/12 (2.73e8 values, 1.41 GB, ramp flat12, 3NF400, float32 lab matrices, 30 workers, Jacobi basis cached from the first run): 16 min 42 s in job 3309244, with the force on one process (449 s)
+and the writer formatting in the main process; 5 min 13 s in job 3309469 with the force on 30 workers (72 s), the flows 18 s, the lab stage 186 s (host T coefficients dominate), the write 6.5 s, NN projection
+16 s, peak host memory 8.9 GB. The two files have the same size, 1 413 800 052 bytes.
+
+## Production estimate after the GH200 measurements (14/28/16, ramp 40-5-36-7-32-9-28-11-24)
+
+| stage | estimate | basis |
+|---|---|---|
+| NN projection and flows of the 2-body channels | 25 s | measured |
+| per channel: Jacobi basis, embeddings, force (30 workers), flow | up to 95 + 31 + 119 + 28 = 273 s (J=5/2); about 35-50 min over all 72 channels | measured for the largest, scaled |
+| lab transform | T coefficients about 17 min serial (44 s for the largest channel; 70 channels), contraction a few minutes plus first-run compilation | measured for two channels, scaled |
+| writer | 90 s | measured on a prefix |
+| total | about 1 hour on one GH200 | |
+
+Open points that would shorten it: the T coefficients are built one channel at a time on one core (the 32 cores are idle in that stage; channels are independent, so a pool of workers or multithreaded BLAS applies);
+the Jacobi basis is cached after the first run; the first run compiles the lab kernels once (the persistent compile cache then holds them).
