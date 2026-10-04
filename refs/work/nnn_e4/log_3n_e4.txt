@@ -1,0 +1,357 @@
+
+############################################################
+#          NuHamil (Tokyo) code
+############################################################
+
+# Version is main:4d310c14970d9b47fa6f40dfde78d03b61afb526
+# OpenMP number of threads=  16
+
+################### Input Parameters #####################
+# hw =  16.00 MeV
+# renorm: srg, lambda =   2.00
+# Generator of SRG: kinetic
+# 
+# Parameters for two-body system
+# N2max = 100,  Jmax =  12, Jmax(NNint) =   8
+# NN interaction: N3LO_EM500
+# Maximum momentum =   8.00 fm-1,  Number of gauss-legendre mesh points 100
+# input_nn_file = /root/NuHamil-public/input_nn_files/N3LO_EM500_kmax8_N100_Jmax8.bin
+# N3max =   8,  Jmax =  11
+# Genuine three-body force will be included
+# Regulator: Local, Regulator Power:  2, Cutoff Lambda (Local): 400.0000 MeV, Cutoff Lambda (NonLocal): 500.0000 MeV
+# Two-pion exchange: c1 =   -0.8100 GeV-1, c3 =   -3.2000 GeV-1, c4 =    5.4000 GeV-1
+# One-pion exchange: cD =   -0.2000
+# Contact term: cE =    0.0980
+# 
+################### For Output Files #####################
+# emax =   4, e2max =   8, e3max =   4
+# file name: nnn_3NF400_e4.me3j.gz
+# double precision
+# Calculations will be done for Operators:
+# hamil, 
+# directory for temporary files: ./
+############################################################
+           Calculations for NNN sector
+############################################################
+
+You are trying to calcule three-body matrix element in Laboratory frame.
+Then, 'coul' is turned to false.
+Creating directory,  .//cfp 
+Creating directory,  .//ops 
+myrank=   0,  :Calculating for J =  1/2,   P =  1,   T =  1/2, Nmax =  8
+myrank=   0, J=  1/2, P= 1, T= 1/2, Number of physical and orthonormal states:      190      64
+Not found .//NNint_A2_rel_N3LO_EM500_bare_Nmax100_hw16.gz
+Calculating NN interaction in relative coordinate:
+NNint = N3LO_EM500, Nmax =  100, Jmax =   8, hw =  16.00 MeV
+# Local 3NF, precalculations:     7.472217 sec
+# Local 3NF, set c1:     0.195799 sec
+# Local 3NF, set c3:     0.605628 sec
+# Local 3NF, set c4:     0.376706 sec
+# Local 3NF, set cD:     0.158708 sec
+# Local 3NF, set cE:     0.111604 sec
+myrank=   0, Eigen values of original 3-body H:       -1.349102    9.222036   13.745185   15.351910   19.414468
+myrank=   0, Eigen values of 3-body H (after SRG):    -1.349102    9.222036   13.745185   15.351910   19.414468
+myrank=   0,  :Calculating for J =  1/2,   P = -1,   T =  1/2, Nmax =  8
+myrank=   0, J=  1/2, P=-1, T= 1/2, Number of physical and orthonormal states:      140      47
+# Local 3NF, precalculations:     7.587755 sec
+# Local 3NF, set c1:     0.131013 sec
+# Local 3NF, set c3:     0.423288 sec
+# Local 3NF, set c4:     0.243506 sec
+# Local 3NF, set cD:     0.110265 sec
+# Local 3NF, set cE:     0.061335 sec
+myrank=   0, Eigen values of original 3-body H:        8.365957   10.225029   20.403750   24.762422   25.201903
+myrank=   0, Eigen values of 3-body H (after SRG):     8.365957   10.225029   20.403750   24.762422   25.201903
+myrank=   0,  :Calculating for J =  3/2,   P =  1,   T =  1/2, Nmax =  8
+myrank=   0, J=  3/2, P= 1, T= 1/2, Number of physical and orthonormal states:      304     101
+# Local 3NF, precalculations:     7.689034 sec
+# Local 3NF, set c1:     0.608216 sec
+# Local 3NF, set c3:     1.919254 sec
+# Local 3NF, set c4:     1.080589 sec
+# Local 3NF, set cD:     0.536639 sec
+# Local 3NF, set cE:     0.304928 sec
+myrank=   0, Eigen values of original 3-body H:       12.449326   13.756134   15.375254   16.382629   19.301675
+myrank=   0, Eigen values of 3-body H (after SRG):    12.449326   13.756134   15.375254   16.382629   19.301675
+myrank=   0,  :Calculating for J =  3/2,   P = -1,   T =  1/2, Nmax =  8
+myrank=   0, J=  3/2, P=-1, T= 1/2, Number of physical and orthonormal states:      220      73
+# Local 3NF, precalculations:     7.732075 sec
+# Local 3NF, set c1:     0.408054 sec
+# Local 3NF, set c3:     1.358925 sec
+# Local 3NF, set c4:     0.731991 sec
+# Local 3NF, set cD:     0.302273 sec
+# Local 3NF, set cE:     0.190278 sec
+myrank=   0, Eigen values of original 3-body H:        8.881818    9.945478   20.423526   23.145542   25.137066
+myrank=   0, Eigen values of 3-body H (after SRG):     8.881818    9.945478   20.423526   23.145542   25.137066
+myrank=   0,  :Calculating for J =  5/2,   P =  1,   T =  1/2, Nmax =  8
+myrank=   0, J=  5/2, P= 1, T= 1/2, Number of physical and orthonormal states:      340     113
+# Local 3NF, precalculations:     7.703146 sec
+# Local 3NF, set c1:     1.065443 sec
+# Local 3NF, set c3:     3.243635 sec
+# Local 3NF, set c4:     1.838905 sec
+# Local 3NF, set cD:     0.746354 sec
+# Local 3NF, set cE:     0.441788 sec
+myrank=   0, Eigen values of original 3-body H:       13.686849   15.434151   16.183497   28.631611   29.003337
+myrank=   0, Eigen values of 3-body H (after SRG):    13.686848   15.434151   16.183497   28.631611   29.003337
+myrank=   0,  :Calculating for J =  5/2,   P = -1,   T =  1/2, Nmax =  8
+myrank=   0, J=  5/2, P=-1, T= 1/2, Number of physical and orthonormal states:      236      79
+# Local 3NF, precalculations:     7.454969 sec
+# Local 3NF, set c1:     0.577489 sec
+# Local 3NF, set c3:     2.030409 sec
+# Local 3NF, set c4:     1.136874 sec
+# Local 3NF, set cD:     0.444666 sec
+# Local 3NF, set cE:     0.256176 sec
+myrank=   0, Eigen values of original 3-body H:        8.596960   23.113679   23.268306   23.688318   24.939260
+myrank=   0, Eigen values of 3-body H (after SRG):     8.596960   23.113679   23.268306   23.688318   24.939260
+myrank=   0,  :Calculating for J =  7/2,   P =  1,   T =  1/2, Nmax =  8
+myrank=   0, J=  7/2, P= 1, T= 1/2, Number of physical and orthonormal states:      320     107
+# Local 3NF, precalculations:     7.457390 sec
+# Local 3NF, set c1:     1.112079 sec
+# Local 3NF, set c3:     4.489571 sec
+# Local 3NF, set c4:     2.617956 sec
+# Local 3NF, set cD:     1.072264 sec
+# Local 3NF, set cE:     0.661308 sec
+myrank=   0, Eigen values of original 3-body H:       15.215073   28.067643   28.759367   29.193463   29.693803
+myrank=   0, Eigen values of 3-body H (after SRG):    15.215073   28.067644   28.759367   29.193463   29.693803
+myrank=   0,  :Calculating for J =  7/2,   P = -1,   T =  1/2, Nmax =  8
+myrank=   0, J=  7/2, P=-1, T= 1/2, Number of physical and orthonormal states:      212      71
+# Local 3NF, precalculations:     7.693363 sec
+# Local 3NF, set c1:     0.685703 sec
+# Local 3NF, set c3:     2.613845 sec
+# Local 3NF, set c4:     1.398344 sec
+# Local 3NF, set cD:     0.555912 sec
+# Local 3NF, set cE:     0.336865 sec
+myrank=   0, Eigen values of original 3-body H:       23.071409   23.442964   24.377656   27.661236   28.783745
+myrank=   0, Eigen values of 3-body H (after SRG):    23.071409   23.442964   24.377656   27.661236   28.783745
+myrank=   0,  :Calculating for J =  9/2,   P =  1,   T =  1/2, Nmax =  8
+myrank=   0, J=  9/2, P= 1, T= 1/2, Number of physical and orthonormal states:      268      89
+# Local 3NF, precalculations:     7.647789 sec
+# Local 3NF, set c1:     1.172090 sec
+# Local 3NF, set c3:     4.658671 sec
+# Local 3NF, set c4:     2.392594 sec
+# Local 3NF, set cD:     0.817929 sec
+# Local 3NF, set cE:     0.455954 sec
+myrank=   0, Eigen values of original 3-body H:       28.814235   29.201055   29.698441   32.375202   33.518766
+myrank=   0, Eigen values of 3-body H (after SRG):    28.814235   29.201055   29.698441   32.375202   33.518766
+myrank=   0,  :Calculating for J =  9/2,   P = -1,   T =  1/2, Nmax =  8
+myrank=   0, J=  9/2, P=-1, T= 1/2, Number of physical and orthonormal states:      166      55
+# Local 3NF, precalculations:     7.558423 sec
+# Local 3NF, set c1:     0.665942 sec
+# Local 3NF, set c3:     2.527742 sec
+# Local 3NF, set c4:     1.596048 sec
+# Local 3NF, set cD:     0.574272 sec
+# Local 3NF, set cE:     0.261083 sec
+myrank=   0, Eigen values of original 3-body H:       23.134422   42.894326   43.247628   43.369614   44.052634
+myrank=   0, Eigen values of 3-body H (after SRG):    23.134422   42.894326   43.247628   43.369614   44.052634
+myrank=   0,  :Calculating for J = 11/2,   P =  1,   T =  1/2, Nmax =  8
+myrank=   0, J= 11/2, P= 1, T= 1/2, Number of physical and orthonormal states:      201      67
+# Local 3NF, precalculations:     7.624732 sec
+# Local 3NF, set c1:     1.345959 sec
+# Local 3NF, set c3:     4.206990 sec
+# Local 3NF, set c4:     2.199191 sec
+# Local 3NF, set cD:     0.737116 sec
+# Local 3NF, set cE:     0.366309 sec
+myrank=   0, Eigen values of original 3-body H:       29.250547   32.973957   49.480040   49.638763   49.832769
+myrank=   0, Eigen values of 3-body H (after SRG):    29.250547   32.973957   49.480040   49.638763   49.832769
+myrank=   0,  :Calculating for J = 11/2,   P = -1,   T =  1/2, Nmax =  8
+myrank=   0, J= 11/2, P=-1, T= 1/2, Number of physical and orthonormal states:      114      38
+# Local 3NF, precalculations:     7.976135 sec
+# Local 3NF, set c1:     0.850045 sec
+# Local 3NF, set c3:     2.197745 sec
+# Local 3NF, set c4:     1.082737 sec
+# Local 3NF, set cD:     0.303443 sec
+# Local 3NF, set cE:     0.193040 sec
+myrank=   0, Eigen values of original 3-body H:       42.812896   43.113249   43.307397   46.469463   47.487630
+myrank=   0, Eigen values of 3-body H (after SRG):    42.812896   43.113249   43.307397   46.469463   47.487630
+myrank=   0,  :Calculating for J =  1/2,   P =  1,   T =  3/2, Nmax =  8
+myrank=   0, J=  1/2, P= 1, T= 3/2, Number of physical and orthonormal states:       94      31
+# Local 3NF, precalculations:     7.674626 sec
+# Local 3NF, set c1:     0.061683 sec
+# Local 3NF, set c3:     0.225602 sec
+# Local 3NF, set c4:     0.000128 sec
+# Local 3NF, set cD:     0.054228 sec
+# Local 3NF, set cE:     0.031177 sec
+myrank=   0, Eigen values of original 3-body H:       14.155316   19.214790   30.257204   32.613646   33.875237
+myrank=   0, Eigen values of 3-body H (after SRG):    14.155316   19.214790   30.257204   32.613646   33.875237
+myrank=   0,  :Calculating for J =  1/2,   P = -1,   T =  3/2, Nmax =  8
+myrank=   0, J=  1/2, P=-1, T= 3/2, Number of physical and orthonormal states:       70      23
+# Local 3NF, precalculations:     7.813062 sec
+# Local 3NF, set c1:     0.050836 sec
+# Local 3NF, set c3:     0.139520 sec
+# Local 3NF, set c4:     0.000104 sec
+# Local 3NF, set cD:     0.032287 sec
+# Local 3NF, set cE:     0.020113 sec
+myrank=   0, Eigen values of original 3-body H:       10.245159   25.683183   27.413700   28.697129   43.829015
+myrank=   0, Eigen values of 3-body H (after SRG):    10.245158   25.683183   27.413700   28.697129   43.829015
+myrank=   0,  :Calculating for J =  3/2,   P =  1,   T =  3/2, Nmax =  8
+myrank=   0, J=  3/2, P= 1, T= 3/2, Number of physical and orthonormal states:      150      49
+# Local 3NF, precalculations:     7.992441 sec
+# Local 3NF, set c1:     0.301824 sec
+# Local 3NF, set c3:     1.022916 sec
+# Local 3NF, set c4:     0.000413 sec
+# Local 3NF, set cD:     0.338796 sec
+# Local 3NF, set cE:     0.186819 sec
+myrank=   0, Eigen values of original 3-body H:       16.011570   18.253071   29.386114   32.452630   32.766715
+myrank=   0, Eigen values of 3-body H (after SRG):    16.011570   18.253071   29.386114   32.452630   32.766715
+myrank=   0,  :Calculating for J =  3/2,   P = -1,   T =  3/2, Nmax =  8
+myrank=   0, J=  3/2, P=-1, T= 3/2, Number of physical and orthonormal states:      110      37
+# Local 3NF, precalculations:     7.786953 sec
+# Local 3NF, set c1:     0.148361 sec
+# Local 3NF, set c3:     0.566158 sec
+# Local 3NF, set c4:     0.000311 sec
+# Local 3NF, set cD:     0.106444 sec
+# Local 3NF, set cE:     0.072116 sec
+myrank=   0, Eigen values of original 3-body H:       10.056637   25.496477   26.964620   27.304818   28.320376
+myrank=   0, Eigen values of 3-body H (after SRG):    10.056637   25.496477   26.964620   27.304818   28.320376
+myrank=   0,  :Calculating for J =  5/2,   P =  1,   T =  3/2, Nmax =  8
+myrank=   0, J=  5/2, P= 1, T= 3/2, Number of physical and orthonormal states:      170      57
+# Local 3NF, precalculations:     8.219813 sec
+# Local 3NF, set c1:     0.305337 sec
+# Local 3NF, set c3:     1.146633 sec
+# Local 3NF, set c4:     0.000722 sec
+# Local 3NF, set cD:     0.232191 sec
+# Local 3NF, set cE:     0.138903 sec
+myrank=   0, Eigen values of original 3-body H:       16.007758   18.500586   29.123782   32.651947   32.748127
+myrank=   0, Eigen values of 3-body H (after SRG):    16.007758   18.500586   29.123782   32.651947   32.748127
+myrank=   0,  :Calculating for J =  5/2,   P = -1,   T =  3/2, Nmax =  8
+myrank=   0, J=  5/2, P=-1, T= 3/2, Number of physical and orthonormal states:      117      39
+# Local 3NF, precalculations:     7.580487 sec
+# Local 3NF, set c1:     0.195308 sec
+# Local 3NF, set c3:     0.718417 sec
+# Local 3NF, set c4:     0.000519 sec
+# Local 3NF, set cD:     0.136785 sec
+# Local 3NF, set cE:     0.090264 sec
+myrank=   0, Eigen values of original 3-body H:       23.687752   26.645091   27.195809   28.835573   44.765704
+myrank=   0, Eigen values of 3-body H (after SRG):    23.687752   26.645091   27.195809   28.835573   44.765704
+myrank=   0,  :Calculating for J =  7/2,   P =  1,   T =  3/2, Nmax =  8
+myrank=   0, J=  7/2, P= 1, T= 3/2, Number of physical and orthonormal states:      157      51
+# Local 3NF, precalculations:     7.557024 sec
+# Local 3NF, set c1:     0.384391 sec
+# Local 3NF, set c3:     4.198825 sec
+# Local 3NF, set c4:     0.000957 sec
+# Local 3NF, set cD:     0.274245 sec
+# Local 3NF, set cE:     0.155451 sec
+myrank=   0, Eigen values of original 3-body H:       29.659881   32.235379   32.802292   33.221777   34.165199
+myrank=   0, Eigen values of 3-body H (after SRG):    29.659881   32.235379   32.802292   33.221777   34.165199
+myrank=   0,  :Calculating for J =  7/2,   P = -1,   T =  3/2, Nmax =  8
+myrank=   0, J=  7/2, P=-1, T= 3/2, Number of physical and orthonormal states:      106      35
+# Local 3NF, precalculations:     8.116659 sec
+# Local 3NF, set c1:     0.240928 sec
+# Local 3NF, set c3:     0.867263 sec
+# Local 3NF, set c4:     0.000644 sec
+# Local 3NF, set cD:     0.155421 sec
+# Local 3NF, set cE:     0.094046 sec
+myrank=   0, Eigen values of original 3-body H:       23.652107   28.288743   44.712933   46.200902   47.068867
+myrank=   0, Eigen values of 3-body H (after SRG):    23.652107   28.288743   44.712933   46.200902   47.068867
+myrank=   0,  :Calculating for J =  9/2,   P =  1,   T =  3/2, Nmax =  8
+myrank=   0, J=  9/2, P= 1, T= 3/2, Number of physical and orthonormal states:      134      45
+# Local 3NF, precalculations:     7.592648 sec
+# Local 3NF, set c1:     0.462510 sec
+# Local 3NF, set c3:     1.530620 sec
+# Local 3NF, set c4:     0.001004 sec
+# Local 3NF, set cD:     0.250840 sec
+# Local 3NF, set cE:     0.149778 sec
+myrank=   0, Eigen values of original 3-body H:       29.638868   32.815428   33.705525   50.511146   53.365768
+myrank=   0, Eigen values of 3-body H (after SRG):    29.638868   32.815428   33.705525   50.511146   53.365768
+myrank=   0,  :Calculating for J =  9/2,   P = -1,   T =  3/2, Nmax =  8
+myrank=   0, J=  9/2, P=-1, T= 3/2, Number of physical and orthonormal states:       83      28
+# Local 3NF, precalculations:     7.603130 sec
+# Local 3NF, set c1:     0.231352 sec
+# Local 3NF, set c3:     0.900797 sec
+# Local 3NF, set c4:     0.000641 sec
+# Local 3NF, set cD:     0.161263 sec
+# Local 3NF, set cE:     0.094195 sec
+myrank=   0, Eigen values of original 3-body H:       27.100911   43.008845   46.452505   47.231317   47.493475
+myrank=   0, Eigen values of 3-body H (after SRG):    27.100911   43.008845   46.452505   47.231317   47.493475
+myrank=   0,  :Calculating for J = 11/2,   P =  1,   T =  3/2, Nmax =  8
+myrank=   0, J= 11/2, P= 1, T= 3/2, Number of physical and orthonormal states:       97      32
+# Local 3NF, precalculations:     8.641066 sec
+# Local 3NF, set c1:     0.348227 sec
+# Local 3NF, set c3:     1.360232 sec
+# Local 3NF, set c4:     0.000927 sec
+# Local 3NF, set cD:     0.216360 sec
+# Local 3NF, set cE:     0.131533 sec
+myrank=   0, Eigen values of original 3-body H:       49.801949   52.868848   53.242878   53.973167   54.258470
+myrank=   0, Eigen values of 3-body H (after SRG):    49.801949   52.868848   53.242878   53.973167   54.258470
+myrank=   0,  :Calculating for J = 11/2,   P = -1,   T =  3/2, Nmax =  8
+myrank=   0, J= 11/2, P=-1, T= 3/2, Number of physical and orthonormal states:       57      19
+# Local 3NF, precalculations:     9.374076 sec
+# Local 3NF, set c1:     4.256125 sec
+# Local 3NF, set c3:     0.735450 sec
+# Local 3NF, set c4:     0.000538 sec
+# Local 3NF, set cD:     0.135591 sec
+# Local 3NF, set cE:     0.063631 sec
+myrank=   0, Eigen values of original 3-body H:       43.010963   47.313538   47.445352   49.255459   76.144016
+myrank=   0, Eigen values of 3-body H (after SRG):    43.010963   47.313538   47.445352   49.255459   76.144016
+# Calculating Transformation coefficient ...
+calculating T-Coefs channel:    1/  22
+calculating T-Coefs channel:    2/  22
+calculating T-Coefs channel:    3/  22
+calculating T-Coefs channel:    4/  22
+calculating T-Coefs channel:    5/  22
+calculating T-Coefs channel:    6/  22
+calculating T-Coefs channel:    7/  22
+calculating T-Coefs channel:    8/  22
+calculating T-Coefs channel:    9/  22
+calculating T-Coefs channel:   10/  22
+calculating T-Coefs channel:   11/  22
+calculating T-Coefs channel:   12/  22
+calculating T-Coefs channel:   13/  22
+calculating T-Coefs channel:   14/  22
+calculating T-Coefs channel:   15/  22
+calculating T-Coefs channel:   16/  22
+calculating T-Coefs channel:   17/  22
+calculating T-Coefs channel:   18/  22
+calculating T-Coefs channel:   19/  22
+calculating T-Coefs channel:   20/  22
+calculating T-Coefs channel:   21/  22
+calculating T-Coefs channel:   22/  22
+# hamil in Antisymmetrized 3-body basis:     0.000013 GB
+    Set three-body operator in jacobi basis ...
+
+############################################################
+    Doing transformaion to sp basis tuned using DGEMM ...
+    Block number is 400
+############################################################
+
+myrank=   0,  :Calculating for J =  1/2,   P =  1,   T =  1/2
+myrank=   0,  :Calculating for J =  1/2,   P = -1,   T =  1/2
+myrank=   0,  :Calculating for J =  3/2,   P =  1,   T =  1/2
+myrank=   0,  :Calculating for J =  3/2,   P = -1,   T =  1/2
+myrank=   0,  :Calculating for J =  5/2,   P =  1,   T =  1/2
+myrank=   0,  :Calculating for J =  5/2,   P = -1,   T =  1/2
+myrank=   0,  :Calculating for J =  7/2,   P =  1,   T =  1/2
+myrank=   0,  :Calculating for J =  7/2,   P = -1,   T =  1/2
+myrank=   0,  :Calculating for J =  9/2,   P =  1,   T =  1/2
+myrank=   0,  :Calculating for J =  9/2,   P = -1,   T =  1/2
+myrank=   0,  :Calculating for J = 11/2,   P =  1,   T =  1/2
+myrank=   0,  :Calculating for J =  1/2,   P =  1,   T =  3/2
+myrank=   0,  :Calculating for J =  1/2,   P = -1,   T =  3/2
+myrank=   0,  :Calculating for J =  3/2,   P =  1,   T =  3/2
+myrank=   0,  :Calculating for J =  3/2,   P = -1,   T =  3/2
+myrank=   0,  :Calculating for J =  5/2,   P =  1,   T =  3/2
+myrank=   0,  :Calculating for J =  5/2,   P = -1,   T =  3/2
+myrank=   0,  :Calculating for J =  7/2,   P =  1,   T =  3/2
+myrank=   0,  :Calculating for J =  7/2,   P = -1,   T =  3/2
+myrank=   0,  :Calculating for J =  9/2,   P =  1,   T =  3/2
+myrank=   0,  :Calculating for J =  9/2,   P = -1,   T =  3/2
+myrank=   0,  :Calculating for J = 11/2,   P =  1,   T =  3/2
+Number of three-body matrix elements is         24890
+
+    summary of time, total =     0:06:25
+
+                                     time,    ncall, time/ncall,   ratio 
+         Storing 6-j couplings       0.061       123     0.00050   0.0002
+         Storing 9-j couplings       3.088        97     0.03184   0.0080
+       InitThreeBodyJacIsoChan       0.193        24     0.00805   0.0005
+                 Write to file       0.374        74     0.00505   0.0010
+                Read from file       7.841       137     0.05723   0.0203
+                    SRG H flow      97.965       648     0.15118   0.2540
+        SetTwoBodyRelOpChannel       0.494       912     0.00054   0.0013
+   SetThreeBodyJacOpChanScalar       0.214        72     0.00298   0.0006
+      SetGenuineThreeBodyForce     277.253        24    11.55220   0.7189
+Storing Talmi-Moshinsky bracke       0.011         2     0.00535   0.0000
+       T coefficient (NAS|Lab)       0.001        35     0.00003   0.0000
+       T coefficient ( AS|Lab)       0.002        35     0.00004   0.0000
+MPI parent-child, set three-bo       0.000         1     0.00000   0.0000
+                TMTransChannel       0.005        22     0.00022   0.0000
+                          misc      -1.821                        -0.0047
+
