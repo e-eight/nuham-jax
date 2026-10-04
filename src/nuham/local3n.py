@@ -106,3 +106,26 @@ def radial_tables(meshes: LocalMeshes, cutoff_mev: float, power: int, x_max: int
         np.asarray(zx),
         np.stack([fkx0, np.asarray(fkx1), np.asarray(fkx2)]),
     )
+
+
+def radial_function(
+    term: str, key: tuple[int, ...], tables: RadialTables, meshes: LocalMeshes
+) -> np.ndarray:
+    """Radial function ``g_a(xi1, xi2)`` of ``term`` on the mesh, shape ``(n_xi, n_xi)``.
+
+    The key is the one used by :func:`nuham.local3n_angular.radial_keys`: ``(X,)`` for cE,
+    ``(K, X)`` for cD, ``(K3, X)`` for c1 and ``(K1, K2, K3, X)`` for c3 and c4.
+    ``s = xi1 / sqrt2`` and
+    ``a = sqrt(3/2) xi2`` are the two vectors whose distance enters the pion and contact functions.
+    """
+    s = (meshes.xi / np.sqrt(2.0))[:, None]
+    a = (np.sqrt(1.5) * meshes.xi)[None, :]
+    if term == "cE":
+        return tables.z0[:, None] * tables.zx[key[0]]
+    if term == "cD":
+        return tables.fk[key[0]][:, None] * tables.zx[key[1]]
+    if term == "c1":
+        k3, x = key
+        return s**k3 * a ** (1 - k3) * tables.fk[1][:, None] * tables.fkx[1, x]
+    k1, k2, k3, x = key
+    return s**k3 * a ** (k2 - k3) * tables.fk[k1][:, None] * tables.fkx[k2, x]

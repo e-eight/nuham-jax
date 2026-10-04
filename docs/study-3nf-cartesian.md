@@ -58,3 +58,25 @@ Mesh convergence (`refs/nnn_radial_mesh_study.py`, output next to it; x up to 42
 - at Lambda = 1000 MeV NuHamil's 8 fm^-1 p cut-off leaves 1e-3 (`exp(-(8 hc/1000)^4)` = 2e-3), as predicted in spec 5b;
 - converged meshes with 200-600 p points and 120-160 cosines all reach the 1e-13 noise floor, so 300 and 120 are the defaults.
 The xi mesh (80 points to 15 fm) only enters through the HO projection and is studied in 5.2.4 and 5.2.5.
+
+# Phase 5.2.3: angular layer (`nuham.local3n_angular`, `tests/test_local3n_angular.py`)
+
+`local3n_angular.coefficients(term, bra, ket, j2, t2, x_max)` returns, for two pair-antisymmetric channels
+`(l12, s12, j12, t12; l3, j3)`, the coefficients `C_a` of the radial functions `g_a` (keys `(X)` for cE, `(K, X)` for
+cD, `(K3, X)` for c1, `(K1, K2, K3, X)` for c3 and c4; `local3n.radial_function` builds `g_a` from the 5.2.2 tables). All
+constants are in (LEC = 1, MeV, fm), c1, c3, c4 for 1 GeV^-1. The formulas are Eqs. (15), (38), (42), (47) and (49) of Navratil
+(Few-Body Syst. 41, 117), read from the arXiv text; a hand check shows they are the same sums as NuHamil's
+`NNNForceLocal.F90` (same 6j and 9j triads; Nav07's `[C(2K2+1, 2K3)]^(1/2) hat(K2-K3)` equals NuHamil's `fk3k4`). Because
+that agrees term by term, no slow Fortran transcription was added to `refs/`: NuHamil's saved matrices are the cross-check.
+
+Gate: `tests/ref_nnn_projection.py` projects the coefficients with plain Gauss quadrature on NuHamil's meshes and compares with
+the saved per-term NAS matrices. Maximum absolute difference (MeV, matrices up to 0.6):
+- N3max 6, Lambda 400 and 500 (the 500 MeV set): all 24 (J, P, T) blocks, all five terms, <= 5e-13;
+- N3max 8, Lambda 400: all 24 blocks, all five terms, <= 4e-13.
+This includes c3 and c4 (c4 is zero for T = 3/2 as it must be) and settles the sign and phase conventions: the NAS gauge is Nav07's
+(the `(-1)^l12` of the Cartesian check above is consistent with Nav07 defining xi2 with the opposite sign to the one used there, which gives `(-1)^l3`; not checked separately). The paper's printed phase `(-1)^(J-J'+s+j')` is
+garbled in the arXiv text; the Fortran's `(-1)^((Jtot-j3)/2 + s12 + j45)` (c4: `(Jtot+j3)/2 + j45`) is what reproduces the files.
+
+Cost: the loops are scalar Python over cached 6j/9j symbols (0.3 s per N3max 6 channel for all terms, a minute for the 24 channels at
+N3max 8). That is fine for validation, not for N3max 40: 5.2.4 and 5.2.5 vectorise it on `racah_array` and group the intermediate
+sums (the `(v, r, y, z)` loops factor over the bra and ket orbital labels).
