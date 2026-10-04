@@ -13,6 +13,7 @@ from concurrent.futures import ProcessPoolExecutor
 
 import jax.numpy as jnp
 import numpy as np
+import scipy.sparse as sp
 
 from nuham.constants import HBARC, M_REDUCED_PN
 from nuham.kernels.nnn.projection import orbital_table, project_pairs
@@ -138,15 +139,28 @@ def nas_matrix(
     return out
 
 
-def antisymmetrize(w: np.ndarray, channel: JacobiChannel, blocks: list | None = None) -> np.ndarray:
-    """Return ``cfp W cfp^T`` block by block in ``N`` (``blocks`` default: those of ``channel``)."""
+def antisymmetrize(
+    w: np.ndarray | sp.csr_array, channel: JacobiChannel, blocks: list | None = None
+) -> np.ndarray:
+    """Return ``cfp W cfp^T`` block by block in ``N`` (``blocks`` default: those of ``channel``).
+
+    ``w`` may be a SciPy sparse array (the pair operators of Phase 5.3 are); empty blocks are
+    skipped.
+    """
     blocks = list(channel.blocks) if blocks is None else blocks
     off = np.concatenate([[0], np.cumsum([len(b.nas) for b in blocks])])
     off_as = np.concatenate([[0], np.cumsum([len(b.cfp) for b in blocks])])
     out = np.zeros((off_as[-1], off_as[-1]))
     for i, bi in enumerate(blocks):
         for k, bk in enumerate(blocks[: i + 1]):
-            v = bi.cfp @ w[off[i] : off[i + 1], off[k] : off[k + 1]] @ bk.cfp.T
+            rows, cols = slice(off[i], off[i + 1]), slice(off[k], off[k + 1])
+            if isinstance(w, sp.csr_array):
+                block = w[rows, cols]
+                if block.nnz == 0:
+                    continue
+                v = bi.cfp @ (block @ bk.cfp.T)
+            else:
+                v = bi.cfp @ w[rows, cols] @ bk.cfp.T
             out[off_as[i] : off_as[i + 1], off_as[k] : off_as[k + 1]] = v
             out[off_as[k] : off_as[k + 1], off_as[i] : off_as[i + 1]] = v.T
     return out

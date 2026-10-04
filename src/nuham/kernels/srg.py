@@ -1,5 +1,6 @@
 """Similarity renormalization group flow of a Hamiltonian ``H = T + V`` with generator ``T``."""
 
+from collections.abc import Callable
 from functools import partial
 
 import diffrax
@@ -34,6 +35,57 @@ def _commutator_rhs(h: Array, d: Array, e_up: Array, e_low: Array) -> Array:
     )
     m = (a - a.T) @ h
     return m + m.T
+
+
+def _commutator_rhs_dense(h: Array, g: Array) -> Array:
+    """Right-hand side ``[[G, H], H]`` for a dense symmetric generator ``G``.
+
+    Same identity as :func:`_commutator_rhs`, with ``A = GH`` as a GEMM: two products in all.
+    """
+    a = g @ h
+    m = (a - a.T) @ h
+    return m + m.T
+
+
+def _integrate(
+    rhs: Callable[[Array], Array],
+    h0: Array,
+    s_final: float,
+    rtol: float,
+    atol: float,
+    max_steps: int,
+) -> Array:
+    """Integrate ``dH/ds = rhs(H)`` from 0 to ``s_final`` with Dopri8 and a max-norm controller."""
+    solution = diffrax.diffeqsolve(
+        diffrax.ODETerm(lambda _t, h, _args: rhs(h)),
+        diffrax.Dopri8(),
+        t0=0.0,
+        t1=s_final,
+        dt0=None,
+        y0=h0,
+        stepsize_controller=diffrax.PIDController(rtol=rtol, atol=atol, norm=optx.max_norm),
+        max_steps=max_steps,
+        saveat=diffrax.SaveAt(t1=True),
+    )
+    return solution.ys[0]
+
+
+@partial(jax.jit, static_argnames=("max_steps",))
+def srg_flow_dense(
+    h0: Array,
+    g: Array,
+    s_final: float,
+    rtol: float = 1e-10,
+    atol: float = 1e-10,
+    max_steps: int = 100_000,
+) -> Array:
+    """Integrate ``dH/ds = [[G, H], H]`` for a dense symmetric generator ``G`` (3N Jacobi space).
+
+    ``G`` is the kinetic energy there, block tridiagonal in N but dense inside blocks, so the
+    banded form of :func:`srg_flow` does not apply. Arguments and units are those of
+    :func:`srg_flow` with ``g`` of shape ``(n, n)`` in place of the two diagonals.
+    """
+    return _integrate(lambda h: _commutator_rhs_dense(h, g), h0, s_final, rtol, atol, max_steps)
 
 
 @partial(jax.jit, static_argnames=("max_steps",))
@@ -76,18 +128,9 @@ def srg_flow(
     zero = jnp.zeros(1, dtype=h0.dtype)
     e_up = jnp.concatenate([t_off, zero])
     e_low = jnp.concatenate([zero, t_off])
-    solution = diffrax.diffeqsolve(
-        diffrax.ODETerm(lambda _t, h, _args: _commutator_rhs(h, t_diag, e_up, e_low)),
-        diffrax.Dopri8(),
-        t0=0.0,
-        t1=s_final,
-        dt0=None,
-        y0=h0,
-        stepsize_controller=diffrax.PIDController(rtol=rtol, atol=atol, norm=optx.max_norm),
-        max_steps=max_steps,
-        saveat=diffrax.SaveAt(t1=True),
+    return _integrate(
+        lambda h: _commutator_rhs(h, t_diag, e_up, e_low), h0, s_final, rtol, atol, max_steps
     )
-    return solution.ys[0]
 
 
 @partial(jax.jit, static_argnames=("max_steps",))

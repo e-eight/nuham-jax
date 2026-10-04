@@ -118,6 +118,7 @@ kinetic. [V]
   - **Coulomb is not included**: `ThreeBodyManagers` forces `coul=.false.` when `trans2lab` (`ThreeBodyManager.F90:~53-58`, printed
     "Then, 'coul' is turned to false" in both logs). In the non-lab path (eigenvalue solver) `coul` keeps its default `.true.` and pp
     Coulomb would be averaged in (U: untested). [V for lab path]
+  - **Order matters** (verified 2026-10-04): the pp, pn, nn *bare* matrices are averaged first and the average is what the SRG flows (`renorm_ho_space_isospin` acts on the isospin-formalism object). Flowing pp, pn, nn separately and averaging afterwards differs from NuHamil by 1e-4 relative in V3 (trace 164.0128 instead of 164.0073).
   - SRG (when `renorm != bare` and `renorm_space2 == 'ho'`, `NNForceIsospin.F90:~207-210`): `renorm_ho_space_isospin` (`:298-328`) -> `HOSRGChannel`
     (`:330-415`) per isospin channel in the **full N2max = 100 relative space**: H = T + V, generator = relative kinetic (`CalcMERel`), same
     `SRGHflow` as spec 2, V_evolved = H_ev - T. alpha uses `m_red_pn` (`:~310-313`): alpha = (lambda hc / sqrt(2 m_red_pn))^-4, with hc =

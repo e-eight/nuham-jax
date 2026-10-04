@@ -188,6 +188,36 @@ def evolve_relative_nn_many(
     ]
 
 
+def evolve_potentials(
+    states: Sequence[tuple[np.ndarray, np.ndarray, np.ndarray]],
+    hw: float,
+    lam: float,
+    rtol: float = 1e-10,
+    atol: float = 1e-10,
+    granularity: int = 16,
+) -> list[np.ndarray]:
+    """SRG-evolve potentials that are already in the HO relative basis.
+
+    Parameters
+    ----------
+    states
+        ``(n, l, v)`` per channel: basis quantum numbers (l-major) and the potential in MeV.
+    hw, lam
+        Oscillator energy in MeV and SRG cutoff in fm^-1 (``lam`` must be non-zero).
+    rtol, atol, granularity
+        As in :func:`evolve_relative_nn`.
+
+    Returns
+    -------
+    list[np.ndarray]
+        Evolved potentials ``V = H - T_rel``, one per channel.
+    """
+    prepared = [
+        _Prepared((0, 0, 0, 0), n, l, v, np.asarray(kinetic_matrix(n, l, hw))) for n, l, v in states
+    ]
+    return _flow([prepared], [(hw, lam)], rtol, atol, granularity)[0]
+
+
 def _flow(
     prepared: list[list[_Prepared]],
     params: Sequence[tuple[float, float | None]],

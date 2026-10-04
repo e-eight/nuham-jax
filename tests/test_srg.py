@@ -3,7 +3,14 @@ import numpy as np
 import pytest
 
 import nuham  # noqa: F401
-from nuham.kernels.srg import _commutator_rhs, srg_alpha, srg_evolve_batch, srg_flow
+from nuham.kernels.srg import (
+    _commutator_rhs,
+    _commutator_rhs_dense,
+    srg_alpha,
+    srg_evolve_batch,
+    srg_flow,
+    srg_flow_dense,
+)
 
 
 def random_problem(n: int, seed: int) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
@@ -61,3 +68,38 @@ def test_padding_does_not_change_the_result() -> None:
     b = srg_evolve_batch(jnp.asarray(hp[None]), jnp.asarray(dp[None]), jnp.asarray(ep[None]), *args)
     np.testing.assert_allclose(np.asarray(b)[0, :15, :15], np.asarray(a)[0], atol=1e-8)
     assert np.all(np.asarray(b)[0, 15:] == 0.0)
+
+
+def test_dense_flow_with_tridiagonal_generator_equals_banded_flow() -> None:
+    h, t, d, e = random_problem(20, 4)
+    args = (jnp.asarray(h / 100), 0.2)
+    banded = srg_flow(args[0], jnp.asarray(d / 100), jnp.asarray(e / 100), args[1])
+    dense = srg_flow_dense(args[0], jnp.asarray(t / 100), args[1])
+    np.testing.assert_allclose(dense, banded, atol=1e-12)
+
+
+def test_dense_flow_with_block_generator_preserves_invariants() -> None:
+    # Dense inside blocks, coupling neighbouring blocks: the shape of the 3N kinetic energy.
+    rng = np.random.default_rng(5)
+    sizes = [4, 6, 5, 7]
+    n, edges = sum(sizes), np.cumsum([0, *sizes])
+    g = np.zeros((n, n))
+    for k, size in enumerate(sizes):
+        sl = slice(edges[k], edges[k + 1])
+        b = rng.normal(size=(size, size))
+        g[sl, sl] = 0.1 * (b + b.T) + np.diag(1.0 + k + np.arange(size))
+        if k:
+            c = 0.1 * rng.normal(size=(sizes[k - 1], size))
+            g[edges[k - 1] : edges[k], sl] = c
+            g[sl, edges[k - 1] : edges[k]] = c.T
+    v = rng.normal(size=(n, n))
+    h = g + 0.3 * (v + v.T) / n
+    eta = g @ h - h @ g
+    np.testing.assert_allclose(
+        _commutator_rhs_dense(jnp.asarray(h), jnp.asarray(g)), eta @ h - h @ eta, atol=1e-12
+    )
+    out = np.asarray(srg_flow_dense(jnp.asarray(h), jnp.asarray(g), 0.5))
+    np.testing.assert_allclose(np.linalg.eigvalsh(out), np.linalg.eigvalsh(h), atol=1e-8)
+    np.testing.assert_allclose(np.trace(out), np.trace(h), atol=1e-9)
+    np.testing.assert_allclose(np.trace(out @ out), np.trace(h @ h), atol=1e-8)
+    np.testing.assert_allclose(out, out.T, atol=1e-12)
