@@ -123,3 +123,16 @@ def test_matches_nuhamil_cfp(name: str, table: MoshinskyTable) -> None:
         a = antisymmetrizer(nas, j2, t2, n_quanta, table)
         assert abs(cfp.T @ cfp - a).max() < 1e-13
         assert abs(mine.cfp.T @ mine.cfp - cfp.T @ cfp).max() < 1e-13
+
+
+def test_cached_channel_equals_built_channel(tmp_path) -> None:
+    """A basis read back from the cache is the one that was built, bit for bit."""
+    from nuham.nnn.jacobi import load_or_build_channel
+
+    built = load_or_build_channel(3, 1, 1, 6, cache_dir=tmp_path)
+    assert any(tmp_path.glob("jacobi_j3_p+_t1_N6.npz"))
+    read = load_or_build_channel(3, 1, 1, 6, cache_dir=tmp_path)
+    assert [b.n_quanta for b in read.blocks] == [b.n_quanta for b in built.blocks]
+    for a, b in zip(read.blocks, built.blocks, strict=True):
+        np.testing.assert_array_equal(a.nas, b.nas)
+        np.testing.assert_array_equal(a.cfp, b.cfp)

@@ -1,0 +1,35 @@
+{
+ "benchmark": "lab",
+ "environment": {
+  "host": "darjeeling",
+  "platform": "Linux-7.1.13+deb13-amd64-x86_64-with-glibc2.41",
+  "cpu_count": 16,
+  "python": "3.12.9",
+  "jax": "0.11.2",
+  "backend": "cpu",
+  "device": "cpu:cpu",
+  "x64": true,
+  "git_commit": "7ebe7da"
+ },
+ "rows": [
+  {
+   "emax": 10,
+   "e2max": 20,
+   "e3max": 12,
+   "j2": 9,
+   "parity": 1,
+   "t2": 1,
+   "lab_states": 7221,
+   "matrix_gb": 0.208571364,
+   "lab_seconds": 14.402749564003898,
+   "stages": {
+    "jacobi_bases": 7.54,
+    "brackets": 0.0,
+    "tcoef": 8.709,
+    "contract": 5.687
+   },
+   "peak_host_rss_gb": 2.332548,
+   "peak_device_bytes": null
+  }
+ ]
+}

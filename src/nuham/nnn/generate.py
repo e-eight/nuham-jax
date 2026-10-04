@@ -1,5 +1,6 @@
 """End-to-end generation of a 3N ``me3j`` file: Jacobi Hamiltonian, SRG, lab transform, writer."""
 
+import argparse
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -7,16 +8,21 @@ import numpy as np
 
 from nuham.angmom.moshinsky_table import MoshinskyTable
 from nuham.basis.lab import make_orbits
-from nuham.nn.input_file import MomentumNN
+from nuham.nn.input_file import MomentumNN, read_nn_mom
 from nuham.nnn.hamiltonian import isospin_nn
-from nuham.nnn.jacobi import JacobiChannel, build_channel, ramp_nmax
+from nuham.nnn.jacobi import JacobiChannel, load_or_build_channel, ramp_nmax
 from nuham.nnn.lab_transform import lab_scalar_device
 from nuham.nnn.local_force.assembly import local_3nf_matrix
 from nuham.nnn.local_force.radial import RadialTables, nuhamil_meshes, radial_tables
 from nuham.nnn.me3j import LabMatrix3, me3j_values, write_me3j
 from nuham.nnn.srg3 import three_body_operator
 from nuham.nnn.tcoef import make_brackets
-from nuham.runtime import WriterOptions
+from nuham.runtime import (
+    WriterOptions,
+    add_writer_arguments,
+    enable_compilation_cache,
+    writer_options_from_args,
+)
 from nuham.timing import StageTimer, stage
 
 
@@ -45,6 +51,7 @@ def jacobi_operators(
     timer: StageTimer | None = None,
     rtol: float = 1e-8,
     jmax3: int | None = None,
+    cache_dir: str | Path | None = None,
 ) -> tuple[dict[tuple[int, int, int], np.ndarray], dict[tuple[int, int, int], JacobiChannel]]:
     """Evolved three-body operators ``V3`` of all Jacobi channels, cut to ``N <= e3max``.
 
@@ -52,7 +59,8 @@ def jacobi_operators(
     can occur in the lab transform of ``e3max`` (a smaller ``jmax3`` drops the higher ones, as
     NuHamil's input of the same name does). Each flow runs in the full ramp space and is dropped
     after its leading block is kept, so memory stays at the size of the largest single channel.
-    ``force=None`` omits the genuine force.
+    ``force=None`` omits the genuine force. ``cache_dir`` keeps the Jacobi bases between runs
+    (:func:`nuham.nnn.jacobi.load_or_build_channel`).
 
     Returns
     -------
@@ -73,7 +81,7 @@ def jacobi_operators(
                 if nmax < e3max:
                     raise ValueError(f"ramp {ramp!r} is below e3max = {e3max} at 2J = {j2}")
                 with stage(timer, "jacobi_basis"):
-                    channel = build_channel(j2, parity, t2, nmax, table)
+                    channel = load_or_build_channel(j2, parity, t2, nmax, table, cache_dir)
                 if not channel.blocks:  # no antisymmetric state: nothing to evolve or transform
                     continue
                 v3n = None
@@ -140,6 +148,8 @@ def generate_me3j(
     rtol: float = 1e-8,
     jmax3: int | None = None,
     lab_dtype: type = np.float64,
+    workers: int = 1,
+    cache_dir: str | Path | None = None,
 ) -> int:
     """Generate the 3N interaction in the lab HO basis and write it as ``me3j``.
 
@@ -166,6 +176,10 @@ def generate_me3j(
         Largest doubled ``J`` of the Jacobi channels; ``None`` is ``2 e3max + 3``.
     lab_dtype
         Storage type of the lab matrices (``np.float32`` for production sizes).
+    workers
+        Processes that look up and order the file's values (:func:`nuham.nnn.me3j.me3j_values`).
+    cache_dir
+        Directory that keeps the Jacobi bases between runs (they do not depend on ``hw``, ``lam``).
 
     Returns
     -------
@@ -175,7 +189,7 @@ def generate_me3j(
     if e3max > e2max:
         raise ValueError("e3max > e2max gives a file that imsrg++ cannot read (spec 5d 2.3)")
     ops, chans = jacobi_operators(
-        nn, hw, lam, e3max, ramp, force, timer=timer, rtol=rtol, jmax3=jmax3
+        nn, hw, lam, e3max, ramp, force, timer=timer, rtol=rtol, jmax3=jmax3, cache_dir=cache_dir
     )
     labs = lab_matrices(emax, e2max, e3max, ops, chans, timer, lab_dtype)
     if path is None:
@@ -185,8 +199,61 @@ def generate_me3j(
     with stage(timer, "write"):
         return write_me3j(
             path,
-            me3j_values(make_orbits(emax), e2max, e3max, labs),
+            me3j_values(make_orbits(emax), e2max, e3max, labs, workers=workers),
             opts.compresslevel,
             opts.compressor,
             opts.compress_threads,
         )
+
+
+def main() -> None:
+    """Command-line entry point: ``python -m nuham.nnn.generate --help``."""
+    p = argparse.ArgumentParser(
+        description="Generate a 3N me3j file (local N2LO force) for imsrg++."
+    )
+    p.add_argument("nn_file", help="NuHamil momentum-space *.bin file")
+    p.add_argument("output", help="output file, e.g. N3LO_3NF400_hw16_e14_e2_28_e3_16.me3j.gz")
+    p.add_argument("--hw", type=float, required=True, help="oscillator energy in MeV")
+    p.add_argument("--lam", type=float, required=True, help="SRG cutoff in fm^-1")
+    p.add_argument("--emax", type=int, required=True)
+    p.add_argument("--e2max", type=int, required=True)
+    p.add_argument("--e3max", type=int, required=True)
+    p.add_argument(
+        "--ramp", required=True, help="flow space per J, e.g. flat8 or ramp40-5-36-7-32-9-28-11-24"
+    )
+    p.add_argument(
+        "--jmax3", type=int, default=None, help="largest doubled J (default 2 e3max + 3)"
+    )
+    p.add_argument(
+        "--no-3nf", action="store_true", help="induced 3N force of the NN interaction only"
+    )
+    p.add_argument("--cutoff", type=float, default=400.0, help="local 3NF regulator cutoff (MeV)")
+    p.add_argument("--power", type=int, default=2, help="local regulator power")
+    for name, default in (("c1", -0.81), ("c3", -3.2), ("c4", 5.4), ("cD", -0.2), ("cE", 0.098)):
+        p.add_argument(f"--{name}", type=float, default=default)
+    p.add_argument("--rtol", type=float, default=1e-8, help="flow tolerance (rtol = atol / hw)")
+    p.add_argument("--lab-dtype", choices=("float32", "float64"), default="float32")
+    p.add_argument("--workers", type=int, default=1, help="processes for the value lookup")
+    p.add_argument("--jacobi-cache", default=None, help="directory for cached Jacobi bases")
+    add_writer_arguments(p)
+    p.add_argument("--compile-cache", default=None, help="directory for JAX's compilation cache")
+    p.add_argument("--no-compile-cache", action="store_true")
+    args = p.parse_args()
+    if not args.no_compile_cache:
+        enable_compilation_cache(args.compile_cache)
+    force = None
+    if not args.no_3nf:
+        lecs = {k: getattr(args, k) for k in ("c1", "c3", "c4", "cD", "cE")}
+        force = LocalForce(lecs, args.cutoff, args.power)
+    timer = StageTimer()
+    n = generate_me3j(
+        read_nn_mom(args.nn_file), args.output, args.hw, args.lam, args.emax, args.e2max,
+        args.e3max, args.ramp, force, timer, writer_options_from_args(args), args.rtol,
+        args.jmax3, getattr(np, args.lab_dtype), args.workers, args.jacobi_cache,
+    )  # fmt: skip
+    print(f"wrote {n} values to {args.output}")
+    print({k: round(v, 1) for k, v in timer.seconds.items()})
+
+
+if __name__ == "__main__":
+    main()

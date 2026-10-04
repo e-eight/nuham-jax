@@ -15,6 +15,7 @@ from nuham.kernels.nnn.lab import congruence_block, place_block
 from nuham.kernels.transfer import to_host
 from nuham.nnn.jacobi import JacobiChannel
 from nuham.nnn.tcoef import Brackets, LabBlock, lab_t_blocks
+from nuham.timing import StageTimer, stage
 
 Run = tuple[int, int, np.ndarray, tuple[int, int]]
 """``(start, stop, positions in the channel's AS order, (jrel, parity))`` of one group's rows."""
@@ -79,12 +80,14 @@ def lab_scalar_device(
     brackets: Brackets,
     dtype: type = np.float64,
     granularity: int = 64,
+    timer: StageTimer | None = None,
 ) -> tuple[LabBlock, np.ndarray, np.ndarray]:
     """Laboratory matrix ``6 sum T^T V_jac T`` of one channel, contracted on the device.
 
     Arguments as in :func:`nuham.nnn.tcoef.lab_scalar`, plus the storage type of the result and
     the granularity to which block sizes are rounded up (zero padding; it limits the number of
-    distinct compiled shapes). The arithmetic is float64 whatever ``dtype`` is.
+    distinct compiled shapes). The arithmetic is float64 whatever ``dtype`` is. ``timer`` records
+    ``tcoef`` (host coefficients), ``contract`` (device products, including the final copy).
 
     Returns
     -------
@@ -92,50 +95,56 @@ def lab_scalar_device(
         The lab states, the matrix in ``N``-major order, and ``order``: the lab-state index of
         each row (and column) of that matrix.
     """
-    lab, blocks = lab_t_blocks(j2, parity, t2, orb, e2max, e3max, channels, brackets)
+    with stage(timer, "tcoef"):
+        lab, blocks = lab_t_blocks(j2, parity, t2, orb, e2max, e3max, channels, brackets)
     offs = {}
     for key, ch in channels.items():
         sizes = [len(b.cfp) for b in ch.blocks]
         offs[key] = {
             b.n_quanta: int(o) for b, o in zip(ch.blocks, np.cumsum([0, *sizes]), strict=False)
         }
-    keys = [k for k in vjac if vjac[k].size]
-    base, flat, pos = {}, [], 0
-    for key in keys:
-        base[key] = (pos, len(vjac[key]))
-        flat.append(vjac[key].ravel())
-        pos += vjac[key].size
-    v_flat = jnp.asarray(np.concatenate([*flat, np.zeros(1)]))
-    ns = sorted(blocks)
-    order = np.concatenate([blocks[n][0] for n in ns]) if ns else np.zeros(0, dtype=np.int64)
-    first_col = dict(zip(ns, np.cumsum([0] + [len(blocks[n][0]) for n in ns])[:-1], strict=True))
-    t_dev, runs = {}, {}
-    for n in ns:
-        t_as, labels = blocks[n][1], blocks[n][2]
-        rows_pad, cols_pad = (
-            _bucket(t_as.shape[0], granularity),
-            _bucket(t_as.shape[1], granularity),
+    with stage(timer, "contract"):
+        keys = [k for k in vjac if vjac[k].size]
+        base, flat, pos = {}, [], 0
+        for key in keys:
+            base[key] = (pos, len(vjac[key]))
+            flat.append(vjac[key].ravel())
+            pos += vjac[key].size
+        v_flat = jnp.asarray(np.concatenate([*flat, np.zeros(1)]))
+        ns = sorted(blocks)
+        order = np.concatenate([blocks[n][0] for n in ns]) if ns else np.zeros(0, dtype=np.int64)
+        first_col = dict(
+            zip(ns, np.cumsum([0] + [len(blocks[n][0]) for n in ns])[:-1], strict=True)
         )
-        padded = np.zeros((rows_pad, cols_pad))
-        padded[: t_as.shape[0], : t_as.shape[1]] = t_as
-        t_dev[n] = jnp.asarray(padded)
-        runs[n] = _runs(labels, offs)
-    out = jnp.zeros((len(lab), len(lab)))
-    for ib, nb in enumerate(ns):
-        for nk in ns[: ib + 1]:
-            src, rows, cols = _pair_entries(runs[nb], runs[nk], base)
-            if not len(src):
-                continue
-            size = _bucket(len(src), 1 << max(0, len(src).bit_length() - 3))
-            fill = size - len(src)
-            block = congruence_block(
-                t_dev[nb],
-                t_dev[nk],
-                v_flat,
-                jnp.asarray(np.pad(src, (0, fill), constant_values=len(v_flat) - 1)),
-                jnp.asarray(np.pad(rows, (0, fill))),
-                jnp.asarray(np.pad(cols, (0, fill))),
+        t_dev, runs = {}, {}
+        for n in ns:
+            t_as, labels = blocks[n][1], blocks[n][2]
+            rows_pad, cols_pad = (
+                _bucket(t_as.shape[0], granularity),
+                _bucket(t_as.shape[1], granularity),
             )
-            nb_cols, nk_cols = len(blocks[nb][0]), len(blocks[nk][0])
-            out = place_block(out, 6.0 * block[:nb_cols, :nk_cols], first_col[nb], first_col[nk])
-    return lab, to_host(out.astype(dtype)), order
+            padded = np.zeros((rows_pad, cols_pad))
+            padded[: t_as.shape[0], : t_as.shape[1]] = t_as
+            t_dev[n] = jnp.asarray(padded)
+            runs[n] = _runs(labels, offs)
+        out = jnp.zeros((len(lab), len(lab)))
+        for ib, nb in enumerate(ns):
+            for nk in ns[: ib + 1]:
+                src, rows, cols = _pair_entries(runs[nb], runs[nk], base)
+                if not len(src):
+                    continue
+                size = _bucket(len(src), 1 << max(0, len(src).bit_length() - 3))
+                fill = size - len(src)
+                block = congruence_block(
+                    t_dev[nb],
+                    t_dev[nk],
+                    v_flat,
+                    jnp.asarray(np.pad(src, (0, fill), constant_values=len(v_flat) - 1)),
+                    jnp.asarray(np.pad(rows, (0, fill))),
+                    jnp.asarray(np.pad(cols, (0, fill))),
+                )
+                nb_cols, nk_cols = len(blocks[nb][0]), len(blocks[nk][0])
+                out = place_block(
+                    out, 6.0 * block[:nb_cols, :nk_cols], first_col[nb], first_col[nk]
+                )
+        return lab, to_host(out.astype(dtype)), order

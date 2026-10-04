@@ -1,0 +1,58 @@
+# Study: the 3N lab transform and the me3j writer (Phase 5.4)
+
+Chain (`nuham.nnn.generate`, CLI `uv run python -m nuham.nnn.generate --help`): isospin-averaged NN (once) -> per Jacobi channel: basis (cached), kinetic and NN embedding, local 3NF,
+SRG flow, `V3 = H(s) - T - 3 V_NN(s)` cut to `N <= e3max` -> per lab channel: host T coefficients, device contraction `6 sum T^T V3 T` -> file order lookup -> `10f16.8` text, gzip.
+
+## Correctness
+
+| check | result |
+|---|---|
+| NuHamil's 4/8/4 file, 3NF400, all 24 890 values (`tests/test_me3j.py`) | max difference 2.2e-6 (float64 lab matrices), 1.2e-6 through the CLI with float32 storage |
+| NuHamil's NN-only 4/8/4 file (made with `jmax3 = 5`) | 1.7e-6 |
+| value counts | 24 890 (4/8/4), 456 320 (6/12/6), 5 199 790 (8/16/8): spec 5d |
+| tuple order | equal to the nested loops of NuHamil tuple by tuple (`file_tuples`) |
+| device contraction against the host `lab_scalar`, random operators, 5 channels | 1e-9 relative |
+| imsrg++, 4He, 4/8/4, full flow | EHF 5.8490859 against 5.8490810, E(IMSRG(2)) 1.761308 against 1.761305 (`docs/imsrg-check.md`) |
+
+imsrg++ needs `file3e2max` (see the same file). The lab contraction is exact for any number of workers (`test_parallel_values_equal_serial`).
+
+## Measured on this CPU (16 cores)
+
+Stage times of `generate_me3j` with the 3NF400 (ramp flat`e3max`):
+
+| emax/e2max/e3max | values | NN | basis | force | flow | lab (T coefficients + contraction) | write |
+|---|---|---|---|---|---|---|---|
+| 4/8/4 | 24 890 | 6 s | 1 s | 76 s | 16 s | 8 s | 0.2 s |
+| 6/12/6 | 456 320 | 11 s | 1 s | 25 s | 15 s | 7 s | 0.2 s |
+| 8/16/8 | 5 199 790 | 10 s | 2 s | 90 s | 20 s | 52 s | 1.2 s |
+
+(4/8/4 runs 24 channels to jmax3 = 11 with their own radial tables; 6 and 8 use the default `jmax3 = 2 e3max + 3`.) Lab channel J=9/2+ T=1/2 at e3max 12 (7 221 lab states):
+T coefficients 8.7 s, contraction 5.7 s on the CPU, 2.3 GB (`benchmarks/baseline_cpu_me3j_lab_e12.json`). The writer (`benchmarks/bench_me3j.py write`, emax 8, e2max 16, e3max 12,
+2.5e8 values): lookup and ordering 4.1 M values/s on one process (40.7 s), 12 M/s with 8 worker processes (20.8 s); with formatting and ISA-L compression the whole write is
+5.1 M values/s (48 s) on one process and 8.8 M/s with 8 workers (28 s); 1.5 GB of gzip.
+
+## Production size (14/28/16, 6.37e9 values), counted and extrapolated
+
+- **Contraction.** 70 lab channels, 2.7e14 flop in all with the dense per-pair formulation (largest channel J=9/2+ T=1/2: 32 259 lab states, 3.2e13 flop, T coefficients 2.8 GB in float64,
+  the dense `V_bd` of one block pair 2 GB). About 7 s at the 40 TFLOP/s measured for FP64 products on the GH200, so the contraction is not a cost; the lab matrices of all channels need 45.5 GiB in float32.
+- **T coefficients** (host, hw independent): about 16 core-minutes for all channels (`docs/study-tcoef3.md`), plus the `cfp` products (2.5e14 flop on the host BLAS).
+- **Writer.** 6.4e9 values at 8.8 M/s on 8 workers is 12 minutes on this machine; the formatter (22 M values/s) and the compressor (ISA-L 370 MB/s here, 103 GB of text) run in the main thread and
+  a background thread. A device-side lookup and formatting is possible (the me2j device assembler is the template) but not needed before the GH200 measurement.
+- **Jacobi basis, 3NF and flow** dominate: basis plus force of the largest channel (J=5/2, N = 40) are 90 s + 119 s on the GH200 (`docs/study-local-3nf.md`), the flow about 40 s
+  (`docs/study-3n-flow.md`). Summed over the 72 channels of the production ramp I estimate 35-40 minutes for basis plus force and 3-5 minutes for the flows; the estimate is a scaling of the measured
+  channels, not a measurement.
+- **Memory.** Lab matrices 45.5 GiB (float32) on the host for the lookup, the Jacobi `V3` operators cut to e3max (a few hundred MB in all), and per channel up to about 15 GB on the device.
+
+## The optional device-side move of the 3NF assembly
+
+Move the radial sums (35 s), the scatter (11 s) and `cfp W cfp^T` (46 s) of J=5/2, N = 40 to the device (GH200 times, `docs/study-local-3nf.md`): the assembly of that channel would fall from 119 s to
+about 30 s, and the dense NAS matrix (9.3 GB) would live on the device. Over the whole production ramp that saves roughly 15-20 minutes of the 35-40 minutes of basis and force. It is not the
+first thing to do:
+
+1. The **Jacobi basis** is as large as the assembly (90 s against 119 s for J=5/2) and depends only on `(J, P, T, N)`. `load_or_build_channel` now caches it (one `.npz` per channel,
+   hw and lambda independent), which removes that half for every run after the first, in particular for hw and lambda scans.
+2. A scan over hw redoes the radial projection (device) but not the angular coefficients; a scan over lambda or the LECs redoes only the flow and the combination (the five LEC-free terms can be
+   stored, as planned in 5.2).
+3. The device-side assembly adds device memory pressure (the dense NAS matrix) next to the flow and the lab matrices, and two more kernels to maintain.
+
+Recommendation: measure the production chain on the GH200 as it is (basis cached, 8-16 writer workers), then decide on the device-side assembly from the measured stage shares.

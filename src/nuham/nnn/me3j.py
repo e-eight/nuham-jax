@@ -9,7 +9,11 @@ all ``(J12, J45, J)`` and the five isospin combinations ``(T12, T45, 2T) = (0,0,
 of the triple list of equal parity. The text layout is that of ``me2j`` (:func:`write_me3j`).
 """
 
+import itertools
+import multiprocessing
+from collections import deque
 from collections.abc import Iterator
+from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -132,23 +136,18 @@ def count_values(orb: Orbits, e2max: int, e3max: int) -> int:
     return sum(len(bra_tuples(orb, tri, b)[0]) for b in range(len(tri[0])))
 
 
-def me3j_values(
-    orb: Orbits,
-    e2max: int,
-    e3max: int,
-    labs: dict[tuple[int, int, int], LabMatrix3],
-    chunk: int = _CHUNK,
-) -> Iterator[np.ndarray]:
-    """Yield the values of the file in order, about ``chunk`` at a time.
+_WORKER: dict = {}
 
-    Parameters
-    ----------
-    labs
-        Lab matrices by ``(2J, P, 2T)``. A tuple whose channel or states are absent, like the
-        Pauli-forbidden ones, gets 0.0, as in NuHamil's ``GetThBME``.
-    """
+
+def _values_for(
+    orb: Orbits,
+    tri: tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray],
+    labs: dict[tuple[int, int, int], LabMatrix3],
+    bras: range,
+    chunk: int,
+) -> Iterator[np.ndarray]:
+    """Yield the values of the bra triples ``bras`` in file order, about ``chunk`` at a time."""
     n = len(orb)
-    tri = triples(orb, e2max, e3max)
     i1, i2, i3, par = tri
     pending: list[tuple[np.ndarray, ...]] = []
     size = 0
@@ -172,7 +171,7 @@ def me3j_values(
             out[sel[ok]] = lab.m[lab.rows[rb[ok]], lab.rows[rk[ok]]]
         return out
 
-    for bra in range(len(i1)):
+    for bra in bras:
         ket, j12, j45, jt, t12, t45, t2 = bra_tuples(orb, tri, bra)
         pending.append(
             (np.full(len(ket), bra), ket, j12, j45, jt, t12, t45, t2, par[np.full(len(ket), bra)])
@@ -183,6 +182,62 @@ def me3j_values(
             pending, size = [], 0
     if pending:
         yield flush()
+
+
+def _task(bras: range) -> np.ndarray:
+    """Values of ``bras`` in a worker process (inputs inherited through ``fork``)."""
+    w = _WORKER
+    parts = list(_values_for(w["orb"], w["tri"], w["labs"], bras, w["chunk"]))
+    return np.concatenate(parts) if parts else np.zeros(0)
+
+
+def _split(par: np.ndarray, pairs_per_task: int) -> list[range]:
+    """Consecutive ranges of bra triples with about ``pairs_per_task`` (bra, ket) pairs each."""
+    seen = {1: np.cumsum(par == 1), -1: np.cumsum(par == -1)}
+    cost = np.where(par == 1, seen[1], seen[-1])  # kets of equal parity not after the bra
+    bounds = np.searchsorted(np.cumsum(cost), np.arange(0, cost.sum(), pairs_per_task)[1:])
+    edges = [0, *bounds.tolist(), len(par)]
+    return [range(a, b) for a, b in zip(edges[:-1], edges[1:], strict=True) if b > a]
+
+
+def me3j_values(
+    orb: Orbits,
+    e2max: int,
+    e3max: int,
+    labs: dict[tuple[int, int, int], LabMatrix3],
+    chunk: int = _CHUNK,
+    workers: int = 1,
+    pairs_per_task: int = 40_000,
+) -> Iterator[np.ndarray]:
+    """Yield the values of the file in order, about ``chunk`` at a time.
+
+    Parameters
+    ----------
+    labs
+        Lab matrices by ``(2J, P, 2T)``. A tuple whose channel or states are absent, like the
+        Pauli-forbidden ones, gets 0.0, as in NuHamil's ``GetThBME``.
+    workers
+        With more than one, forked processes build consecutive slices of the file (``labs`` is
+        shared copy-on-write) and the results come back in order; at most ``2 * workers`` slices
+        are in flight, so memory stays bounded when the consumer is slower. The values are the
+        same as with one worker.
+    pairs_per_task
+        Size of a slice in (bra, ket) triple pairs (about 50 values each at e3max 16).
+    """
+    tri = triples(orb, e2max, e3max)
+    if workers <= 1:
+        yield from _values_for(orb, tri, labs, range(len(tri[0])), chunk)
+        return
+    _WORKER.update(orb=orb, tri=tri, labs=labs, chunk=chunk)
+    ctx = multiprocessing.get_context("fork")
+    tasks = iter(_split(tri[3], pairs_per_task))
+    with ProcessPoolExecutor(workers, mp_context=ctx) as pool:
+        inflight: deque = deque(pool.submit(_task, t) for t in itertools.islice(tasks, 2 * workers))
+        while inflight:
+            values = inflight.popleft().result()
+            if (nxt := next(tasks, None)) is not None:
+                inflight.append(pool.submit(_task, nxt))
+            yield values
 
 
 def write_me3j(

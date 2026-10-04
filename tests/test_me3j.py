@@ -71,3 +71,24 @@ def test_whole_file_matches_nuhamil(
     assert n == len(want) == len(got) == 24890
     assert np.abs(got - want).max() < 1e-5
     assert (got[want == 0.0] == 0.0).all()
+
+
+def test_parallel_values_equal_serial() -> None:
+    """Forked workers give the same stream, in order, as one process."""
+    from nuham.nnn.me3j import LabMatrix3, me3j_values
+    from nuham.nnn.tcoef import lab_states
+
+    orb = make_orbits(6)
+    rng = np.random.default_rng(3)
+    labs = {}
+    for t2 in (1, 3):
+        for j2 in range(1, 16, 2):
+            for p in (1, -1):
+                lab = lab_states(orb, j2, p, t2, 12, 6)
+                if len(lab):
+                    m = rng.normal(size=(len(lab), len(lab)))
+                    labs[j2, p, t2] = LabMatrix3.make(lab, m, len(orb))
+    serial = np.concatenate(list(me3j_values(orb, 12, 6, labs)))
+    parallel = np.concatenate(list(me3j_values(orb, 12, 6, labs, workers=3, pairs_per_task=500)))
+    assert len(serial) == 456320
+    np.testing.assert_array_equal(parallel, serial)
