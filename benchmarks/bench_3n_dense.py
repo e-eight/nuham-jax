@@ -114,7 +114,7 @@ def qr_record(n: int) -> dict:
     return rec
 
 
-def tcoef_record(n: int) -> dict:
+def tcoef_record(n: int, profile: bool = False) -> dict:
     """Time one dense-product T_NAS block (quanta ``n``) on the host and on the JAX device."""
     sys.path.insert(0, str(ROOT / "refs"))
     import tcoef3_gemm_prototype as proto
@@ -128,13 +128,14 @@ def tcoef_record(n: int) -> dict:
 
         def run(b: str = backend) -> dict:
             t0 = time.perf_counter()
-            out = proto.tcoef_gemm(rows_, cols, 3, orb, br, backend=b)
+            out = proto.tcoef_gemm(rows_, cols, 3, orb, br, backend=b, profile=profile)
             return {
                 "total_seconds": time.perf_counter() - t0,
                 **proto.tcoef_gemm.stage,
                 "flops": proto.tcoef_gemm.flops,
                 "nonzeros": int((out != 0).sum()),
                 "checksum": float(np.abs(out).sum()),
+                **({"profile": dict(proto.tcoef_gemm.profile)} if profile else {}),
             }
 
         rec[backend] = [attempt(run) for _ in range(repeats)]
@@ -166,6 +167,9 @@ def main() -> None:
     q.add_argument("--sizes", type=int, nargs="+", default=[2000, 5000, 10400])
     t = sub.add_parser("tcoef")
     t.add_argument("--n", type=int, nargs="+", default=[8, 10, 12])
+    t.add_argument(
+        "--profile", action="store_true", help="attribute the product stage to its steps"
+    )
     sub.add_parser("gemm")
     for sp in sub.choices.values():
         sp.add_argument("--json", default=None, help="also write the record to this file")
@@ -173,7 +177,7 @@ def main() -> None:
     if args.what == "qr":
         calls = [(qr_record, (n,)) for n in args.sizes]
     elif args.what == "tcoef":
-        calls = [(tcoef_record, (n,)) for n in args.n]
+        calls = [(tcoef_record, (n, args.profile)) for n in args.n]
     else:
         calls = [(gemm_record, mk) for mk in GEMM_SHAPES]
     rows = []

@@ -12,7 +12,7 @@ import nuham.tcoef3 as tc
 from nuham.tcoef3 import *
 
 
-def tcoef_gemm(rows, cols, j2, orb, br, chunk=2_000_000, backend="numpy"):
+def tcoef_gemm(rows, cols, j2, orb, br, chunk=2_000_000, backend="numpy", profile=False):
     """Dense-product form; ``backend='jax'`` runs the products and the scatter on the default device."""
     dev = backend == "jax"
     if dev:
@@ -95,6 +95,20 @@ def tcoef_gemm(rows, cols, j2, orb, br, chunk=2_000_000, backend="numpy"):
     j3s = np.arange(int(j3_q.max()) + 1)
     jrels = np.arange(int(jrel_q.max()) + 1)
     flops = 0
+    prof = {k: 0.0 for k in ("build_AB", "upload", "matmul", "index", "scatter")}
+    prof.update(n_products=0, n_steps=0, dense_elements=0, valid_elements=0)
+    clock = [time.perf_counter()]
+
+    def lap(name, obj=None):
+        """Charge the time since the last lap to ``name``; sync the device first when profiling."""
+        if profile:
+            if obj is not None and dev:
+                obj.block_until_ready()
+            now = time.perf_counter()
+            prof[name] += now - clock[0]
+            clock[0] = now
+
+    tcoef_gemm.profile = prof
     tcoef_gemm.stage = {"host_factors": time.perf_counter() - t_host, "product": 0.0}
     t_prod = time.perf_counter()
     for j12 in np.unique(j12_p):
@@ -120,26 +134,35 @@ def tcoef_gemm(rows, cols, j2, orb, br, chunk=2_000_000, backend="numpy"):
                 .transpose(1, 2, 0)
                 .reshape(npair * len(Pj), len(keep))
             )
+            lap("build_AB")
             flops += 2 * A.shape[0] * A.shape[1] * B.shape[1]
+            prof["n_products"] += 1
             step = max(1, chunk // max(B.shape[1], 1))
             qs = np.tile(np.arange(nq), len(Cj))[None, :]
             cc = np.repeat(Cj, nq)[None, :]
             if dev:
                 Ad = jnp.asarray(A)
                 Bd = jnp.asarray(B)
+                lap("upload", Bd)
             for s0 in range(0, A.shape[0], step):
                 blk = (Ad[s0 : s0 + step] @ Bd) if dev else A[s0 : s0 + step] @ B
+                lap("matmul", blk)
+                prof["n_steps"] += 1
                 ii = np.arange(s0, min(s0 + step, A.shape[0]))
                 pair_i = ii // len(Pj)
                 p_i = Pj[ii % len(Pj)]
                 ridx = rowmap[p_i[:, None], qs]
                 cidx = colmap[pair_i[:, None], cc, t12_p[p_i][:, None]]
                 ok = (ridx >= 0) & (cidx >= 0)
+                prof["dense_elements"] += ok.size
+                prof["valid_elements"] += int(ok.sum())
+                lap("index")
                 if dev:
                     tgt = np.where(ok, ridx * n_c + cidx, n_r * n_c).reshape(-1)
                     outd = outd.at[jnp.asarray(tgt)].add(blk.reshape(-1), mode="drop")
                 else:
                     flat[(ridx * n_c + cidx)[ok]] += blk[ok]
+                lap("scatter", outd if dev else None)
     if dev:
         out = np.asarray(outd.block_until_ready()).reshape(n_r, n_c)
     tcoef_gemm.stage["product"] = time.perf_counter() - t_prod
