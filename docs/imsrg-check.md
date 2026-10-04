@@ -91,3 +91,20 @@ The two of ours are identical; the difference to NuHamil is 1.3e-6 (HF) and 1.5e
 
 **Remaining gap:** imsrg++ itself consuming an emax 14 file. It used 8.9 GB at emax 12 and 2.9 GB at emax 10, so emax 14 would need roughly 25-30 GB, more than this machine's 19 GB. It would need a larger machine
 (imsrg++ built for aarch64 on DeltaAI or run elsewhere). The decoder test above covers the one risk that differs between emax 12 and 14 (stream size); the parsing is the same code that read emax 12.
+
+## 3N: imsrg++ reads our me3j file (2026-10-04, Phase 5.4)
+
+4He, N3LO EM500 with the local 3NF400 (c1 -0.81, c3 -3.2, c4 5.4, cD -0.2, cE 0.098), hw 16, lambda 2.0, `emax=4, e3max=4`, ramp flat8, full flow (smax 500), `3bme_type=full`,
+`file3e1max=4`, `file3e3max=4`, **`file3e2max=8`**. Both runs read an me2j and an me3j file, NuHamil's or ours (`nuham.nn.generate`, `nuham.nnn.generate.generate_me3j`):
+
+| files | e2hf | e3hf | EHF | EMP2 | E(IMSRG(2)) |
+|---|---|---|---|---|---|
+| NuHamil | -29.2196072 | 14.5720766 | 5.8490810 | -3.44611700 | 1.761305 |
+| nuham | -29.2196093 | 14.5720818 | 5.8490859 | -3.44611837 | 1.761308 |
+
+The differences are 5e-6 (EHF) and 3e-6 (IMSRG(2)), at the level of the element-wise agreement of the two files (2e-6). The absolute energies are not physical: a flat8 ramp with e3max 4
+keeps the induced 3N force large (spec 5c, section 3.4); the run only checks that imsrg++ reads our file and gets the same numbers.
+
+**`file3e2max` must be given.** With the default (-1) this imsrg++ build stores zero 3N values ("Stored 0 floating point numbers", no error, `e3hf = 0`), for NuHamil's file as well as ours;
+the run then gives the NN-only energies. Spec 5d section 7.3 said the default is fine: it is not. Run with `BME3=FILE E3MAX=4 EXTRA="file3e2max=8" refs/imsrg/run_he4.sh FILE2 4 8 500`
+(`GREP=` overrides the output filter; check that "Stored N floating point numbers" equals the file's value count).

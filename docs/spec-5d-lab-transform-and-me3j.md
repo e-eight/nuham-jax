@@ -398,7 +398,7 @@ i.e. the lower triangle: 45.458067 GB (double) at 14/28/16, 1.898222 GB at 10/20
 
 ### 7.3 Parameters the user must give imsrg++ for a file written with (emax, e2max, e3max)
 
-`file3e1max = emax`, `file3e3max = e3max` (and optionally `file3e2max = e2max`; the default is fine if e3max <= e2max), `emax <= file emax`, `e3max <= file e3max`
+`file3e1max = emax`, `file3e3max = e3max` and `file3e2max = e2max` (**required**: with the default -1 the imsrg++ build used here stores zero 3N values without a message, checked 2026-10-04, `docs/imsrg-check.md`), `emax <= file emax`, `e3max <= file e3max`
 (model-space values), `3bme_type=full`, and `hw`/target mass for Trel as for the 2N part. Wrong `file3e*max` silently misaligns the stream (there is no consistency
 check except reading past the end). If the file has fewer values than `nread` (wrong parameters), `infile >> float` fails silently (zeros).
 `lmax` in the file must equal emax. Production: a 14/28/16 file read with `emax=14 e3max=16` stores about as many values as the file holds (the file is already in imsrg++'s storage order), i.e. tens of GB (imsrg++ side; not measured).
