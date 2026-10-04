@@ -92,3 +92,24 @@ def test_parallel_values_equal_serial() -> None:
     parallel = np.concatenate(list(me3j_values(orb, 12, 6, labs, workers=3, pairs_per_task=500)))
     assert len(serial) == 456320
     np.testing.assert_array_equal(parallel, serial)
+
+
+def test_fields_equal_formatted_values(tmp_path: Path) -> None:
+    """Workers that format give a file with the same text as the plain writer."""
+    from nuham.nnn.me3j import LabMatrix3, me3j_values, write_me3j, write_me3j_fields
+    from nuham.nnn.tcoef import lab_states
+
+    orb = make_orbits(5)
+    rng = np.random.default_rng(5)
+    labs = {}
+    for t2 in (1, 3):
+        for j2 in range(1, 14, 2):
+            for p in (1, -1):
+                lab = lab_states(orb, j2, p, t2, 10, 5)
+                if len(lab):
+                    m = 3.0 * rng.normal(size=(len(lab), len(lab)))
+                    labs[j2, p, t2] = LabMatrix3.make(lab, m, len(orb))
+    write_me3j(tmp_path / "a.me3j", me3j_values(orb, 10, 5, labs))
+    fields = me3j_values(orb, 10, 5, labs, workers=2, pairs_per_task=300, as_fields=True)
+    write_me3j_fields(tmp_path / "b.me3j", fields)
+    assert (tmp_path / "a.me3j").read_bytes() == (tmp_path / "b.me3j").read_bytes()

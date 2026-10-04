@@ -20,7 +20,7 @@ from pathlib import Path
 import numpy as np
 
 from nuham.basis.lab import Orbits
-from nuham.nn.me2j import write_me2j
+from nuham.nn.me2j import format_fields_host, write_me2j, write_me2j_fields
 from nuham.nnn.tcoef import LabBlock
 
 HEADER = "NNN int. calculated by nuham (JAX)"
@@ -185,10 +185,14 @@ def _values_for(
 
 
 def _task(bras: range) -> np.ndarray:
-    """Values of ``bras`` in a worker process (inputs inherited through ``fork``)."""
+    """Values of ``bras`` in a worker process (inputs inherited through ``fork``).
+
+    With ``as_fields`` the worker also formats them, so the writer's thread only lays out lines.
+    """
     w = _WORKER
     parts = list(_values_for(w["orb"], w["tri"], w["labs"], bras, w["chunk"]))
-    return np.concatenate(parts) if parts else np.zeros(0)
+    values = np.concatenate(parts) if parts else np.zeros(0)
+    return format_fields_host(values) if w["as_fields"] else values
 
 
 def _split(par: np.ndarray, pairs_per_task: int) -> list[range]:
@@ -208,6 +212,7 @@ def me3j_values(
     chunk: int = _CHUNK,
     workers: int = 1,
     pairs_per_task: int = 40_000,
+    as_fields: bool = False,
 ) -> Iterator[np.ndarray]:
     """Yield the values of the file in order, about ``chunk`` at a time.
 
@@ -223,12 +228,18 @@ def me3j_values(
         same as with one worker.
     pairs_per_task
         Size of a slice in (bra, ket) triple pairs (about 50 values each at e3max 16).
+    as_fields
+        Yield the values already formatted as 16-byte ``f16.8`` fields, shape ``(n, 16)``, for
+        :func:`write_me3j_fields`; the workers do the formatting. On the GH200 the single-threaded
+        formatting of the main process limited the write to 16 M values/s however many workers
+        looked the values up (105 M/s).
     """
     tri = triples(orb, e2max, e3max)
     if workers <= 1:
-        yield from _values_for(orb, tri, labs, range(len(tri[0])), chunk)
+        for values in _values_for(orb, tri, labs, range(len(tri[0])), chunk):
+            yield format_fields_host(values) if as_fields else values
         return
-    _WORKER.update(orb=orb, tri=tri, labs=labs, chunk=chunk)
+    _WORKER.update(orb=orb, tri=tri, labs=labs, chunk=chunk, as_fields=as_fields)
     ctx = multiprocessing.get_context("fork")
     tasks = iter(_split(tri[3], pairs_per_task))
     with ProcessPoolExecutor(workers, mp_context=ctx) as pool:
@@ -252,3 +263,14 @@ def write_me3j(
     This is :func:`nuham.nn.me2j.write_me2j`, whose layout is the same, with its own header line.
     """
     return write_me2j(path, chunks, HEADER, compresslevel, compressor, compress_threads)
+
+
+def write_me3j_fields(
+    path: str | Path,
+    fields: Iterator[np.ndarray],
+    compresslevel: int = 1,
+    compressor: str = "auto",
+    compress_threads: int = 1,
+) -> int:
+    """Write values formatted as 16-byte fields (``me3j_values(..., as_fields=True)``)."""
+    return write_me2j_fields(path, fields, HEADER, compresslevel, compressor, compress_threads)

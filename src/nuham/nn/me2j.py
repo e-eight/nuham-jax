@@ -376,18 +376,22 @@ def _tables() -> tuple[np.ndarray, np.ndarray]:
 _VECTOR_LIMIT = 1.0e5
 
 
-def _format_lines(values: np.ndarray) -> bytes:
-    """Format a multiple of 10 values as ``10f16.8`` lines, each ending in a newline.
+def format_fields_host(values: np.ndarray) -> np.ndarray:
+    """Format values as 16-character ``f16.8`` fields, shape ``(n, 16)``, uint8.
 
     The output is byte-identical to Python's ``%16.8f``, which rounds the exact binary value
     half-to-even. Here the value is scaled by 1e8 and rounded as an integer, which is only
     reliable away from ties: scaling has an error of about one ulp of the product, so any value
-    whose scaled fraction lies within a few ulp of 0.5 is formatted by Python instead. Chunks
-    with non-finite or very large values take the Python path entirely.
+    whose scaled fraction lies within a few ulp of 0.5 is formatted by Python instead.
+
+    Raises
+    ------
+    ValueError
+        If a value is not finite or has magnitude of 1e5 or more (it would not fit a field).
     """
     x = np.asarray(values, dtype=np.float64).ravel()
     if not (np.abs(x) < _VECTOR_LIMIT).all():
-        return _format_lines_python(x).encode("ascii")
+        raise ValueError("a value is not finite or has magnitude >= 1e5; cannot format it")
     scaled = np.abs(x) * 1.0e8
     q = np.rint(scaled).astype(np.int64)
     near_tie = np.abs(np.abs(scaled - np.floor(scaled)) - 0.5) <= 4.0 * np.spacing(scaled)
@@ -402,7 +406,18 @@ def _format_lines(values: np.ndarray) -> bytes:
     halves[:, 3] = frac_table[lo]
     for i in np.flatnonzero(near_tie):
         buf[i] = np.frombuffer((f"{x[i]:16.8f}").encode("ascii"), dtype=np.uint8)
-    lines = np.empty((len(x) // 10, 161), dtype=np.uint8)
+    return buf
+
+
+def _format_lines(values: np.ndarray) -> bytes:
+    """Format a multiple of 10 values as ``10f16.8`` lines, each ending in a newline.
+
+    Chunks with non-finite or very large values take the Python path entirely.
+    """
+    if not (np.abs(np.asarray(values, dtype=np.float64)) < _VECTOR_LIMIT).all():
+        return _format_lines_python(np.asarray(values, dtype=np.float64)).encode("ascii")
+    buf = format_fields_host(values)
+    lines = np.empty((len(buf) // 10, 161), dtype=np.uint8)
     lines[:, :160] = buf.reshape(-1, 160)
     lines[:, 160] = ord("\n")
     return lines.tobytes()

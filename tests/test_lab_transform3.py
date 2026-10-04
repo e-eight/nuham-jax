@@ -39,7 +39,7 @@ def test_device_equals_host(setup, j2: int, parity: int, t2: int) -> None:
     c = {(j, p): m for (t, j, p), m in chans.items() if t == t2}
     lab, want = lab_scalar(j2, parity, t2, orb, 2 * EMAX, EMAX, v, c, brackets)
     lab_d, got, order = lab_scalar_device(
-        j2, parity, t2, orb, 2 * EMAX, EMAX, v, c, brackets, granularity=16
+        j2, parity, t2, orb, 2 * EMAX, EMAX, v, c, brackets, granularity=32
     )
     assert len(lab_d) == len(lab) == len(order)
     full = np.zeros_like(want)

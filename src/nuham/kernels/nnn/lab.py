@@ -11,22 +11,21 @@ operators and the two big products run as plain GEMMs. This differs from
 coefficient matrix over all lab states.
 """
 
+from functools import partial
+
 import jax
 import jax.numpy as jnp
 from jax import Array
 
 
-@jax.jit
-def congruence_block(
-    t_bra: Array, t_ket: Array, v_flat: Array, src: Array, rows: Array, cols: Array
+@partial(jax.jit, static_argnames=("shape",))
+def block_diagonal_operator(
+    v_flat: Array, src: Array, rows: Array, cols: Array, shape: tuple[int, int]
 ) -> Array:
-    """Return ``T_b^T V_bd T_k`` for one block pair.
+    """Return ``V_bd`` of the given ``shape``, built from the Jacobi operators on the device.
 
     Parameters
     ----------
-    t_bra, t_ket
-        Coefficient rows of the two blocks, shapes ``(R_b, C_b)`` and ``(R_k, C_k)``; padding rows
-        and columns are zero.
     v_flat
         All Jacobi operators raveled and concatenated, with a zero as the last element.
     src
@@ -34,18 +33,21 @@ def congruence_block(
         trailing zero.
     rows, cols
         Position of each entry in ``V_bd``, shape as ``src`` (padding entries may be anything).
-
-    Returns
-    -------
-    Array
-        Matrix of shape ``(C_b, C_k)``.
+    shape
+        ``(R_b, R_k)``.
     """
-    v_bd = jnp.zeros((t_bra.shape[0], t_ket.shape[0]), v_flat.dtype).at[rows, cols].add(v_flat[src])
-    return t_bra.T @ (v_bd @ t_ket)
+    return jnp.zeros(shape, v_flat.dtype).at[rows, cols].add(v_flat[src])
 
 
-@jax.jit
-def place_block(out: Array, block: Array, i: Array, j: Array) -> Array:
-    """Return ``out`` with ``block`` written at ``[i, j]`` and its transpose at ``[j, i]``."""
-    out = jax.lax.dynamic_update_slice(out, block, (i, j))
-    return jax.lax.dynamic_update_slice(out, block.T, (j, i))
+@partial(jax.jit, static_argnames=("dtype",))
+def congruence_block(
+    t_bra: Array, t_ket: Array, v_bd: Array, scale: float, dtype: type = jnp.float64
+) -> Array:
+    """Return ``scale * T_b^T V_bd T_k`` as ``dtype``.
+
+    The coefficient rows ``t_bra`` and ``t_ket`` have shapes ``(R_b, C_b)`` and ``(R_k, C_k)``
+    (zero padding allowed) and ``v_bd`` has shape ``(R_b, R_k)``. The result has shape
+    ``(C_b, C_k)``. Building ``V_bd`` is a separate kernel so that the compiled shapes of the two
+    steps do not multiply.
+    """
+    return (scale * (t_bra.T @ (v_bd @ t_ket))).astype(dtype)

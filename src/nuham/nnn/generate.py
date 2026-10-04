@@ -14,7 +14,7 @@ from nuham.nnn.jacobi import JacobiChannel, load_or_build_channel, ramp_nmax
 from nuham.nnn.lab_transform import lab_scalar_device
 from nuham.nnn.local_force.assembly import local_3nf_matrix
 from nuham.nnn.local_force.radial import RadialTables, nuhamil_meshes, radial_tables
-from nuham.nnn.me3j import LabMatrix3, me3j_values, write_me3j
+from nuham.nnn.me3j import LabMatrix3, me3j_values, write_me3j, write_me3j_fields
 from nuham.nnn.srg3 import three_body_operator
 from nuham.nnn.tcoef import make_brackets
 from nuham.runtime import (
@@ -52,6 +52,7 @@ def jacobi_operators(
     rtol: float = 1e-8,
     jmax3: int | None = None,
     cache_dir: str | Path | None = None,
+    workers: int = 1,
 ) -> tuple[dict[tuple[int, int, int], np.ndarray], dict[tuple[int, int, int], JacobiChannel]]:
     """Evolved three-body operators ``V3`` of all Jacobi channels, cut to ``N <= e3max``.
 
@@ -59,7 +60,9 @@ def jacobi_operators(
     can occur in the lab transform of ``e3max`` (a smaller ``jmax3`` drops the higher ones, as
     NuHamil's input of the same name does). Each flow runs in the full ramp space and is dropped
     after its leading block is kept, so memory stays at the size of the largest single channel.
-    ``force=None`` omits the genuine force. ``cache_dir`` keeps the Jacobi bases between runs
+    ``force=None`` omits the genuine force. ``workers`` processes compute the angular
+    coefficients of the force (a single process took 650 s for the largest channel on the GH200,
+    where 30 took 119 s). ``cache_dir`` keeps the Jacobi bases between runs
     (:func:`nuham.nnn.jacobi.load_or_build_channel`).
 
     Returns
@@ -91,7 +94,9 @@ def jacobi_operators(
                             tables[nmax] = radial_tables(
                                 meshes, force.cutoff, force.power, nmax + 2
                             )
-                        v3n = local_3nf_matrix(channel, hw, meshes, tables[nmax], force.lecs)
+                        v3n = local_3nf_matrix(
+                            channel, hw, meshes, tables[nmax], force.lecs, workers=workers
+                        )
                 with stage(timer, "flow"):
                     v3 = three_body_operator(
                         channel, hw, lam, bare, evolved, v3n, e3max, rtol=rtol, atol=rtol
@@ -177,7 +182,8 @@ def generate_me3j(
     lab_dtype
         Storage type of the lab matrices (``np.float32`` for production sizes).
     workers
-        Processes that look up and order the file's values (:func:`nuham.nnn.me3j.me3j_values`).
+        Processes for the angular coefficients of the 3N force and for the lookup, ordering and
+        formatting of the file's values (:func:`nuham.nnn.me3j.me3j_values`).
     cache_dir
         Directory that keeps the Jacobi bases between runs (they do not depend on ``hw``, ``lam``).
 
@@ -189,17 +195,33 @@ def generate_me3j(
     if e3max > e2max:
         raise ValueError("e3max > e2max gives a file that imsrg++ cannot read (spec 5d 2.3)")
     ops, chans = jacobi_operators(
-        nn, hw, lam, e3max, ramp, force, timer=timer, rtol=rtol, jmax3=jmax3, cache_dir=cache_dir
+        nn,
+        hw,
+        lam,
+        e3max,
+        ramp,
+        force,
+        timer=timer,
+        rtol=rtol,
+        jmax3=jmax3,
+        cache_dir=cache_dir,
+        workers=workers,
     )
     labs = lab_matrices(emax, e2max, e3max, ops, chans, timer, lab_dtype)
     if path is None:
         return 0
     opts = (WriterOptions() if options is None else options).resolve()
     assert opts.compress_threads is not None
+    orb = make_orbits(emax)
     with stage(timer, "write"):
+        if workers > 1:
+            fields = me3j_values(orb, e2max, e3max, labs, workers=workers, as_fields=True)
+            return write_me3j_fields(
+                path, fields, opts.compresslevel, opts.compressor, opts.compress_threads
+            )
         return write_me3j(
             path,
-            me3j_values(make_orbits(emax), e2max, e3max, labs, workers=workers),
+            me3j_values(orb, e2max, e3max, labs),
             opts.compresslevel,
             opts.compressor,
             opts.compress_threads,

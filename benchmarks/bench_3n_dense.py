@@ -211,7 +211,14 @@ _NN_CACHE: dict = {}
 
 
 def flow_record(
-    n: int, j2: int, parity: int, t2: int, genuine: bool, rtols: list[float], check_spectrum: bool
+    n: int,
+    j2: int,
+    parity: int,
+    t2: int,
+    genuine: bool,
+    rtols: list[float],
+    check_spectrum: bool,
+    workers: int = 1,
 ) -> dict:
     """Time the 3-body SRG flow of one channel at ``Nmax = n`` (hw 16, lambda 2.0) per tolerance.
 
@@ -236,7 +243,7 @@ def flow_record(
         lecs = {"c1": -0.81, "c3": -3.2, "c4": 5.4, "cD": -0.2, "cE": 0.098}
         with timer.stage("force"):
             h0 = h0 + local_3nf_matrix(
-                channel, hw, meshes, radial_tables(meshes, 400.0, 2, n + 2), lecs
+                channel, hw, meshes, radial_tables(meshes, 400.0, 2, n + 2), lecs, workers=workers
             )
     dim = len(h0)
     rho = float(eigsh(h0, k=1, which="LA", return_eigenvectors=False)[0])
@@ -292,6 +299,7 @@ def main() -> None:
     fl.add_argument("--genuine", action="store_true", help="add the bare local 3NF400 to H0")
     fl.add_argument("--rtol", type=float, nargs="+", default=[1e-8, 1e-10, 1e-12])
     fl.add_argument("--check-spectrum", action="store_true", help="dense eigh before/after")
+    fl.add_argument("--workers", type=int, default=1, help="processes for the 3NF coefficients")
     for sp in sub.choices.values():
         sp.add_argument("--json", default=None, help="also write the record to this file")
     args = p.parse_args()
