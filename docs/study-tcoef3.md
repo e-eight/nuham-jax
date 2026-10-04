@@ -163,6 +163,24 @@ Records: `benchmarks/baseline_gh200_3n_{gemm,qr,tcoef}.json`. Tests of `jacobi3`
   costs 16 s on the host, once per channel and N, and the result is hw independent and cacheable. `eigh` is 15x faster
   if a gauge-independent pipeline is ever wanted.
 
+### Profile of the product stage (job 3304294, commit ce3d733, `bench_3n_dense.py tcoef --profile`)
+
+Record: `benchmarks/baseline_gh200_3n_tcoef_profile.json`. J=3/2+, T=1/2, warm second call on the GH200, seconds
+(the device is synchronised after every step; `valid` is the share of product elements that land in the matrix):
+
+| N | product stage | index (host) | scatter (device) | matmul | upload | build A, B | product elements | valid |
+|---|---|---|---|---|---|---|---|---|
+| 8 | 0.5 | 0.34 | 0.16 | 0.01 | 0.01 | 0.02 | 5.0e7 | 1.3% |
+| 10 | 4.4 | 2.86 | 1.38 | 0.09 | 0.01 | 0.08 | 4.7e8 | 0.70% |
+| 12 | 26.2 | 18.0 (69%) | 7.5 (29%) | 0.46 (1.8%) | 0.02 | 0.23 | 3.1e9 | 0.42% |
+
+The matrix products are 2% of the product stage. The host builds the destination indices for all 3.1e9 product
+elements (18 s) and the device scatters them, dropping 99.6% (7.5 s). The valid fraction falls with N, so the waste
+grows. The first (cold) call spends another 23 s in matmul and 19 s in scatter at N=12: 1 558 steps of varying
+shape, each compiled once. The host NumPy path has the same split (index 18 s, scatter 3.7 s, matmul 0.7 s).
+Energy conservation on both sides (lab: `e1 + e2 + e3 = N`; Jacobi: `E12 + E3 + 2 Ncm + Lcm = N`) shrinks
+the product to the valid blocks, with fixed block shapes (few compilations) and index arrays built once per channel.
+
 ## 6. What was not done
 
 No JAX/GPU measurement (no accelerator on this machine). The e3max 14 and 16 cost is extrapolated

@@ -1,0 +1,220 @@
+{
+ "benchmark": "tcoef",
+ "environment": {
+  "host": "gh115.hsn.cm.delta.internal.ncsa.edu",
+  "platform": "Linux-6.4.0-150600.23.53-64kb-aarch64-with-glibc2.38",
+  "cpu_count": 288,
+  "python": "3.12.11",
+  "jax": "0.11.2",
+  "backend": "gpu",
+  "device": "gpu:NVIDIA GH200 120GB",
+  "x64": true,
+  "git_commit": "ce3d733"
+ },
+ "rows": [
+  {
+   "n": 8,
+   "rows": 1887,
+   "cols": 682,
+   "numpy": [
+    {
+     "total_seconds": 25.039326635189354,
+     "host_factors": 24.541755830403417,
+     "product": 0.4972930536605418,
+     "flops": 930064560,
+     "nonzeros": 551858,
+     "checksum": 9127.943444933742,
+     "profile": {
+      "build_AB": 0.021308166906237602,
+      "upload": 0.0,
+      "matmul": 0.03984947921708226,
+      "index": 0.3524125409312546,
+      "scatter": 0.08372225891798735,
+      "n_products": 18,
+      "n_steps": 36,
+      "dense_elements": 49563720,
+      "valid_elements": 643497
+     }
+    }
+   ],
+   "jax": [
+    {
+     "total_seconds": 13.931550703011453,
+     "host_factors": 0.6053035203367472,
+     "product": 13.326125042047352,
+     "flops": 930064560,
+     "nonzeros": 551858,
+     "checksum": 9127.943444933742,
+     "profile": {
+      "build_AB": 0.02413746202364564,
+      "upload": 0.4101097770035267,
+      "matmul": 7.366218343377113,
+      "index": 0.3481912910938263,
+      "scatter": 5.176151439547539,
+      "n_products": 18,
+      "n_steps": 36,
+      "dense_elements": 49563720,
+      "valid_elements": 643497
+     }
+    },
+    {
+     "total_seconds": 1.0259863948449492,
+     "host_factors": 0.485102407168597,
+     "product": 0.5407920861616731,
+     "flops": 930064560,
+     "nonzeros": 551858,
+     "checksum": 9127.943444933742,
+     "profile": {
+      "build_AB": 0.02163225645199418,
+      "upload": 0.008228202350437641,
+      "matmul": 0.010868607088923454,
+      "index": 0.33573278272524476,
+      "scatter": 0.16328940447419882,
+      "n_products": 18,
+      "n_steps": 36,
+      "dense_elements": 49563720,
+      "valid_elements": 643497
+     }
+    }
+   ],
+   "peak_device_bytes": 185450240,
+   "peak_host_rss_gb": 0.92128
+  },
+  {
+   "n": 10,
+   "rows": 4263,
+   "cols": 1528,
+   "numpy": [
+    {
+     "total_seconds": 5.901918014045805,
+     "host_factors": 2.0092221503145993,
+     "product": 3.8922803876921535,
+     "flops": 10421802160,
+     "nonzeros": 2837681,
+     "checksum": 29356.738020863304,
+     "profile": {
+      "build_AB": 0.0820695380680263,
+      "upload": 0.0,
+      "matmul": 0.20489952992647886,
+      "index": 2.909279506187886,
+      "scatter": 0.6960240378975868,
+      "n_products": 28,
+      "n_steps": 246,
+      "dense_elements": 468175400,
+      "valid_elements": 3256974
+     }
+    }
+   ],
+   "jax": [
+    {
+     "total_seconds": 27.815350083168596,
+     "host_factors": 1.4461582438088953,
+     "product": 26.368604336865246,
+     "flops": 10421802160,
+     "nonzeros": 2837681,
+     "checksum": 29356.738020863304,
+     "profile": {
+      "build_AB": 0.08108643488958478,
+      "upload": 0.594166565220803,
+      "matmul": 14.649119501002133,
+      "index": 2.913183835335076,
+      "scatter": 8.12269144738093,
+      "n_products": 28,
+      "n_steps": 246,
+      "dense_elements": 468175400,
+      "valid_elements": 3256974
+     }
+    },
+    {
+     "total_seconds": 5.807227345649153,
+     "host_factors": 1.384074481204152,
+     "product": 4.422645614948124,
+     "flops": 10421802160,
+     "nonzeros": 2837681,
+     "checksum": 29356.738020863304,
+     "profile": {
+      "build_AB": 0.0781534630805254,
+      "upload": 0.01356526231393218,
+      "matmul": 0.08661634381860495,
+      "index": 2.8580175982788205,
+      "scatter": 1.3805847321636975,
+      "n_products": 28,
+      "n_steps": 246,
+      "dense_elements": 468175400,
+      "valid_elements": 3256974
+     }
+    }
+   ],
+   "peak_device_bytes": 283761664,
+   "peak_host_rss_gb": 1.299968
+  },
+  {
+   "n": 12,
+   "rows": 8540,
+   "cols": 2995,
+   "numpy": [
+    {
+     "total_seconds": 27.13407453894615,
+     "host_factors": 4.345953484997153,
+     "product": 22.78736402094364,
+     "flops": 78602115592,
+     "nonzeros": 11339679,
+     "checksum": 79620.5043554716,
+     "profile": {
+      "build_AB": 0.22996029816567898,
+      "upload": 0.0,
+      "matmul": 0.7394065009430051,
+      "index": 18.117987086065114,
+      "scatter": 3.700002070516348,
+      "n_products": 40,
+      "n_steps": 1558,
+      "dense_elements": 3070117050,
+      "valid_elements": 12788720
+     }
+    }
+   ],
+   "jax": [
+    {
+     "total_seconds": 64.95631796494126,
+     "host_factors": 3.6749663408845663,
+     "product": 61.280156875029206,
+     "flops": 78602115592,
+     "nonzeros": 11339679,
+     "checksum": 79620.5043554716,
+     "profile": {
+      "build_AB": 0.2380184750072658,
+      "upload": 0.8851068117655814,
+      "matmul": 22.9766983021982,
+      "index": 18.0445845015347,
+      "scatter": 19.10011708550155,
+      "n_products": 40,
+      "n_steps": 1558,
+      "dense_elements": 3070117050,
+      "valid_elements": 12788720
+     }
+    },
+    {
+     "total_seconds": 29.741921447217464,
+     "host_factors": 3.5651617078110576,
+     "product": 26.17570501798764,
+     "flops": 78602115592,
+     "nonzeros": 11339679,
+     "checksum": 79620.5043554716,
+     "profile": {
+      "build_AB": 0.2304619150236249,
+      "upload": 0.020905295852571726,
+      "matmul": 0.46467748610302806,
+      "index": 17.950835685245693,
+      "scatter": 7.485384058672935,
+      "n_products": 40,
+      "n_steps": 1558,
+      "dense_elements": 3070117050,
+      "valid_elements": 12788720
+     }
+    }
+   ],
+   "peak_device_bytes": 575114240,
+   "peak_host_rss_gb": 2.160128
+  }
+ ]
+}
