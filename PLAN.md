@@ -153,8 +153,8 @@ meshes (80 points to 15 fm, 100 p-points to 8 fm^-1) available as an option to v
 
 | Sub-step | Work | Gate |
 |---|---|---|
-| 5.2.0 | Oracle data: NuHamil with `save_3nf_before_lec` for 3NF400 at N3max 6 and 8, and the 500 MeV set (cD 0.83, cE -0.052) at N3max 6; commit the N3max 6 set (about 10 MB). | Files parse; NuHamil's `3 V LEC` and cfp reproduce its stored AS matrix. |
-| 5.2.1 | Brute-force Cartesian check (`refs/`) of cE, cD, c1 at the lowest l: settles factor 3 vs 6, signs, `(-1)^x`, NuHamil's constants. | cE and cD agree for the lowest J=1/2 states; c1 in one channel. |
+| 5.2.0 — DONE (`refs/work/nnn3f`, `docs/study-3nf-cartesian.md`; the AS-matrix gate is deferred to 5.2.4) | Oracle data: NuHamil with `save_3nf_before_lec` for 3NF400 at N3max 6 and 8, and the 500 MeV set (cD 0.83, cE -0.052) at N3max 6; commit the N3max 6 set (about 10 MB). | Files parse; NuHamil's `3 V LEC` and cfp reproduce its stored AS matrix. |
+| 5.2.1 — DONE (`refs/nnn_cartesian.py`: factor 3 confirmed, NAS gauge `(-1)^l12`) | Brute-force Cartesian check (`refs/`) of cE, cD, c1 at the lowest l: settles factor 3 vs 6, signs, `(-1)^x`, NuHamil's constants. | cE and cD agree for the lowest J=1/2 states; c1 in one channel. |
 | 5.2.2 | Radial layer in JAX: `z0, zx, fk, fkx, f1, f2` (f1/f2 as a 1D table in r). | Lambda -> infinity cE limit (spec 5b 7.2), Yukawa closed forms, mesh-convergence study. |
 | 5.2.3 | Angular layer `C_a` per term (host NumPy on `racah_array`), from Nav07; NuHamil's formulas in `refs/`. | Each term equals NuHamil's NAS lower triangle to 1e-8 relative, N3max 6 then 8. |
 | 5.2.4 | Projection and assembly: batched `B_a` GEMMs, blocks by (N, N'), then `C V C^T` with the 5.1 cfp. | `C^T V_AS C` equals NuHamil's `cfp^T work cfp` (factor 3 included). |

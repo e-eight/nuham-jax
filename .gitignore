@@ -12,3 +12,10 @@ wheels/
 # Tool caches
 .pytest_cache/
 .ruff_cache/
+
+# NuHamil oracle outputs that are not committed
+refs/work/nnn3f/n400_N8/
+refs/work/nnn3f/*/NNint_*.gz
+refs/work/nnn3f/*/*.me3j.gz
+refs/work/nnn3f/*/ops/NNN-full*
+refs/work/nnn3f/*/ops/UT_*
