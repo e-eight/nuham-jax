@@ -22,6 +22,7 @@ from nuham.tcoef3 import (
     make_brackets,
     tcoef_as,
     tcoef_nas,
+    tcoef_nas_blocked,
 )
 
 EMAX = 4
@@ -172,3 +173,19 @@ def test_reference_me3j_all_values(orbits, brackets) -> None:
         if i is not None and j is not None:
             got[k] = mat[i, j]
     np.testing.assert_allclose(got, want, atol=1e-8)
+
+
+@pytest.mark.parametrize(
+    ("j2", "parity", "t2", "n"),
+    [(1, -1, 1, 5), (3, 1, 1, 8), (5, -1, 3, 7), (7, 1, 3, 6), (1, 1, 1, 0)],
+)
+def test_blocked_equals_termwise(brackets, j2, parity, t2, n) -> None:
+    """The energy-blocked products reproduce the term-wise sums and waste little work."""
+    orb = make_orbits(8)
+    lab = lab_states(orb, j2, parity, t2, 16, 8).select(n)
+    rows = jacobi_cm_rows(j2, parity, t2, n)
+    stats: dict[str, int] = {}
+    blocked = tcoef_nas_blocked(rows, lab, j2, orb, brackets, stats)
+    assert np.abs(blocked - tcoef_nas(rows, lab, j2, orb, brackets)).max() < 1e-13
+    if n >= 5:
+        assert stats["valid"] / stats["elements"] > 0.3

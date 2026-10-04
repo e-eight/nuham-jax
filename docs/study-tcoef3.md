@@ -2,7 +2,7 @@
 
 Code: `src/nuham/tcoef3.py` (NumPy, host). Tests: `tests/test_tcoef3.py`, helpers `tests/ref3n.py`.
 Throwaway oracles: `refs/tcoef3_reference.py` (element-wise transcription of the nested sums),
-`refs/tcoef3_gemm_prototype.py` (the sums as dense products). Spec: `docs/spec-5d`, sections 4-5.
+`refs/tcoef3_gemm_prototype.py` (the sums as dense products; removed once `tcoef_nas_blocked` replaced it, see section 6b). Spec: `docs/spec-5d`, sections 4-5.
 
 ## Result in one paragraph
 
@@ -127,7 +127,7 @@ nothing was run on a GPU.
 
 ## 5. Recommendation for 5.4
 
-1. **Keep the term-wise NumPy `tcoef_nas` as the validated reference and for development sizes**
+1. **Use `tcoef_nas_blocked` (section 6b); keep the term-wise `tcoef_nas` as the validated reference**
    (e3max <= 12: 1-3 core-minutes per channel, about 22 core-minutes in total at 12).
 2. **Do not store `T`; recompute per channel.** Peak memory is set by the largest `T_NAS` block
    (6.1 GB double at production). Build it in row groups `(jrel, ncm, lcm)` and multiply by `cfp`
@@ -180,6 +180,38 @@ grows. The first (cold) call spends another 23 s in matmul and 19 s in scatter a
 shape, each compiled once. The host NumPy path has the same split (index 18 s, scatter 3.7 s, matmul 0.7 s).
 Energy conservation on both sides (lab: `e1 + e2 + e3 = N`; Jacobi: `E12 + E3 + 2 Ncm + Lcm = N`) shrinks
 the product to the valid blocks, with fixed block shapes (few compilations) and index arrays built once per channel.
+
+## 6b. Energy-blocked build (`nuham.tcoef3.tcoef_nas_blocked`)
+
+Energy conservation ties the labels: a lab pair of energy `e_ab` and a Jacobi pair of energy `e12` fix
+`2 nit + lit = e_ab - e12`, the energy `N - e_ab` of `c` and the energy `N - e12` of `(n3, l3, Ncm, Lcm)`. For each
+`(e_ab, e12)` and each `(j12, jc)` the sum over `k = (lit, Lam)` is then one dense product `A[(p, pair), k] @ B[k, (c, q)]`
+whose elements are (almost) all valid. The left and right factors come from the same dense helpers as the term-wise
+reference (`_left_dense`, `_right_dense`, refactored out of `_left_terms`/`_right_terms`), evaluating the 6j/9j symbols on
+the unique label combinations only; the `a1` and `g` 6j tables are built once per channel.
+
+Correctness: equal to `tcoef_nas` to 6e-17 at every block tested (`tests/test_tcoef3.py::test_blocked_equals_termwise`,
+five channels up to N = 8), and `lab_scalar` now uses it, so the NuHamil reference test (all 24 890 values) runs through
+this path. Host NumPy, one core, this machine, J=3/2+, T=1/2 block of lab channel:
+
+| N | rows x cols | non-zeros | product elements | valid | time | peak RSS | term-wise `tcoef_nas` |
+|---|---|---|---|---|---|---|---|
+| 10 | 4 263 x 1 528 | 2.8e6 | 8.2e6 | 39% | 2.3 s | 0.4 GB | 3.9 s |
+| 12 | 8 540 x 2 995 | 1.1e7 | 3.6e7 | 35% | 3.5 s | 0.6 GB | 18-19 s |
+| 14 | 15 660 x 5 427 | 3.8e7 | 1.3e8 | 33% | 7.0 s | 1.3 GB | - |
+| 16 | 26 829 x 9 273 | 1.1e8 | 4.0e8 | 31% | 16.7 s | 3.1 GB | - |
+
+The product elements are 86x fewer than in the unblocked product at N = 12 (3.1e9) and the valid fraction is 35%
+instead of 0.4%. A whole channel (all N, J=3/2+, T=1/2): **e3max 12 6.6 s (term-wise 85 s), e3max 16 31.8 s and 3.1 GB**
+for 20 270 lab states. Scaling to the 70 production channels by lab states squared (sum n^2 = 1.2e10, this channel
+4.1e8, so about 30 channel equivalents) gives **about 16 core-minutes** for all `T_NAS` at e3max 16, against the earlier
+4-11 core-hours; a few core-minutes on 16 processes. At N = 16 the time splits about evenly between the dense products
+plus index/scatter (7 s) and the 6j evaluation (7.5 s).
+
+Consequence for 5.4: **`T_NAS` is cheap on the host and does not need the device.** Build it per channel on the host
+(in parallel over channels), apply `cfp`, and put the device to work on the contraction `6 sum T^T V T` (41-56 TFLOP/s
+fp64 measured, section 6a), which is the dominant flop count (5e14). A device version of the blocked products would
+only affect the 7 s of 32 s that the products take.
 
 ## 6. What was not done
 

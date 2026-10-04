@@ -6,20 +6,19 @@ Three independent measurements, chosen with a sub-command:
            of a random symmetric projector of rank ``n/3``, the shape of the antisymmetriser blocks
            (largest block at Nmax 40: about 10 400 states). Also checks that the device pivot order
            equals SciPy's, which keeps ``jacobi3.antisymmetric_basis`` deterministic.
-``tcoef``  one ``T_NAS`` block of the J=3/2+, T=1/2 lab channel as dense products, host NumPy vs the
-           default JAX device (the 5.1b gate: ``--n 12`` is the N = 12 block of e3max 12).
-           Uses the throwaway prototype ``refs/tcoef3_gemm_prototype.py``.
+``tcoef``  one ``T_NAS`` block of the J=3/2+, T=1/2 lab channel from the energy-blocked dense
+           products of :func:`nuham.tcoef3.tcoef_nas_blocked` (host NumPy); ``--n 12`` is the
+           N = 12 block of e3max 12, ``--reference`` adds the term-wise build and the difference.
 ``gemm``   float64 matrix-product rate for the shapes of the lab contraction ``T^T V T``.
 
     uv run python benchmarks/bench_3n_dense.py qr --sizes 2000 5000 10400 --json qr.json
-    uv run python benchmarks/bench_3n_dense.py tcoef --n 10 12 --json tcoef.json
+    uv run python benchmarks/bench_3n_dense.py tcoef --n 10 12 16 --json tcoef.json
     uv run python benchmarks/bench_3n_dense.py gemm --json gemm.json
 """
 
 import argparse
 import json
 import resource
-import sys
 import time
 from collections.abc import Callable
 from pathlib import Path
@@ -30,6 +29,14 @@ import scipy.linalg
 from run_nn import environment, peak_device_bytes
 
 import nuham  # noqa: F401  sets JAX allocation defaults before the first device use
+from nuham.basis.lab import make_orbits
+from nuham.tcoef3 import (
+    jacobi_cm_rows,
+    lab_states,
+    make_brackets,
+    tcoef_nas,
+    tcoef_nas_blocked,
+)
 
 jax.config.update("jax_enable_x64", True)
 import jax.numpy as jnp  # noqa: E402
@@ -114,32 +121,32 @@ def qr_record(n: int) -> dict:
     return rec
 
 
-def tcoef_record(n: int, profile: bool = False) -> dict:
-    """Time one dense-product T_NAS block (quanta ``n``) on the host and on the JAX device."""
-    sys.path.insert(0, str(ROOT / "refs"))
-    import tcoef3_gemm_prototype as proto
+def tcoef_record(n: int, reference: bool = False) -> dict:
+    """Time the energy-blocked ``T_NAS`` build of one block (quanta ``n``) of the J=3/2+ channel.
 
-    orb = proto.make_orbits(n)
-    br = proto.make_brackets()
-    lab = proto.lab_states(orb, 3, 1, 1, 2 * n, n)
-    cols, rows_ = lab.select(n), proto.jacobi_cm_rows(3, 1, 1, n)
-    rec: dict = {"n": n, "rows": len(rows_), "cols": len(cols)}
-    for backend, repeats in (("numpy", 1), ("jax", 2)):  # the first jax call compiles per shape
-
-        def run(b: str = backend) -> dict:
-            t0 = time.perf_counter()
-            out = proto.tcoef_gemm(rows_, cols, 3, orb, br, backend=b, profile=profile)
-            return {
-                "total_seconds": time.perf_counter() - t0,
-                **proto.tcoef_gemm.stage,
-                "flops": proto.tcoef_gemm.flops,
-                "nonzeros": int((out != 0).sum()),
-                "checksum": float(np.abs(out).sum()),
-                **({"profile": dict(proto.tcoef_gemm.profile)} if profile else {}),
-            }
-
-        rec[backend] = [attempt(run) for _ in range(repeats)]
-    rec["peak_device_bytes"] = peak_device_bytes()
+    With ``reference`` the term-wise :func:`nuham.tcoef3.tcoef_nas` is timed and compared too.
+    """
+    orb = make_orbits(n)
+    br = make_brackets()
+    cols = lab_states(orb, 3, 1, 1, 2 * n, n).select(n)
+    rows = jacobi_cm_rows(3, 1, 1, n)
+    rec: dict = {"n": n, "rows": len(rows), "cols": len(cols)}
+    stats: dict[str, int] = {}
+    t0 = time.perf_counter()
+    blocked = tcoef_nas_blocked(rows, cols, 3, orb, br, stats)
+    rec["blocked"] = {
+        "seconds": time.perf_counter() - t0,
+        "nonzeros": int((blocked != 0).sum()),
+        "valid_fraction": stats["valid"] / max(stats["elements"], 1),
+        **stats,
+    }
+    if reference:
+        t0 = time.perf_counter()
+        termwise = tcoef_nas(rows, cols, 3, orb, br)
+        rec["termwise"] = {
+            "seconds": time.perf_counter() - t0,
+            "max_difference": float(np.abs(blocked - termwise).max()),
+        }
     rec["peak_host_rss_gb"] = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1e6
     return rec
 
@@ -168,7 +175,7 @@ def main() -> None:
     t = sub.add_parser("tcoef")
     t.add_argument("--n", type=int, nargs="+", default=[8, 10, 12])
     t.add_argument(
-        "--profile", action="store_true", help="attribute the product stage to its steps"
+        "--reference", action="store_true", help="also time and compare the term-wise tcoef_nas"
     )
     sub.add_parser("gemm")
     for sp in sub.choices.values():
@@ -177,7 +184,7 @@ def main() -> None:
     if args.what == "qr":
         calls = [(qr_record, (n,)) for n in args.sizes]
     elif args.what == "tcoef":
-        calls = [(tcoef_record, (n, args.profile)) for n in args.n]
+        calls = [(tcoef_record, (n, args.reference)) for n in args.n]
     else:
         calls = [(gemm_record, mk) for mk in GEMM_SHAPES]
     rows = []
