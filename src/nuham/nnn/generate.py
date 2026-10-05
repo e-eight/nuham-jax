@@ -2,6 +2,7 @@
 
 import argparse
 import cProfile
+import hashlib
 import itertools
 import json
 import multiprocessing
@@ -9,6 +10,7 @@ import os
 import sys
 import warnings
 from collections import deque
+from collections.abc import Sequence
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass, field, replace
 from pathlib import Path
@@ -48,6 +50,33 @@ class LocalForce:
     )
     cutoff: float = 400.0
     power: int = 2
+    jmax3: int | None = None
+    """Largest doubled ``J`` of the Jacobi channels that get the genuine force; above it only the
+    induced force of the NN interaction is kept, as for NuHamil's ``J3max_initial_3nf``
+    (``None``: all channels, NuHamil's default). The angular coefficients of the high-``J``
+    channels are most of the cost of a production run."""
+
+
+CACHE_VERSION = 1
+"""Bump when a change of the physics code makes cached operators stale."""
+
+
+def _nn_digest(nn: MomentumNN) -> str:
+    """Short digest of the momentum-space interaction's numbers."""
+    h = hashlib.sha1()
+    for a in (nn.k, nn.w):
+        h.update(np.ascontiguousarray(a).tobytes())
+    for c in nn.channels:
+        h.update(repr((c.j, c.parity, c.s, c.tz)).encode())
+        h.update(np.ascontiguousarray(c.v).tobytes())
+    return h.hexdigest()[:16]
+
+
+def _v3_path(cache_dir: str | Path, tag: str, j2: int, parity: int, t2: int, nmax: int) -> Path:
+    """File of one channel's cached ``V3`` (the tag fixes everything but the channel)."""
+    return (
+        Path(cache_dir) / "v3" / f"v3_{tag}_j{j2}_p{'+' if parity > 0 else '-'}_t{t2}_N{nmax}.npy"
+    )
 
 
 class StageLog:
@@ -108,6 +137,7 @@ def jacobi_operators(
     cache_dir: str | Path | None = None,
     workers: int = 1,
     log: StageLog | None = None,
+    js: Sequence[int] | None = None,
 ) -> tuple[dict[tuple[int, int, int], np.ndarray], dict[tuple[int, int, int], JacobiChannel]]:
     """Evolved three-body operators ``V3`` of all Jacobi channels, cut to ``N <= e3max``.
 
@@ -118,8 +148,11 @@ def jacobi_operators(
     ``force=None`` omits the genuine force. ``workers`` processes compute the angular
     coefficients of the force (a single process took 650 s for the largest channel on the GH200,
     where 30 took 119 s). ``cache_dir`` keeps the Jacobi bases between runs
-    (:func:`nuham.nnn.jacobi.load_or_build_channel`). ``log`` receives the stage times of every
-    channel.
+    (:func:`nuham.nnn.jacobi.load_or_build_channel`) and, in ``cache_dir/v3``, each channel's
+    finished ``V3``: a run that stopped (time limit, crash) resumes after the last channel it
+    completed, and a run with other ``hw``, ``lam``, interaction, force, ``e3max`` or ``rtol``
+    never reads them. ``log`` receives the stage times of every channel. ``js`` restricts the
+    channels to those doubled ``J`` (for timing a few channels of a large run).
 
     Returns
     -------
@@ -133,8 +166,13 @@ def jacobi_operators(
     meshes = nuhamil_meshes()
     tables: dict[int, RadialTables] = {}
     ops, chans = {}, {}
+    tag = hashlib.sha1(
+        repr((CACHE_VERSION, _nn_digest(nn), hw, lam, e3max, rtol, force)).encode()
+    ).hexdigest()[:16]
     for t2 in (1, 3):
         for j2 in range(1, (2 * e3max + 3 if jmax3 is None else jmax3) + 1, 2):
+            if js is not None and j2 not in js:
+                continue
             for parity in (1, -1):
                 nmax = ramp_nmax(j2, ramp)
                 if nmax < e3max:
@@ -144,8 +182,18 @@ def jacobi_operators(
                     channel = load_or_build_channel(j2, parity, t2, nmax, table, cache_dir)
                 if not channel.blocks:  # no antisymmetric state: nothing to evolve or transform
                     continue
+                v3_file = (
+                    None if cache_dir is None else _v3_path(cache_dir, tag, j2, parity, t2, nmax)
+                )
+                kept = tuple(b for b in channel.blocks if b.n_quanta <= e3max)
+                if v3_file is not None and v3_file.exists():
+                    chans[j2, parity, t2] = JacobiChannel(j2, parity, t2, e3max, kept)
+                    ops[j2, parity, t2] = np.load(v3_file)
+                    _record(timer, log, "jacobi", ct, j2=j2, parity=parity, t2=t2, nmax=nmax,
+                            n_as=channel.n_as, n_nas=channel.n_nas, cached=1)  # fmt: skip
+                    continue
                 v3n = None
-                if force:
+                if force and (force.jmax3 is None or j2 <= force.jmax3):
                     with ct.stage("force"):
                         if nmax not in tables:
                             tables[nmax] = radial_tables(
@@ -157,9 +205,12 @@ def jacobi_operators(
                 v3 = three_body_operator(
                     channel, hw, lam, bare, evolved, v3n, e3max, rtol=rtol, atol=rtol, timer=ct
                 )
-                kept = tuple(b for b in channel.blocks if b.n_quanta <= e3max)
                 chans[j2, parity, t2] = JacobiChannel(j2, parity, t2, e3max, kept)
                 ops[j2, parity, t2] = v3
+                if v3_file is not None:
+                    v3_file.parent.mkdir(parents=True, exist_ok=True)
+                    np.save(v3_file.with_suffix(".tmp.npy"), v3)
+                    v3_file.with_suffix(".tmp.npy").rename(v3_file)
                 _record(timer, log, "jacobi", ct, j2=j2, parity=parity, t2=t2, nmax=nmax,
                         n_as=channel.n_as, n_nas=channel.n_nas)  # fmt: skip
     return ops, chans
@@ -259,6 +310,7 @@ def generate_me3j(
     cache_dir: str | Path | None = None,
     stop_after: str = "write",
     stage_log: str | Path | None = None,
+    js: Sequence[int] | None = None,
 ) -> int:
     """Generate the 3N interaction in the lab HO basis and write it as ``me3j``.
 
@@ -299,6 +351,9 @@ def generate_me3j(
         ``"write"`` (the whole file); an earlier stop returns 0. For timing one part of a large run.
     stage_log
         File that receives the stage times of every channel as JSON lines (appended).
+    js
+        Compute only the Jacobi channels with these doubled ``J`` (needs ``stop_after="jacobi"``:
+        the lab transform needs all channels). For timing a few channels of a large run.
 
     Returns
     -------
@@ -307,6 +362,8 @@ def generate_me3j(
     """
     if stop_after not in ("jacobi", "lab", "write"):
         raise ValueError(f"stop_after must be 'jacobi', 'lab' or 'write', not {stop_after!r}")
+    if js is not None and stop_after != "jacobi":
+        raise ValueError("js restricts the Jacobi channels, so the run must stop after 'jacobi'")
     workers = default_workers() if workers is None else workers
     if workers == 1 and default_workers() > 4:
         warnings.warn(
@@ -320,7 +377,7 @@ def generate_me3j(
     try:
         ops, chans = jacobi_operators(
             nn, hw, lam, e3max, ramp, force, timer=timer, rtol=rtol, jmax3=jmax3,
-            cache_dir=cache_dir, workers=workers, log=log,
+            cache_dir=cache_dir, workers=workers, log=log, js=js,
         )  # fmt: skip
         if stop_after == "jacobi":
             return 0
@@ -367,7 +424,8 @@ def run_config(args: argparse.Namespace, workers: int, writer: WriterOptions) ->
         "emax": args.emax, "e2max": args.e2max, "e3max": args.e3max, "ramp": args.ramp,
         "hw": args.hw, "lam": args.lam, "genuine_3nf": not args.no_3nf,
         "lab_dtype": args.lab_dtype, "rtol": args.rtol, "stop_after": args.stop_after,
-        "jacobi_cache": args.jacobi_cache, "stage_log": args.stage_log,
+        "jacobi_cache": args.jacobi_cache, "stage_log": args.stage_log, "js": args.js,
+        "j3max_3nf": args.j3max_3nf,
     }  # fmt: skip
 
 
@@ -392,6 +450,16 @@ def main() -> None:
     p.add_argument("--no-3nf", action="store_true", help="induced 3N force of the NN force only")
     p.add_argument("--cutoff", type=float, default=400.0, help="local 3NF regulator cutoff (MeV)")
     p.add_argument("--power", type=int, default=2, help="local regulator power")
+    p.add_argument(
+        "--j3max-3nf",
+        type=int,
+        default=None,
+        help="largest doubled J of the Jacobi channels with the genuine 3NF (default: all; "
+        "above it only the induced force, like NuHamil's J3max_initial_3nf)",
+    )
+    p.add_argument(
+        "--js", default=None, help="comma-separated doubled J: only these Jacobi channels (timing)"
+    )
     for name, default in (("c1", -0.81), ("c3", -3.2), ("c4", 5.4), ("cD", -0.2), ("cE", 0.098)):
         p.add_argument(f"--{name}", type=float, default=default)
     p.add_argument("--rtol", type=float, default=1e-8, help="flow tolerance (rtol = atol / hw)")
@@ -427,7 +495,7 @@ def main() -> None:
     force = None
     if not args.no_3nf:
         lecs = {k: getattr(args, k) for k in ("c1", "c3", "c4", "cD", "cE")}
-        force = LocalForce(lecs, args.cutoff, args.power)
+        force = LocalForce(lecs, args.cutoff, args.power, args.j3max_3nf)
     timer = StageTimer()
     profiler = cProfile.Profile() if args.cprofile else None
     if profiler is not None:
@@ -436,6 +504,7 @@ def main() -> None:
         read_nn_mom(args.nn_file), args.output, args.hw, args.lam, args.emax, args.e2max,
         args.e3max, args.ramp, force, timer, writer, args.rtol, args.jmax3,
         getattr(np, args.lab_dtype), workers, args.jacobi_cache, args.stop_after, args.stage_log,
+        None if args.js is None else [int(x) for x in args.js.split(",")],
     )  # fmt: skip
     if profiler is not None:
         profiler.disable()

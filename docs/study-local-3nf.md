@@ -106,7 +106,7 @@ physics formula alone at finite Lambda to 1e-10.
 
 Assembly was restructured for scale (`nas_matrix`): the Racah coefficients of each channel pair stay host scalar code but run in `workers` forked processes
 (pure Python and NumPy, no JAX in the children; the fork warning JAX prints is about its own threads); the weighted sum over radial functions is one matrix
-product per chunk of 64 pairs; the HO projection is `kernels.nnn.projection.project_pairs` (a `vmap` of `project_pair`), batched on the device. Results
+product per chunk of 64 pairs; the HO projection is `kernels.nnn.projection.project_pairs_indexed` (a `vmap` of `project_pair` that also picks the orbital rows), batched on the device. Results
 are bit-identical with 1 and 2 workers and unchanged by a larger `x_max` (`tests/test_local3n_assembly.py`).
 
 Agreement with NuHamil at larger N (3NF400, hw 16, NuHamil's cfp, `n400_N16_bare` and `_ind`, kept local): J = 1/2, P = +-, T = 1/2 and 3/2 at N3max 16: max element

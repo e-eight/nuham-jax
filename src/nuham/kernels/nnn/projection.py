@@ -50,5 +50,15 @@ def project_pair(
     return jnp.einsum("abj,cj,dj->acbd", first, u3_bra, u3_ket)
 
 
-project_pairs = jax.jit(jax.vmap(project_pair))
-"""Batched :func:`project_pair`: every argument gains a leading pair axis."""
+@jax.jit
+def project_pairs_indexed(
+    orbitals: Array, lb: Array, l3b: Array, lk: Array, l3k: Array, grids: Array
+) -> Array:
+    """Batched :func:`project_pair` over a chunk of channel pairs; the orbitals are picked here.
+
+    ``orbitals`` is the table of :func:`orbital_table`; ``lb, l3b, lk, l3k`` give the ``l`` of
+    each pair's four orbitals and ``grids`` the kernel of each pair. Picking the orbital rows
+    inside the compiled kernel replaced four eager gathers per chunk, which made 120 s of
+    dispatch overhead in a GH200 run.
+    """
+    return jax.vmap(project_pair)(orbitals[lb], orbitals[l3b], orbitals[lk], orbitals[l3k], grids)

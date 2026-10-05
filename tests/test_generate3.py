@@ -99,9 +99,36 @@ def test_cli_reports_and_forwards_its_settings(monkeypatch, capsys) -> None:
     config, seen = run_cli(monkeypatch, capsys)
     assert config["workers"] == default_workers()
     assert config["compress_threads"] == min(8, default_workers())
-    # positional order of generate_me3j: ..., writer, rtol, jmax3, dtype, workers, cache, stop, log
-    assert seen["args"][-4] == default_workers()
+    # last positional arguments of generate_me3j: workers, cache, stop, log, js
+    assert seen["args"][-5] == default_workers()
     config, seen = run_cli(monkeypatch, capsys, "--workers", "5", "--stop-after", "lab",
                            "--compress-threads", "3")  # fmt: skip
     assert (config["workers"], config["compress_threads"], config["stop_after"]) == (5, 3, "lab")
-    assert seen["args"][-4] == 5 and seen["args"][-2] == "lab"
+    assert seen["args"][-5] == 5 and seen["args"][-3] == "lab"
+
+
+def test_finished_channels_are_cached_and_resumed(
+    nn, force_calls: list[dict], tmp_path: Path
+) -> None:
+    first, _ = jacobi_operators(nn, 16.0, 2.0, 3, "flat3", LocalForce(), cache_dir=tmp_path)
+    calls = len(force_calls)
+    assert calls > 0
+    second, _ = jacobi_operators(nn, 16.0, 2.0, 3, "flat3", LocalForce(), cache_dir=tmp_path)
+    assert len(force_calls) == calls  # nothing was recomputed
+    assert first.keys() == second.keys()
+    assert all(np.array_equal(first[k], second[k]) for k in first)
+    # other physics never reads the cache
+    jacobi_operators(nn, 20.0, 2.0, 3, "flat3", LocalForce(), cache_dir=tmp_path)
+    assert len(force_calls) == 2 * calls
+
+
+def test_js_and_force_cut_select_channels(nn, force_calls: list[dict]) -> None:
+    ops, _ = jacobi_operators(nn, 16.0, 2.0, 3, "flat3", None, js=[3])
+    assert {j2 for j2, _, _ in ops} == {3}
+    jacobi_operators(nn, 16.0, 2.0, 3, "flat3", LocalForce())
+    everything = len(force_calls)
+    force_calls.clear()
+    jacobi_operators(nn, 16.0, 2.0, 3, "flat3", LocalForce(jmax3=3))
+    assert 0 < len(force_calls) < everything
+    with pytest.raises(ValueError, match="js"):
+        generate_me3j(nn, None, 16.0, 2.0, 2, 4, 2, "flat2", js=[1], stop_after="write")

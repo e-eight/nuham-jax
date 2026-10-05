@@ -16,7 +16,7 @@ import numpy as np
 import scipy.sparse as sp
 
 from nuham.constants import HBARC, M_REDUCED_PN
-from nuham.kernels.nnn.projection import orbital_table, project_pairs
+from nuham.kernels.nnn.projection import orbital_table, project_pairs_indexed
 from nuham.nnn.jacobi import JacobiChannel
 from nuham.nnn.local_force.angular import TERMS, Channel, coefficients, radial_keys
 from nuham.nnn.local_force.radial import LocalMeshes, RadialTables, radial_function
@@ -123,8 +123,13 @@ def nas_matrix(
         l3k = np.array([channels[ik].l3 for _, ik in pair_chunk] + [0] * (chunk - len(pair_chunk)))
         with stage(timer, "projection"):
             m = np.asarray(
-                project_pairs(
-                    orbitals[lb], orbitals[l3b], orbitals[lk], orbitals[l3k], jnp.asarray(grids)
+                project_pairs_indexed(
+                    orbitals,
+                    jnp.asarray(lb),
+                    jnp.asarray(l3b),
+                    jnp.asarray(lk),
+                    jnp.asarray(l3k),
+                    jnp.asarray(grids),
                 )
             )
         with stage(timer, "scatter"):
