@@ -108,6 +108,11 @@ Per-channel stage logs and cProfile dumps of the main process: `benchmarks/gh200
 The flat16 run wrote the whole production-size file: 6 367 911 165 values (the count of spec 5d), 32.2 GB of gzip (`gzip -t` passed), at 82 M values/s; lab stage 286 s (T coefficients waited for 76 s,
 upload 7 s, device products with compilation 201 s); peak host memory 97.7 GB of the 113 GB Slurm gave (the 45 GiB of float32 lab matrices plus in-flight coefficient blocks).
 
+**Compiled shapes of the lab contraction (item 2 of the production-run list, CPU, e3max 12, 8 channels, cold in-process cache).** The ladder of `lab_transform._rung` (1.5x steps from 256) left 92 compiled
+kernels (54 products, 38 operator builders), 5-7 new ones per channel. On the CPU a compile costs little, so the test is the count and the product time: doubling everywhere gave 49 kernels but doubled the product time
+(29 to 59 s); doubling only below 4096 and for the index lengths gave 53 kernels for 14% more product time (29.5 to 33.5 s), which is what the code now does. At the GH200 rate (0.4-0.5 s per compile) that is
+expected to save of the order of 1-2 minutes of the 162 s, not more; the persistent compile cache removes the rest on any repeat run. Not measured on the GH200 yet.
+
 **What the profiles show** (main process of the flat16 run, 849 s): 162 s in 382 JAX compilations, 118 s in eager gathers of the force assembly (`_index_to_gather`, fixed afterwards by
 `project_pairs_indexed`), waiting for workers 190 s, forking worker pools 15 s. In the workers (profiled on one CPU, J=11/2, N=20, `cProfile`) 95% of the force time is the **pure-Python angular coefficient
 loops** (`_coefficients_tpe` and `_tpe_spin_sum`, 18 million scalar calls for one channel): the force is not limited by the projection or the device.

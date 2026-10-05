@@ -22,17 +22,24 @@ Run = tuple[int, int, np.ndarray, tuple[int, int]]
 """``(start, stop, positions in the channel's AS order, (jrel, parity))`` of one group's rows."""
 
 
-def _rung(n: int, base: int) -> int:
-    """Round ``n`` up to the ladder ``base, 1.5 base, 2 base, 3 base, 4 base, ...``.
+def _rung(n: int, base: int, coarse_below: int = 4096) -> int:
+    """Round ``n`` up to a ladder: doubling below ``coarse_below``, then steps of 1.5x and 4/3x.
 
     Every compiled kernel is specific to its shapes, and the blocks of a channel have dozens of
     different sizes: on the GH200 compiling one kernel per block pair took longer than the
-    products themselves (41 s for the largest channel). A coarse ladder makes pairs share shapes;
-    the padding is zeros that cost up to 1.5 times the size in each dimension.
+    products themselves (41 s for the largest channel), and the whole run needed 382 compilations.
+    A coarse ladder makes pairs share shapes. Zero padding costs up to twice the size in each
+    dimension, which is harmless for small blocks (their products are tiny) and is held to 1.5
+    where the flops matter. On the CPU, doubling everywhere halved the compiled shapes but doubled
+    the product time; this ladder cut the shapes by 40% for 14% more product time
+    (``docs/study-me3j.md``).
     """
     size = base
     while size < n:
-        size = size * 3 // 2 if size & (size - 1) == 0 else size * 4 // 3
+        if size < coarse_below:
+            size *= 2
+        else:
+            size = size * 3 // 2 if size & (size - 1) == 0 else size * 4 // 3
     return size
 
 
@@ -169,7 +176,7 @@ def contract_blocks(
                 src, rows, cols = _pair_entries(runs[nb], runs[nk], base)
                 if not len(src):
                     continue
-                size = _rung(len(src), 1 << 16)
+                size = _rung(len(src), 1 << 16, 1 << 62)
                 fill = size - len(src)
                 v_bd = block_diagonal_operator(
                     v_flat,
