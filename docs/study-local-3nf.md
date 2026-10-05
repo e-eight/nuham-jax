@@ -170,3 +170,19 @@ channel at N3max 40: 13.4 s plus 7.8 s of basis. Against NuHamil (91.8 s for the
 The GPU runs the projection (4.8 s at N3max 40 for J=1/2) but the radial sums (a host NumPy product), the scatter into the dense matrix and the `cfp W cfp^T` products (46 s for the largest
 channel) still run on the host, so the speed-up over the CPU run is only 2.3x for J=1/2 and about 2.6x for J=5/2 at N3max 32. The next steps if more speed is wanted are the radial sums and
 the antisymmetrisation as device products (the dense matrix then also lives in the 98 GB of device memory).
+
+## Vectorised angular coefficients (2026-10-05)
+
+A GH200 profile of the production chain (`docs/study-me3j.md`, job 3310316) showed that 95% of the force time of a channel was the nested Python loops of the angular coefficients (18 million scalar calls for
+J=11/2 at N=20). `nuham.nnn.local_force.angular.coefficient_table` now evaluates the same sums for many channel pairs at once: the nested ranges are expanded into flat index arrays, each factor is an array
+operation, and the 6j and 9j symbols come from their cached scalar functions once per distinct argument tuple. The scalar version is kept in `refs/local3n_angular_scalar.py`.
+
+- **Same numbers:** on random channel pairs of five `(J, P, T)` channels and all five terms the difference to the scalar reference is at most 5e-15 relative (1e-11 absolute for coefficients of size 1e3);
+  `tests/test_local3n_angular.py` and `test_local3n_assembly.py` still reproduce NuHamil (5e-13 and 2e-12), and a whole me3j file at 8/16/8 is identical to the one made with the scalar code (maximum
+  difference 0.0 at eight decimals).
+- **Cost per channel pair, one core** (all five terms): 0.52 ms for J=11/2 at N=20 (a channel of 73 153 pairs: about 38 s against about 220 s before) and 1.2 ms for J=5/2 at N=40 (108 811 pairs: about 130 s
+  against about 3500 core-seconds before), i.e. 6 to 27 times faster, the gain growing with N.
+- **After it the coefficients are hidden behind the device** (waiting for them takes 0.08 s per channel on 15 workers): the force of J=5/2 at N = 32 on this CPU went from 105 s to 57 s, with the
+  projection (35 s, including the weighted sums that moved into the same compiled kernel, `project_weighted_pairs`) and the host scatter (19 s) as what remains; N=24: 40 s to 14 s.
+- The remaining host costs of a large channel on the GH200 (J=5/2, N = 40, earlier run): `cfp W cfp^T` 46 s and the scatter 11 s, and the three embeddings of the flow (31 s), all single-core BLAS and Python
+  copies with `OMP_NUM_THREADS=1`; BLAS threads in the parent process are the next simple lever.

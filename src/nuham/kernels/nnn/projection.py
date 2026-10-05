@@ -51,14 +51,39 @@ def project_pair(
 
 
 @jax.jit
-def project_pairs_indexed(
-    orbitals: Array, lb: Array, l3b: Array, lk: Array, l3k: Array, grids: Array
+def project_weighted_pairs(
+    orbitals: Array,
+    lb: Array,
+    l3b: Array,
+    lk: Array,
+    l3k: Array,
+    weights: Array,
+    radial: Array,
 ) -> Array:
-    """Batched :func:`project_pair` over a chunk of channel pairs; the orbitals are picked here.
+    """Matrix elements of the weighted radial kernels of a chunk of channel pairs.
 
-    ``orbitals`` is the table of :func:`orbital_table`; ``lb, l3b, lk, l3k`` give the ``l`` of
-    each pair's four orbitals and ``grids`` the kernel of each pair. Picking the orbital rows
-    inside the compiled kernel replaced four eager gathers per chunk, which made 120 s of
-    dispatch overhead in a GH200 run.
+    The kernel of pair ``p`` is ``sum_a weights[p, a] radial[a]`` (the radial functions on the
+    ``xi`` mesh, flattened), so the coefficients are all that travels to the device per chunk and
+    the table ``radial`` stays there. The orbital rows are picked here too: both replaced host
+    products and eager gathers that took more than half of the force time of a GH200 run once the
+    angular coefficients were vectorised.
+
+    Parameters
+    ----------
+    orbitals
+        Table of :func:`orbital_table`.
+    lb, l3b, lk, l3k
+        ``l`` of each pair's four orbitals, shape ``(P,)``.
+    weights
+        Coefficients, shape ``(P, n_radial)``.
+    radial
+        Radial functions, shape ``(n_radial, n_xi * n_xi)``.
+
+    Returns
+    -------
+    Array
+        ``M[p, n12, n3, n45, n6]`` as :func:`project_pair`, shape ``(P, ...)``.
     """
+    n_xi = orbitals.shape[-1]
+    grids = (weights @ radial).reshape(-1, n_xi, n_xi)
     return jax.vmap(project_pair)(orbitals[lb], orbitals[l3b], orbitals[lk], orbitals[l3k], grids)

@@ -86,3 +86,38 @@ def test_terms_match_nuhamil(
         ref = lower_to_full(data[k])
         assert matrix.shape == ref.shape
         assert np.abs(matrix - ref).max() < 1e-11, term
+
+
+@pytest.mark.parametrize(
+    ("j2", "parity", "t2", "nmax"), [(1, 1, 1, 8), (5, -1, 1, 10), (3, 1, 3, 9), (11, -1, 1, 7)]
+)
+def test_vectorised_coefficients_equal_the_scalar_reference(
+    j2: int, parity: int, t2: int, nmax: int
+) -> None:
+    """The array evaluation reproduces the nested-loop reference on random channel pairs."""
+    from nuham.nnn.jacobi import nas_states
+    from nuham.nnn.local_force.angular import TERMS, channel_array, coefficient_table, n_keys
+
+    ref = pytest.importorskip("local3n_angular_scalar")
+    seen: dict[tuple[int, ...], None] = {}
+    for n in range(nmax + 1):
+        for row in nas_states(j2, parity, t2, n):
+            seen[(int(row[1]), int(row[2]), int(row[3]), int(row[4]), int(row[6]), int(row[7]))] = (
+                None
+            )
+    channels = list(seen)
+    rng = np.random.default_rng(j2 + t2)
+    pairs = [tuple(rng.integers(len(channels), size=2)) for _ in range(40)]
+    a = channel_array([channels[i] for i, _ in pairs])
+    b = channel_array([channels[k] for _, k in pairs])
+    x_max = nmax + 2
+    for term in TERMS:
+        table = coefficient_table(term, a, b, j2, t2, x_max)
+        keys = radial_keys(term, x_max)
+        assert table.shape == (len(pairs), n_keys(term, x_max))
+        for row, (i, k) in zip(table, pairs, strict=True):
+            want = ref.coefficients(
+                term, ref.Channel(*channels[i]), ref.Channel(*channels[k]), j2, t2, x_max
+            )
+            dense = np.array([want.get(key, 0.0) for key in keys])
+            assert np.abs(row - dense).max() <= 1e-11 * max(1.0, np.abs(dense).max())
