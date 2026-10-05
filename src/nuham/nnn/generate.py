@@ -21,7 +21,7 @@ from nuham.angmom.moshinsky_table import MoshinskyTable
 from nuham.basis.lab import make_orbits
 from nuham.nn.input_file import MomentumNN, read_nn_mom
 from nuham.nnn.hamiltonian import isospin_nn
-from nuham.nnn.jacobi import JacobiChannel, load_or_build_channel, ramp_nmax
+from nuham.nnn.jacobi import JacobiChannel, basis_digest, load_or_build_channel, ramp_nmax
 from nuham.nnn.lab_transform import contract_blocks
 from nuham.nnn.local_force.assembly import local_3nf_matrix
 from nuham.nnn.local_force.radial import RadialTables, nuhamil_meshes, radial_tables
@@ -73,7 +73,11 @@ def _nn_digest(nn: MomentumNN) -> str:
 
 
 def _v3_path(cache_dir: str | Path, tag: str, j2: int, parity: int, t2: int, nmax: int) -> Path:
-    """File of one channel's cached ``V3`` (the tag fixes everything but the channel)."""
+    """File of one channel's cached ``V3``.
+
+    The tag fixes the run and, with the channel's :func:`~nuham.nnn.jacobi.basis_digest`, the AS
+    gauge the operator is expressed in: a rebuilt basis never meets an operator of another one.
+    """
     return (
         Path(cache_dir) / "v3" / f"v3_{tag}_j{j2}_p{'+' if parity > 0 else '-'}_t{t2}_N{nmax}.npy"
     )
@@ -183,7 +187,9 @@ def jacobi_operators(
                 if not channel.blocks:  # no antisymmetric state: nothing to evolve or transform
                     continue
                 v3_file = (
-                    None if cache_dir is None else _v3_path(cache_dir, tag, j2, parity, t2, nmax)
+                    None
+                    if cache_dir is None
+                    else _v3_path(cache_dir, tag + basis_digest(channel), j2, parity, t2, nmax)
                 )
                 kept = tuple(b for b in channel.blocks if b.n_quanta <= e3max)
                 if v3_file is not None and v3_file.exists():

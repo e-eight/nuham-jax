@@ -132,3 +132,34 @@ def test_js_and_force_cut_select_channels(nn, force_calls: list[dict]) -> None:
     assert 0 < len(force_calls) < everything
     with pytest.raises(ValueError, match="js"):
         generate_me3j(nn, None, 16.0, 2.0, 2, 4, 2, "flat2", js=[1], stop_after="write")
+
+
+def test_operators_are_not_reused_with_another_basis(
+    nn, force_calls: list[dict], tmp_path: Path
+) -> None:
+    """A cached V3 belongs to the exact ``cfp`` it was made in: a rebuilt basis recomputes it."""
+    jacobi_operators(nn, 16.0, 2.0, 3, "flat3", LocalForce(), cache_dir=tmp_path)
+    calls = len(force_calls)
+    path = next(tmp_path.glob("jacobi_j3_p+_t1_N3.npz"))
+    with np.load(path) as data:
+        arrays = dict(data)
+    key = next(k for k in arrays if k.startswith("cfp"))
+    arrays[key] = -arrays[key]  # the same space in another gauge
+    np.savez(path, **arrays)
+    jacobi_operators(nn, 16.0, 2.0, 3, "flat3", LocalForce(), cache_dir=tmp_path)
+    assert len(force_calls) == calls + 1  # only the channel with the changed basis
+
+
+def test_basis_cache_of_another_version_is_rebuilt(tmp_path) -> None:
+    from nuham.nnn import jacobi
+
+    built = jacobi.load_or_build_channel(3, 1, 1, 4, cache_dir=tmp_path)
+    path = next(tmp_path.glob("*.npz"))
+    with np.load(path) as data:
+        arrays = {k: v for k, v in data.items() if k != "version"}
+    key = next(k for k in arrays if k.startswith("cfp"))
+    arrays[key] = arrays[key] * 0.0  # stale content under an unversioned file
+    np.savez(path, **arrays)
+    again = jacobi.load_or_build_channel(3, 1, 1, 4, cache_dir=tmp_path)
+    for a, b in zip(again.blocks, built.blocks, strict=True):
+        np.testing.assert_array_equal(a.cfp, b.cfp)

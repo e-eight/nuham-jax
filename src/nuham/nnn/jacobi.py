@@ -13,6 +13,7 @@ quantities built from it are physical; :func:`antisymmetric_basis` makes the cho
 deterministic function of ``A``, not equal to NuHamil's rows.
 """
 
+import hashlib
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -254,6 +255,25 @@ def build_channel(
     return JacobiChannel(j2, parity, t2, nmax, tuple(blocks))
 
 
+BASIS_VERSION = 1
+"""Bump when a change of the antisymmetriser or of the basis choice (pivoting, signs) changes the
+gauge of ``cfp``; cached bases of another version are rebuilt."""
+
+
+def basis_digest(channel: JacobiChannel) -> str:
+    """Short digest of the exact states and ``cfp`` of ``channel``.
+
+    The operators in the AS basis (``V3``) are only meaningful together with the ``cfp`` they were
+    made with, so cached operators are keyed on this digest.
+    """
+    h = hashlib.sha1()
+    for b in channel.blocks:
+        h.update(repr((b.n_quanta, b.nas.shape, b.cfp.shape)).encode())
+        h.update(np.ascontiguousarray(b.nas).tobytes())
+        h.update(np.ascontiguousarray(b.cfp).tobytes())
+    return h.hexdigest()[:16]
+
+
 def load_or_build_channel(
     j2: int,
     parity: int,
@@ -266,20 +286,25 @@ def load_or_build_channel(
 
     The basis does not depend on ``hw``, the SRG cutoff or the interaction, so one cache serves
     every run (NuHamil's ``cfp`` files play the same role). The file is one ``.npz`` per channel
-    and ``nmax``; it is written after a build. Without ``cache_dir`` this is ``build_channel``.
+    and ``nmax``; it is written after a build and carries :data:`BASIS_VERSION` (a file of another
+    version is rebuilt). Without ``cache_dir`` this is ``build_channel``.
     """
     if cache_dir is None:
         return build_channel(j2, parity, t2, nmax, table)
     path = Path(cache_dir) / f"jacobi_j{j2}_p{'+' if parity > 0 else '-'}_t{t2}_N{nmax}.npz"
     if path.exists():
         with np.load(path) as data:
-            blocks = tuple(
-                JacobiBlock(int(n), data[f"nas{n}"], data[f"cfp{n}"]) for n in data["quanta"]
-            )
-        return JacobiChannel(j2, parity, t2, nmax, blocks)
+            if "version" in data and int(data["version"]) == BASIS_VERSION:
+                blocks = tuple(
+                    JacobiBlock(int(n), data[f"nas{n}"], data[f"cfp{n}"]) for n in data["quanta"]
+                )
+                return JacobiChannel(j2, parity, t2, nmax, blocks)
     channel = build_channel(j2, parity, t2, nmax, table)
     path.parent.mkdir(parents=True, exist_ok=True)
-    arrays = {"quanta": np.array([b.n_quanta for b in channel.blocks], dtype=np.int64)}
+    arrays = {
+        "version": np.array(BASIS_VERSION),
+        "quanta": np.array([b.n_quanta for b in channel.blocks], dtype=np.int64),
+    }
     for b in channel.blocks:
         arrays[f"nas{b.n_quanta}"], arrays[f"cfp{b.n_quanta}"] = b.nas, b.cfp
     np.savez(path.with_suffix(".tmp.npz"), **arrays)  # ty: ignore[invalid-argument-type]
