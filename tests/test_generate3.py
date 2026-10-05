@@ -120,6 +120,11 @@ def test_finished_channels_are_cached_and_resumed(
     # other physics never reads the cache
     jacobi_operators(nn, 20.0, 2.0, 3, "flat3", LocalForce(), cache_dir=tmp_path)
     assert len(force_calls) == 2 * calls
+    # the NN flow's space and relative J cut are physics settings too
+    jacobi_operators(nn, 16.0, 2.0, 3, "flat3", LocalForce(), cache_dir=tmp_path, n2max=60)
+    assert len(force_calls) == 3 * calls
+    jacobi_operators(nn, 16.0, 2.0, 3, "flat3", LocalForce(), cache_dir=tmp_path, jmax_nn=6)
+    assert len(force_calls) == 4 * calls
 
 
 def test_js_and_force_cut_select_channels(nn, force_calls: list[dict]) -> None:

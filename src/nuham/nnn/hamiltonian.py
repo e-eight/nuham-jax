@@ -44,6 +44,12 @@ class IsospinChannel:
         return {(int(n), int(l)): i for i, (n, l) in enumerate(zip(self.n, self.l, strict=True))}
 
 
+N2MAX_FLOW = 100
+"""Relative space of the NN flow; a smaller one deviates from NuHamil (see the SRG study)."""
+
+JMAX_NN = 8
+"""Largest relative ``J`` of the NN force; higher ones are zero."""
+
 IsospinNN = dict[tuple[int, int, int, int], IsospinChannel]
 """Isospin channels keyed by ``(j12, parity, s12, t12)`` with ``t12`` the true isospin."""
 
@@ -71,7 +77,11 @@ def isospin_channels(channels: Sequence[RelativeChannel]) -> IsospinNN:
 
 
 def isospin_nn(
-    nn: MomentumNN, hw: float, lam: float | None, n2max: int = 100, jmax: int = 8
+    nn: MomentumNN,
+    hw: float,
+    lam: float | None,
+    n2max: int = N2MAX_FLOW,
+    jmax: int = JMAX_NN,
 ) -> tuple[IsospinNN, IsospinNN]:
     """Return ``(bare, evolved)`` isospin-averaged NN potentials, without Coulomb.
 

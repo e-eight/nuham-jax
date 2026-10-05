@@ -20,7 +20,7 @@ import numpy as np
 from nuham.angmom.moshinsky_table import MoshinskyTable
 from nuham.basis.lab import make_orbits
 from nuham.nn.input_file import MomentumNN, read_nn_mom
-from nuham.nnn.hamiltonian import isospin_nn
+from nuham.nnn.hamiltonian import JMAX_NN, N2MAX_FLOW, isospin_nn
 from nuham.nnn.jacobi import JacobiChannel, basis_digest, load_or_build_channel, ramp_nmax
 from nuham.nnn.lab_transform import contract_blocks
 from nuham.nnn.local_force.assembly import local_3nf_matrix
@@ -57,8 +57,11 @@ class LocalForce:
     channels are most of the cost of a production run."""
 
 
-CACHE_VERSION = 1
-"""Bump when a change of the physics code makes cached operators stale."""
+CACHE_VERSION = 2
+"""Bump when a change of the physics code makes cached operators stale.
+
+``tests/test_v3_reference.py`` fails when the numbers of a small ``V3`` move: that is the signal
+to bump this (and to update the reference if the change is intended)."""
 
 
 def _nn_digest(nn: MomentumNN) -> str:
@@ -142,6 +145,8 @@ def jacobi_operators(
     workers: int = 1,
     log: StageLog | None = None,
     js: Sequence[int] | None = None,
+    n2max: int = N2MAX_FLOW,
+    jmax_nn: int = JMAX_NN,
 ) -> tuple[dict[tuple[int, int, int], np.ndarray], dict[tuple[int, int, int], JacobiChannel]]:
     """Evolved three-body operators ``V3`` of all Jacobi channels, cut to ``N <= e3max``.
 
@@ -156,7 +161,9 @@ def jacobi_operators(
     finished ``V3``: a run that stopped (time limit, crash) resumes after the last channel it
     completed, and a run with other ``hw``, ``lam``, interaction, force, ``e3max`` or ``rtol``
     never reads them. ``log`` receives the stage times of every channel. ``js`` restricts the
-    channels to those doubled ``J`` (for timing a few channels of a large run).
+    channels to those doubled ``J`` (for timing a few channels of a large run). ``n2max`` and
+    ``jmax_nn`` are the NN flow's relative space and largest relative ``J`` (NuHamil's values by
+    default); they are part of the cache key like the other physics settings.
 
     Returns
     -------
@@ -166,12 +173,12 @@ def jacobi_operators(
     """
     table = MoshinskyTable(d=1 / 3) if table is None else table
     with stage(timer, "nn_relative"):
-        bare, evolved = isospin_nn(nn, hw, lam)
+        bare, evolved = isospin_nn(nn, hw, lam, n2max, jmax_nn)
     meshes = nuhamil_meshes()
     tables: dict[int, RadialTables] = {}
     ops, chans = {}, {}
     tag = hashlib.sha1(
-        repr((CACHE_VERSION, _nn_digest(nn), hw, lam, e3max, rtol, force)).encode()
+        repr((CACHE_VERSION, _nn_digest(nn), hw, lam, e3max, rtol, force, n2max, jmax_nn)).encode()
     ).hexdigest()[:16]
     for t2 in (1, 3):
         for j2 in range(1, (2 * e3max + 3 if jmax3 is None else jmax3) + 1, 2):
