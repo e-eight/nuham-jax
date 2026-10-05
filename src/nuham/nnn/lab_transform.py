@@ -109,6 +109,28 @@ def lab_scalar_device(
     """
     with stage(timer, "tcoef"):
         lab, blocks = lab_t_blocks(j2, parity, t2, orb, e2max, e3max, channels, brackets)
+    return contract_blocks(lab, blocks, vjac, channels, dtype, granularity, timer)
+
+
+def contract_blocks(
+    lab: LabBlock,
+    blocks: dict[int, tuple[np.ndarray, np.ndarray, list[tuple[int, int, int, int, int]]]],
+    vjac: dict[tuple[int, int], np.ndarray],
+    channels: dict[tuple[int, int], JacobiChannel],
+    dtype: type = np.float64,
+    granularity: int = 256,
+    timer: StageTimer | None = None,
+) -> tuple[LabBlock, np.ndarray, np.ndarray]:
+    """Contract coefficients built elsewhere with ``vjac``: the device part of the transform.
+
+    ``blocks`` are the coefficients of :func:`nuham.nnn.tcoef.lab_t_blocks`, say from a worker
+    process; the other arguments are those of :func:`lab_scalar_device`.
+
+    Returns
+    -------
+    tuple
+        As :func:`lab_scalar_device`.
+    """
     offs = {}
     for key, ch in channels.items():
         sizes = [len(b.cfp) for b in ch.blocks]

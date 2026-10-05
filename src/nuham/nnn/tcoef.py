@@ -48,6 +48,12 @@ class Brackets:
     third: MoshinskyTable
 
 
+def warm_brackets(brackets: Brackets, e3max: int) -> None:
+    """Build every bracket block a lab transform of ``e3max`` can read, before forking workers."""
+    brackets.pair.warm(e3max)
+    brackets.third.warm(e3max)
+
+
 def make_brackets(cache_dir: str | None = None) -> Brackets:
     """Bracket tables with ``d = 1`` and ``d = 2``, optionally with an on-disk cache."""
     return Brackets(MoshinskyTable(cache_dir), MoshinskyTable(cache_dir, d=2.0))

@@ -38,6 +38,18 @@ def enable_compilation_cache(directory: str | Path | None = None) -> Path:
     return path
 
 
+def default_workers() -> int:
+    """Return the number of CPUs this process may use: the default for worker pools.
+
+    Worker counts that silently stayed at 1 cost a GPU-hour of slow runs once (the force took 650 s
+    instead of 120 s), so drivers default to every available CPU and say what they use.
+    """
+    try:
+        return len(os.sched_getaffinity(0))
+    except AttributeError:  # platforms without CPU affinity
+        return os.cpu_count() or 1
+
+
 def default_flow_sets() -> int | None:
     """Return how many parameter sets share one SRG flow batch by default.
 

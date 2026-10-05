@@ -111,6 +111,16 @@ class MoshinskyTable:
         self._rows: dict[int, dict[tuple[int, int, int, int], int]] = {}
         self._cols: dict[int, dict[tuple[int, int, int, int], int]] = {}
 
+    def warm(self, max_total: int) -> None:
+        """Build (or load) every block with ``total <= max_total``.
+
+        Blocks are computed with JAX, which must not run in a forked worker process, so a driver
+        that forks workers that read the table calls this first.
+        """
+        for total in range(max_total + 1):
+            for lam in range(total + 1):
+                self._block(total, lam)
+
     def row_index(self, total: int) -> dict[tuple[int, int, int, int], int]:
         """Map from ``(n_cm, l_cm, n_rel, l_rel)`` to its row for the given total."""
         if total not in self._rows:

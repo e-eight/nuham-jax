@@ -1,7 +1,16 @@
 """End-to-end generation of a 3N ``me3j`` file: Jacobi Hamiltonian, SRG, lab transform, writer."""
 
 import argparse
-from dataclasses import dataclass, field
+import cProfile
+import itertools
+import json
+import multiprocessing
+import os
+import sys
+import warnings
+from collections import deque
+from concurrent.futures import ProcessPoolExecutor
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 
 import numpy as np
@@ -11,15 +20,16 @@ from nuham.basis.lab import make_orbits
 from nuham.nn.input_file import MomentumNN, read_nn_mom
 from nuham.nnn.hamiltonian import isospin_nn
 from nuham.nnn.jacobi import JacobiChannel, load_or_build_channel, ramp_nmax
-from nuham.nnn.lab_transform import lab_scalar_device
+from nuham.nnn.lab_transform import contract_blocks
 from nuham.nnn.local_force.assembly import local_3nf_matrix
 from nuham.nnn.local_force.radial import RadialTables, nuhamil_meshes, radial_tables
 from nuham.nnn.me3j import LabMatrix3, me3j_values, write_me3j, write_me3j_fields
 from nuham.nnn.srg3 import three_body_operator
-from nuham.nnn.tcoef import make_brackets
+from nuham.nnn.tcoef import LabBlock, lab_t_blocks, make_brackets, warm_brackets
 from nuham.runtime import (
     WriterOptions,
     add_writer_arguments,
+    default_workers,
     enable_compilation_cache,
     writer_options_from_args,
 )
@@ -40,6 +50,50 @@ class LocalForce:
     power: int = 2
 
 
+class StageLog:
+    """Per-channel stage times as JSON lines, and the same times added to a run total.
+
+    One record per Jacobi or lab channel, flushed as it is written, so a job that dies or is
+    cancelled still leaves the profile of the channels it finished.
+    """
+
+    def __init__(self, total: StageTimer | None, path: str | Path | None) -> None:
+        """Add every channel's times to ``total`` and write them to ``path`` (``None``: no file)."""
+        self.total = total
+        self._file = None if path is None else open(path, "a", buffering=1)
+
+    def channel(self, kind: str, label: dict, timer: StageTimer) -> None:
+        """Record the times of one channel; ``label`` describes it."""
+        if self.total is not None:
+            for name, seconds in timer.seconds.items():
+                self.total.seconds[name] = self.total.seconds.get(name, 0.0) + seconds
+                self.total.calls[name] = self.total.calls.get(name, 0) + timer.calls[name]
+        if self._file is not None:
+            record = {
+                "kind": kind,
+                **label,
+                "seconds": {k: round(v, 4) for k, v in timer.seconds.items()},
+            }
+            self._file.write(json.dumps(record) + "\n")
+
+    def close(self) -> None:
+        """Close the file, if any."""
+        if self._file is not None:
+            self._file.close()
+
+
+def _record(
+    total: StageTimer | None, log: StageLog | None, kind: str, ct: StageTimer, **label: int
+) -> None:
+    """Hand one channel's times to the log, or to the run total when there is no log."""
+    if log is not None:
+        log.channel(kind, label, ct)
+    elif total is not None:
+        for name, seconds in ct.seconds.items():
+            total.seconds[name] = total.seconds.get(name, 0.0) + seconds
+            total.calls[name] = total.calls.get(name, 0) + ct.calls[name]
+
+
 def jacobi_operators(
     nn: MomentumNN,
     hw: float,
@@ -53,6 +107,7 @@ def jacobi_operators(
     jmax3: int | None = None,
     cache_dir: str | Path | None = None,
     workers: int = 1,
+    log: StageLog | None = None,
 ) -> tuple[dict[tuple[int, int, int], np.ndarray], dict[tuple[int, int, int], JacobiChannel]]:
     """Evolved three-body operators ``V3`` of all Jacobi channels, cut to ``N <= e3max``.
 
@@ -63,7 +118,8 @@ def jacobi_operators(
     ``force=None`` omits the genuine force. ``workers`` processes compute the angular
     coefficients of the force (a single process took 650 s for the largest channel on the GH200,
     where 30 took 119 s). ``cache_dir`` keeps the Jacobi bases between runs
-    (:func:`nuham.nnn.jacobi.load_or_build_channel`).
+    (:func:`nuham.nnn.jacobi.load_or_build_channel`). ``log`` receives the stage times of every
+    channel.
 
     Returns
     -------
@@ -83,13 +139,14 @@ def jacobi_operators(
                 nmax = ramp_nmax(j2, ramp)
                 if nmax < e3max:
                     raise ValueError(f"ramp {ramp!r} is below e3max = {e3max} at 2J = {j2}")
-                with stage(timer, "jacobi_basis"):
+                ct = StageTimer()
+                with ct.stage("jacobi_basis"):
                     channel = load_or_build_channel(j2, parity, t2, nmax, table, cache_dir)
                 if not channel.blocks:  # no antisymmetric state: nothing to evolve or transform
                     continue
                 v3n = None
                 if force:
-                    with stage(timer, "force"):
+                    with ct.stage("force"):
                         if nmax not in tables:
                             tables[nmax] = radial_tables(
                                 meshes, force.cutoff, force.power, nmax + 2
@@ -97,14 +154,27 @@ def jacobi_operators(
                         v3n = local_3nf_matrix(
                             channel, hw, meshes, tables[nmax], force.lecs, workers=workers
                         )
-                with stage(timer, "flow"):
-                    v3 = three_body_operator(
-                        channel, hw, lam, bare, evolved, v3n, e3max, rtol=rtol, atol=rtol
-                    )
+                v3 = three_body_operator(
+                    channel, hw, lam, bare, evolved, v3n, e3max, rtol=rtol, atol=rtol, timer=ct
+                )
                 kept = tuple(b for b in channel.blocks if b.n_quanta <= e3max)
                 chans[j2, parity, t2] = JacobiChannel(j2, parity, t2, e3max, kept)
                 ops[j2, parity, t2] = v3
+                _record(timer, log, "jacobi", ct, j2=j2, parity=parity, t2=t2, nmax=nmax,
+                        n_as=channel.n_as, n_nas=channel.n_nas)  # fmt: skip
     return ops, chans
+
+
+_LAB_WORKER: dict = {}
+
+
+def _lab_task(key: tuple[int, int, int]) -> tuple:
+    """Host coefficients of one lab channel in a worker process (inputs inherited by ``fork``)."""
+    w = _LAB_WORKER
+    j2, parity, t2 = key
+    return lab_t_blocks(
+        j2, parity, t2, w["orb"], w["e2max"], w["e3max"], w["jac"][t2], w["brackets"]
+    )
 
 
 def lab_matrices(
@@ -115,26 +185,58 @@ def lab_matrices(
     chans: dict[tuple[int, int, int], JacobiChannel],
     timer: StageTimer | None = None,
     dtype: type = np.float64,
+    log: StageLog | None = None,
+    workers: int = 1,
 ) -> dict[tuple[int, int, int], LabMatrix3]:
     """Lab matrices ``6 sum T^T V3 T`` of every ``(2J, P, 2T)`` channel that has states.
 
     The contraction runs on the device in float64 and the matrices are stored as ``dtype`` on the
-    host (``np.float32`` halves the memory; the file has eight decimals anyway).
+    host (``np.float32`` halves the memory; the file has eight decimals anyway). ``log``
+    receives the stage times of every channel. The coefficients are built on the host, one
+    channel at a time (about 44 s for the largest at e3max 16 on the GH200, 17 minutes for all);
+    with ``workers > 1`` forked processes build them for several channels at once, at most
+    ``min(workers, 8)`` finished ones waiting for the device, which bounds the host memory.
     """
     orb = make_orbits(emax)
     brackets = make_brackets()
+    keys = [(j2, p, t2) for t2 in (1, 3) for j2 in range(1, 2 * e3max + 4, 2) for p in (1, -1)]
+    vjac = {t2: {(j, p): v for (j, p, t), v in ops.items() if t == t2} for t2 in (1, 3)}
+    jac = {t2: {(j, p): c for (j, p, t), c in chans.items() if t == t2} for t2 in (1, 3)}
     out = {}
+
+    def finish(key: tuple[int, int, int], lab: LabBlock, blocks: dict, ct: StageTimer) -> None:
+        j2, parity, t2 = key
+        lab, m, order = contract_blocks(lab, blocks, vjac[t2], jac[t2], dtype, timer=ct)
+        if len(lab):
+            out[key] = LabMatrix3.make(lab, m, len(orb), order)
+        _record(timer, log, "lab", ct, j2=j2, parity=parity, t2=t2, n_lab=len(lab))
+
     with stage(timer, "lab"):
-        for t2 in (1, 3):
-            vjac = {(j, p): v for (j, p, t), v in ops.items() if t == t2}
-            jac = {(j, p): c for (j, p, t), c in chans.items() if t == t2}
-            for j2 in range(1, 2 * e3max + 4, 2):
-                for parity in (1, -1):
-                    lab, m, order = lab_scalar_device(
-                        j2, parity, t2, orb, e2max, e3max, vjac, jac, brackets, dtype
-                    )
-                    if len(lab):
-                        out[j2, parity, t2] = LabMatrix3.make(lab, m, len(orb), order)
+        if workers <= 1:
+            for key in keys:
+                ct = StageTimer()
+                with ct.stage("tcoef"):
+                    lab, blocks = lab_t_blocks(*key, orb, e2max, e3max, jac[key[2]], brackets)
+                finish(key, lab, blocks, ct)
+            return out
+        with stage(timer, "brackets"):
+            warm_brackets(brackets, e3max)  # JAX builds them; never inside a forked worker
+        _LAB_WORKER.update(orb=orb, e2max=e2max, e3max=e3max, jac=jac, brackets=brackets)
+        ctx = multiprocessing.get_context("fork")
+        window = max(1, min(workers, 8))
+        pending = iter(keys)
+        with ProcessPoolExecutor(workers, mp_context=ctx) as pool:
+            inflight: deque = deque()
+            for key in itertools.islice(pending, window):
+                inflight.append((key, pool.submit(_lab_task, key)))
+            while inflight:
+                key, future = inflight.popleft()
+                ct = StageTimer()
+                with ct.stage("tcoef_wait"):  # time the device loop waited for this channel
+                    lab, blocks = future.result()
+                if (nxt := next(pending, None)) is not None:
+                    inflight.append((nxt, pool.submit(_lab_task, nxt)))
+                finish(key, lab, blocks, ct)
     return out
 
 
@@ -153,8 +255,10 @@ def generate_me3j(
     rtol: float = 1e-8,
     jmax3: int | None = None,
     lab_dtype: type = np.float64,
-    workers: int = 1,
+    workers: int | None = None,
     cache_dir: str | Path | None = None,
+    stop_after: str = "write",
+    stage_log: str | Path | None = None,
 ) -> int:
     """Generate the 3N interaction in the lab HO basis and write it as ``me3j``.
 
@@ -174,7 +278,9 @@ def generate_me3j(
         Local 3N force, or ``None`` for the induced force of the NN interaction alone.
     options
         Compression settings (only ``compresslevel``, ``compressor`` and ``compress_threads``
-        are used so far; the assembly and formatting are the host paths).
+        are used so far; the assembly and formatting are the host paths). Unset compression
+        threads become ``min(8, workers)``: eight threads wrote 71 M values/s on the GH200, four
+        48 M.
     rtol
         Flow tolerance (rtol = atol in units of ``hw``).
     jmax3
@@ -183,34 +289,49 @@ def generate_me3j(
         Storage type of the lab matrices (``np.float32`` for production sizes).
     workers
         Processes for the angular coefficients of the 3N force and for the lookup, ordering and
-        formatting of the file's values (:func:`nuham.nnn.me3j.me3j_values`).
+        formatting of the file's values (:func:`nuham.nnn.me3j.me3j_values`); ``None`` is every
+        available CPU (:func:`nuham.runtime.default_workers`).
     cache_dir
         Directory that keeps the Jacobi bases between runs (they do not depend on ``hw``, ``lam``).
+
+    stop_after
+        ``"jacobi"`` (the operators of all Jacobi channels), ``"lab"`` (also the lab matrices) or
+        ``"write"`` (the whole file); an earlier stop returns 0. For timing one part of a large run.
+    stage_log
+        File that receives the stage times of every channel as JSON lines (appended).
 
     Returns
     -------
     int
         The number of values written.
     """
+    if stop_after not in ("jacobi", "lab", "write"):
+        raise ValueError(f"stop_after must be 'jacobi', 'lab' or 'write', not {stop_after!r}")
+    workers = default_workers() if workers is None else workers
+    if workers == 1 and default_workers() > 4:
+        warnings.warn(
+            f"workers=1 with {default_workers()} CPUs available: the 3N force and the file "
+            "lookup will run on one process",
+            stacklevel=2,
+        )
     if e3max > e2max:
         raise ValueError("e3max > e2max gives a file that imsrg++ cannot read (spec 5d 2.3)")
-    ops, chans = jacobi_operators(
-        nn,
-        hw,
-        lam,
-        e3max,
-        ramp,
-        force,
-        timer=timer,
-        rtol=rtol,
-        jmax3=jmax3,
-        cache_dir=cache_dir,
-        workers=workers,
-    )
-    labs = lab_matrices(emax, e2max, e3max, ops, chans, timer, lab_dtype)
-    if path is None:
+    log = StageLog(timer, stage_log)
+    try:
+        ops, chans = jacobi_operators(
+            nn, hw, lam, e3max, ramp, force, timer=timer, rtol=rtol, jmax3=jmax3,
+            cache_dir=cache_dir, workers=workers, log=log,
+        )  # fmt: skip
+        if stop_after == "jacobi":
+            return 0
+        labs = lab_matrices(emax, e2max, e3max, ops, chans, timer, lab_dtype, log, workers)
+    finally:
+        log.close()
+    if path is None or stop_after == "lab":
         return 0
-    opts = (WriterOptions() if options is None else options).resolve()
+    opts = options if options is not None else WriterOptions()
+    threads = opts.compress_threads or min(8, workers)
+    opts = replace(opts, compress_threads=threads).resolve()
     assert opts.compress_threads is not None
     orb = make_orbits(emax)
     with stage(timer, "write"):
@@ -228,6 +349,28 @@ def generate_me3j(
         )
 
 
+def run_config(args: argparse.Namespace, workers: int, writer: WriterOptions) -> dict:
+    """Describe what the run will use, for the first line of the log.
+
+    Printed before any work starts, so a wrong worker count, compression thread count or stop
+    point is visible in the first seconds of a job instead of in its timings.
+    """
+    import jax
+
+    return {
+        "workers": workers,
+        "cpus_available": default_workers(),
+        "compress_threads": writer.compress_threads or min(8, workers),
+        "omp_num_threads": os.environ.get("OMP_NUM_THREADS"),
+        "backend": jax.default_backend(),
+        "devices": [str(d) for d in jax.devices()],
+        "emax": args.emax, "e2max": args.e2max, "e3max": args.e3max, "ramp": args.ramp,
+        "hw": args.hw, "lam": args.lam, "genuine_3nf": not args.no_3nf,
+        "lab_dtype": args.lab_dtype, "rtol": args.rtol, "stop_after": args.stop_after,
+        "jacobi_cache": args.jacobi_cache, "stage_log": args.stage_log,
+    }  # fmt: skip
+
+
 def main() -> None:
     """Command-line entry point: ``python -m nuham.nnn.generate --help``."""
     p = argparse.ArgumentParser(
@@ -241,26 +384,44 @@ def main() -> None:
     p.add_argument("--e2max", type=int, required=True)
     p.add_argument("--e3max", type=int, required=True)
     p.add_argument(
-        "--ramp", required=True, help="flow space per J, e.g. flat8 or ramp40-5-36-7-32-9-28-11-24"
+        "--ramp", required=True, help="flow space per J: flat8 or ramp40-5-36-7-32-9-28-11-24"
     )
     p.add_argument(
         "--jmax3", type=int, default=None, help="largest doubled J (default 2 e3max + 3)"
     )
-    p.add_argument(
-        "--no-3nf", action="store_true", help="induced 3N force of the NN interaction only"
-    )
+    p.add_argument("--no-3nf", action="store_true", help="induced 3N force of the NN force only")
     p.add_argument("--cutoff", type=float, default=400.0, help="local 3NF regulator cutoff (MeV)")
     p.add_argument("--power", type=int, default=2, help="local regulator power")
     for name, default in (("c1", -0.81), ("c3", -3.2), ("c4", 5.4), ("cD", -0.2), ("cE", 0.098)):
         p.add_argument(f"--{name}", type=float, default=default)
     p.add_argument("--rtol", type=float, default=1e-8, help="flow tolerance (rtol = atol / hw)")
     p.add_argument("--lab-dtype", choices=("float32", "float64"), default="float32")
-    p.add_argument("--workers", type=int, default=1, help="processes for the value lookup")
+    p.add_argument(
+        "--workers", type=int, default=None, help="worker processes (default: every available CPU)"
+    )
     p.add_argument("--jacobi-cache", default=None, help="directory for cached Jacobi bases")
+    p.add_argument(
+        "--stop-after",
+        choices=("jacobi", "lab", "write"),
+        default="write",
+        help="stop after the Jacobi operators or the lab matrices (timing one part of a big run)",
+    )
+    p.add_argument("--stage-log", default=None, help="append per-channel stage times (JSON lines)")
+    p.add_argument(
+        "--cprofile", default=None, help="write cProfile statistics of the main process here"
+    )
     add_writer_arguments(p)
     p.add_argument("--compile-cache", default=None, help="directory for JAX's compilation cache")
     p.add_argument("--no-compile-cache", action="store_true")
     args = p.parse_args()
+    workers = default_workers() if args.workers is None else args.workers
+    writer = writer_options_from_args(args)
+    print("config:", json.dumps(run_config(args, workers, writer)), flush=True)
+    if workers > default_workers():
+        print(
+            f"WARNING: {workers} workers on {default_workers()} available CPUs",
+            file=sys.stderr, flush=True,
+        )  # fmt: skip
     if not args.no_compile_cache:
         enable_compilation_cache(args.compile_cache)
     force = None
@@ -268,13 +429,19 @@ def main() -> None:
         lecs = {k: getattr(args, k) for k in ("c1", "c3", "c4", "cD", "cE")}
         force = LocalForce(lecs, args.cutoff, args.power)
     timer = StageTimer()
+    profiler = cProfile.Profile() if args.cprofile else None
+    if profiler is not None:
+        profiler.enable()
     n = generate_me3j(
         read_nn_mom(args.nn_file), args.output, args.hw, args.lam, args.emax, args.e2max,
-        args.e3max, args.ramp, force, timer, writer_options_from_args(args), args.rtol,
-        args.jmax3, getattr(np, args.lab_dtype), args.workers, args.jacobi_cache,
+        args.e3max, args.ramp, force, timer, writer, args.rtol, args.jmax3,
+        getattr(np, args.lab_dtype), workers, args.jacobi_cache, args.stop_after, args.stage_log,
     )  # fmt: skip
+    if profiler is not None:
+        profiler.disable()
+        profiler.dump_stats(args.cprofile)
     print(f"wrote {n} values to {args.output}")
-    print({k: round(v, 1) for k, v in timer.seconds.items()})
+    print("stages:", {k: round(v, 1) for k, v in timer.seconds.items()})
 
 
 if __name__ == "__main__":

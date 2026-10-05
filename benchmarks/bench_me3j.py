@@ -30,6 +30,7 @@ from nuham.nnn.jacobi import JacobiChannel, build_channel
 from nuham.nnn.lab_transform import lab_scalar_device
 from nuham.nnn.me3j import LabMatrix3, me3j_values, write_me3j, write_me3j_fields
 from nuham.nnn.tcoef import lab_states, make_brackets
+from nuham.runtime import default_workers
 from nuham.timing import StageTimer
 
 
@@ -140,10 +141,13 @@ def main() -> None:
             )
         else:
             sp.add_argument("--compresslevel", type=int, default=1)
-            sp.add_argument("--workers", type=int, default=1)
+            sp.add_argument("--workers", type=int, default=None, help="default: all CPUs")
             sp.add_argument("--compress-threads", type=int, default=1)
             sp.add_argument("--fields", action="store_true", help="workers format the values")
     args = p.parse_args()
+    if getattr(args, "workers", 0) is None:
+        args.workers = default_workers()  # a silent 1 once cost a GPU-hour of slow runs
+    print("config:", json.dumps({k: v for k, v in vars(args).items() if k != "json"}), flush=True)
     e2max = 2 * args.emax if args.e2max is None else args.e2max
     if args.what == "lab":
         row = lab_record(args.emax, e2max, args.e3max, args.j2, args.parity, args.t2, args.repeat)

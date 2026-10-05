@@ -55,6 +55,7 @@ from nuham.nnn.tcoef import (
     tcoef_nas,
     tcoef_nas_blocked,
 )
+from nuham.runtime import default_workers
 from nuham.timing import StageTimer
 
 jax.config.update("jax_enable_x64", True)
@@ -264,6 +265,7 @@ def flow_record(
         row["v3_dev_from_tightest"] = float(np.abs(row.pop("v3") - reference).max())
     return {
         "n3max": n, "j2": j2, "parity": parity, "t2": t2, "genuine_3nf": genuine, "as": dim,
+        "workers": workers,
         "alpha_mev-2": srg_alpha(lam), "rho_h0_mev": rho, "rho_alpha_hw": rho * srg_alpha(lam) * hw,
         "stages": {k: round(x, 3) for k, x in timer.seconds.items()},
         "flows": rows,
@@ -290,7 +292,7 @@ def main() -> None:
     f.add_argument("--j2", type=int, default=1)
     f.add_argument("--parity", type=int, default=1)
     f.add_argument("--t2", type=int, default=1)
-    f.add_argument("--workers", type=int, default=1)
+    f.add_argument("--workers", type=int, default=None, help="default: all CPUs")
     fl = sub.add_parser("flow")
     fl.add_argument("--n", type=int, nargs="+", default=[8, 12, 16])
     fl.add_argument("--j2", type=int, default=1)
@@ -299,10 +301,18 @@ def main() -> None:
     fl.add_argument("--genuine", action="store_true", help="add the bare local 3NF400 to H0")
     fl.add_argument("--rtol", type=float, nargs="+", default=[1e-8, 1e-10, 1e-12])
     fl.add_argument("--check-spectrum", action="store_true", help="dense eigh before/after")
-    fl.add_argument("--workers", type=int, default=1, help="processes for the 3NF coefficients")
+    fl.add_argument(
+        "--workers",
+        type=int,
+        default=None,
+        help="processes for the 3NF coefficients (default: all CPUs)",
+    )
     for sp in sub.choices.values():
         sp.add_argument("--json", default=None, help="also write the record to this file")
     args = p.parse_args()
+    if getattr(args, "workers", 0) is None:
+        args.workers = default_workers()  # a silent 1 once cost a GPU-hour of slow runs
+    print("config:", json.dumps({k: v for k, v in vars(args).items() if k != "json"}), flush=True)
     if args.what == "qr":
         calls = [(qr_record, (n,)) for n in args.sizes]
     elif args.what == "tcoef":
