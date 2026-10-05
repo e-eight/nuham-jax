@@ -93,3 +93,38 @@ and the writer formatting in the main process; 5 min 13 s in job 3309469 with th
 
 Open points that would shorten it: the T coefficients are built one channel at a time on one core (the 32 cores are idle in that stage; channels are independent, so a pool of workers or multithreaded BLAS applies);
 the Jacobi basis is cached after the first run; the first run compiles the lab kernels once (the persistent compile cache then holds them).
+
+## Smaller ramps and the full-size lab stage (DeltaAI job 3310316, 2026-10-05, node `gh016`, commit `e1c7cb8`, 32 CPUs)
+
+Per-channel stage logs and cProfile dumps of the main process: `benchmarks/gh200_stages_*.jsonl`, `benchmarks/gh200_cprofile_*.prof`. All runs: 14/28/16, hw 16, lambda 2.0, 3NF400, float32 lab matrices,
+30 worker processes (every run printed `"workers": 32` first; the job script aborts otherwise).
+
+| run | Jacobi basis | force | embed | flow | lab | write | whole run |
+|---|---|---|---|---|---|---|---|
+| ramp24-5-22-7-20-9-18-11-16, Jacobi only | 31 s | 521 s | 8 s | 169 s | - | - | about 12 min |
+| ramp32-5-28-7-24-9-20-11-16, Jacobi only | 102 s | 757 s | 34 s | 118 s | - | - | about 17 min |
+| flat16, whole file | 7 s (cached) | 387 s | 3 s | 84 s | 286 s | 77 s | about 14 min |
+
+The flat16 run wrote the whole production-size file: 6 367 911 165 values (the count of spec 5d), 32.2 GB of gzip (`gzip -t` passed), at 82 M values/s; lab stage 286 s (T coefficients waited for 76 s,
+upload 7 s, device products with compilation 201 s); peak host memory 97.7 GB of the 113 GB Slurm gave (the 45 GiB of float32 lab matrices plus in-flight coefficient blocks).
+
+**What the profiles show** (main process of the flat16 run, 849 s): 162 s in 382 JAX compilations, 118 s in eager gathers of the force assembly (`_index_to_gather`, fixed afterwards by
+`project_pairs_indexed`), waiting for workers 190 s, forking worker pools 15 s. In the workers (profiled on one CPU, J=11/2, N=20, `cProfile`) 95% of the force time is the **pure-Python angular coefficient
+loops** (`_coefficients_tpe` and `_tpe_spin_sum`, 18 million scalar calls for one channel): the force is not limited by the projection or the device.
+
+**Force time by channel** (T=1/2, parity +, 30 workers, seconds): the cost grows with `J` at fixed `N`; at N = 16 it is 2.3 (J=1/2), 5.7 (5/2), 11.3 (9/2), 16.8 (17/2), then falls again as the channels run out
+of states (0.7 s at 35/2). A fit `ln t = -5.56 + 0.78 ln n_NAS + 0.85 ln(2J+1) - 0.72 [T=3/2]` reproduces the 140 channels to 16% (rms of the logarithm) but extrapolates the single measured large point
+(J=5/2, N=40, 119 s) from below (64 s). Applied to the production ramp (J <= 5/2 at N=40, 7/2 at 36, 9/2 at 32, 11/2 at 28, J >= 13/2 at 24) it gives about 2400 s for the force, of which 1640 s are the 48 channels with
+J >= 13/2 at N=24, which no run has measured yet (the smaller ramps put those at N=16). With the underestimate at the large end I take 2400-4800 s for the force. The basis (about 300-600 s the first time,
+cached afterwards), embeddings (about 100-200 s) and flows (about 200-300 s) add up to 600-1100 s.
+
+**Estimate of the production run** on 32 CPUs: Jacobi side 50-100 minutes, lab 5 minutes (286 s measured), write 1.5 minutes (77 s measured), NN projection and compilation 5 minutes: **about 1-2 hours**.
+Dominated by the angular coefficients, which parallelise over the CPUs of the node (a GH200 node has 72 cores per GPU).
+
+**The genuine force at high `J`** (`LocalForce.jmax3`, `--j3max-3nf`; NuHamil's `J3max_initial_3nf`, default all `J`): dropping it above J = 9/2 changes the me3j values at 8/16/8 by up to 0.036 MeV
+(rms 4.4e-4 MeV against an rms value of 0.18 MeV; 2.3 of 5.2 million values differ by more than 1e-6), above J = 5/2 by up to 0.066 MeV. That is not negligible at e3max 8, so the default stays "all J";
+it is the user's physics choice if production should cut it (and it would remove most of the force time).
+
+**Guards added after this job:** worker count defaults to every CPU and is printed with the rest of the configuration on the first line; one worker on a machine with more than four CPUs warns; per-channel
+stage log and cProfile options; finished `V3` of each Jacobi channel are cached (`cache_dir/v3`, keyed by interaction, hw, lambda, force, e3max, tolerance and ramp channel), so a run that hits its time limit or
+crashes resumes with the channels it finished; `--js` times a few channels of a large run.
