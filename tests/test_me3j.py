@@ -76,6 +76,7 @@ def test_whole_file_matches_nuhamil(
 def test_parallel_values_equal_serial() -> None:
     """Forked workers give the same stream, in order, as one process."""
     from nuham.nnn.me3j import LabMatrix3, me3j_values
+    from nuham.nnn.packed import pack_lower
     from nuham.nnn.tcoef import lab_states
 
     orb = make_orbits(6)
@@ -87,7 +88,7 @@ def test_parallel_values_equal_serial() -> None:
                 lab = lab_states(orb, j2, p, t2, 12, 6)
                 if len(lab):
                     m = rng.normal(size=(len(lab), len(lab)))
-                    labs[j2, p, t2] = LabMatrix3.make(lab, m, len(orb))
+                    labs[j2, p, t2] = LabMatrix3.make(lab, pack_lower(m), len(orb))
     serial = np.concatenate(list(me3j_values(orb, 12, 6, labs)))
     parallel = np.concatenate(list(me3j_values(orb, 12, 6, labs, workers=3, pairs_per_task=500)))
     assert len(serial) == 456320
@@ -97,6 +98,7 @@ def test_parallel_values_equal_serial() -> None:
 def test_fields_equal_formatted_values(tmp_path: Path) -> None:
     """Workers that format give a file with the same text as the plain writer."""
     from nuham.nnn.me3j import LabMatrix3, me3j_values, write_me3j, write_me3j_fields
+    from nuham.nnn.packed import pack_lower
     from nuham.nnn.tcoef import lab_states
 
     orb = make_orbits(5)
@@ -108,7 +110,7 @@ def test_fields_equal_formatted_values(tmp_path: Path) -> None:
                 lab = lab_states(orb, j2, p, t2, 10, 5)
                 if len(lab):
                     m = 3.0 * rng.normal(size=(len(lab), len(lab)))
-                    labs[j2, p, t2] = LabMatrix3.make(lab, m, len(orb))
+                    labs[j2, p, t2] = LabMatrix3.make(lab, pack_lower(m), len(orb))
     write_me3j(tmp_path / "a.me3j", me3j_values(orb, 10, 5, labs))
     fields = me3j_values(orb, 10, 5, labs, workers=2, pairs_per_task=300, as_fields=True)
     write_me3j_fields(tmp_path / "b.me3j", fields)

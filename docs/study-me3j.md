@@ -113,6 +113,12 @@ kernels (54 products, 38 operator builders), 5-7 new ones per channel. On the CP
 (29 to 59 s); doubling only below 4096 and for the index lengths gave 53 kernels for 14% more product time (29.5 to 33.5 s), which is what the code now does. At the GH200 rate (0.4-0.5 s per compile) that is
 expected to save of the order of 1-2 minutes of the 162 s, not more; the persistent compile cache removes the rest on any repeat run. Not measured on the GH200 yet.
 
+**Packed lab matrices (item 3).** The lab matrices are symmetric, so only the lower triangle is kept, packed by rows (`nuham.nnn.packed`; element (i, j), i >= j, at i(i+1)/2 + j). `contract_blocks` writes each
+block straight into the packed array, so the full square never exists on the host, and the writer's lookup orders its two row indices (the rows are in N-major order, not in the order of the file's keys, so the
+triangle is a property of the stored row order and not of the lookup). Check on this CPU: the emax 6, e2max 12, e3max 6 file (456 320 values, float32 matrices) is the same text as before the change
+(equal md5 of the decompressed stream), and the J=9/2+ T=1/2 matrix at e3max 12 (7221 states) takes 0.104 GB instead of 0.209 GB. The production estimate of 45 GiB to 23 GiB of float32 and the effect on the
+97.7 GB host peak are not measured on the GH200 yet.
+
 **What the profiles show** (main process of the flat16 run, 849 s): 162 s in 382 JAX compilations, 118 s in eager gathers of the force assembly (`_index_to_gather`, fixed afterwards by
 `project_pairs_indexed`), waiting for workers 190 s, forking worker pools 15 s. In the workers (profiled on one CPU, J=11/2, N=20, `cProfile`) 95% of the force time is the **pure-Python angular coefficient
 loops** (`_coefficients_tpe` and `_tpe_spin_sum`, 18 million scalar calls for one channel): the force is not limited by the projection or the device.

@@ -21,6 +21,7 @@ import numpy as np
 
 from nuham.basis.lab import Orbits
 from nuham.nn.me2j import format_fields_host, write_me2j, write_me2j_fields
+from nuham.nnn.packed import packed_index
 from nuham.nnn.tcoef import LabBlock
 
 HEADER = "NNN int. calculated by nuham (JAX)"
@@ -47,19 +48,20 @@ class LabMatrix3:
         Sorted state labels (:func:`_key`).
     rows
         Row of ``m`` of each sorted label.
-    m
-        The matrix, shape ``(n, n)``, in the row order given to :meth:`make`.
+    packed
+        Lower triangle of the (symmetric) matrix packed by rows (:mod:`nuham.nnn.packed`), in
+        the row order given to :meth:`make`.
     """
 
     keys: np.ndarray
     rows: np.ndarray
-    m: np.ndarray
+    packed: np.ndarray
 
     @staticmethod
     def make(
-        lab: LabBlock, m: np.ndarray, n_orbits: int, order: np.ndarray | None = None
+        lab: LabBlock, packed: np.ndarray, n_orbits: int, order: np.ndarray | None = None
     ) -> "LabMatrix3":
-        """Pair the matrix ``m`` with the labels of the states ``lab``.
+        """Pair the packed matrix ``packed`` with the labels of the states ``lab``.
 
         ``order`` gives the state of each row of ``m`` (``None``: the rows are in channel order),
         as returned by :func:`nuham.nnn.lab_transform.lab_scalar_device`.
@@ -67,7 +69,7 @@ class LabMatrix3:
         keys = _key(lab.i1, lab.i2, lab.i3, lab.j12, lab.t12, n_orbits)
         keys = keys if order is None else keys[order]
         rows = np.argsort(keys)
-        return LabMatrix3(keys[rows], rows, m)
+        return LabMatrix3(keys[rows], rows, packed)
 
 
 def triples(
@@ -168,7 +170,7 @@ def _values_for(
             rb, rk = np.searchsorted(lab.keys, kb), np.searchsorted(lab.keys, kk)
             ok = (rb < len(lab.keys)) & (rk < len(lab.keys))
             ok[ok] = (lab.keys[rb[ok]] == kb[ok]) & (lab.keys[rk[ok]] == kk[ok])
-            out[sel[ok]] = lab.m[lab.rows[rb[ok]], lab.rows[rk[ok]]]
+            out[sel[ok]] = lab.packed[packed_index(lab.rows[rb[ok]], lab.rows[rk[ok]])]
         return out
 
     for bra in bras:

@@ -7,6 +7,7 @@ import nuham  # noqa: F401  (enables float64)
 from nuham.basis.lab import make_orbits
 from nuham.nnn.jacobi import JacobiChannel, build_channel
 from nuham.nnn.lab_transform import lab_scalar_device
+from nuham.nnn.packed import unpack_lower
 from nuham.nnn.tcoef import lab_scalar, make_brackets
 
 EMAX = 6
@@ -42,10 +43,25 @@ def test_device_equals_host(setup, j2: int, parity: int, t2: int) -> None:
         j2, parity, t2, orb, 2 * EMAX, EMAX, v, c, brackets, granularity=32
     )
     assert len(lab_d) == len(lab) == len(order)
+    got = unpack_lower(got, len(order))
     full = np.zeros_like(want)
     full[np.ix_(order, order)] = got
     assert np.abs(full - want).max() < 1e-9 * max(1.0, np.abs(want).max())
     np.testing.assert_allclose(full, full.T, atol=1e-12)
     single = lab_scalar_device(j2, parity, t2, orb, 2 * EMAX, EMAX, v, c, brackets, np.float32)[1]
     assert single.dtype == np.float32
-    assert np.abs(single - got).max() < 1e-5 * max(1.0, np.abs(got).max())
+    assert len(single) == len(order) * (len(order) + 1) // 2
+    assert np.abs(unpack_lower(single, len(order)) - got).max() < 1e-5 * max(1.0, np.abs(got).max())
+
+
+def test_packed_storage_round_trip_and_lookup() -> None:
+    from nuham.nnn.packed import pack_lower, packed_index, packed_size
+
+    rng = np.random.default_rng(0)
+    m = rng.normal(size=(9, 9))
+    m = m + m.T
+    packed = pack_lower(m)
+    assert len(packed) == packed_size(9)
+    np.testing.assert_array_equal(unpack_lower(packed, 9), m)
+    i, j = np.meshgrid(np.arange(9), np.arange(9), indexing="ij")
+    np.testing.assert_array_equal(packed[packed_index(i, j)], m)

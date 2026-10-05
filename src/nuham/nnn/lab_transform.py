@@ -4,7 +4,8 @@ Same result as :func:`nuham.nnn.tcoef.lab_scalar` (which stays as the slow host 
 block by block in ``N = e1 + e2 + e3`` with :func:`nuham.kernels.nnn.lab.congruence_block`. The
 coefficients of a channel are built on the host (:func:`nuham.nnn.tcoef.lab_t_blocks`) and
 uploaded once; the matrix is kept in ``N``-major state order, which the writer's lookup undoes
-(:meth:`nuham.nnn.me3j.LabMatrix3.make`).
+(:meth:`nuham.nnn.me3j.LabMatrix3.make`). Only the lower triangle of the symmetric matrix is
+kept, packed by rows (:mod:`nuham.nnn.packed`).
 """
 
 import jax
@@ -15,6 +16,7 @@ from nuham.basis.lab import Orbits
 from nuham.kernels.nnn.lab import block_diagonal_operator, congruence_block
 from nuham.kernels.transfer import to_host
 from nuham.nnn.jacobi import JacobiChannel
+from nuham.nnn.packed import packed_size
 from nuham.nnn.tcoef import Brackets, LabBlock, lab_t_blocks
 from nuham.timing import StageTimer, stage
 
@@ -169,7 +171,7 @@ def contract_blocks(
             t_dev[n] = jnp.asarray(padded)
             runs[n] = _runs(labels, offs)
         jax.block_until_ready(list(t_dev.values()))
-    out = np.zeros((len(lab), len(lab)), dtype=dtype)
+    out = np.zeros(packed_size(len(lab)), dtype=dtype)
     with stage(timer, "gemm"):
         for ib, nb in enumerate(ns):
             for nk in ns[: ib + 1]:
@@ -189,6 +191,10 @@ def contract_blocks(
                 b0, k0 = first_col[nb], first_col[nk]
                 nb_cols, nk_cols = len(blocks[nb][0]), len(blocks[nk][0])
                 part = block[:nb_cols, :nk_cols]
-                out[b0 : b0 + nb_cols, k0 : k0 + nk_cols] = part
-                out[k0 : k0 + nk_cols, b0 : b0 + nb_cols] = part.T
+                rows = b0 + np.arange(nb_cols)
+                if nb != nk:  # every column is left of every row: the block is all lower triangle
+                    out[(rows * (rows + 1) // 2)[:, None] + k0 + np.arange(nk_cols)] = part
+                else:
+                    r, c = np.tril_indices(nb_cols)
+                    out[(b0 + r) * (b0 + r + 1) // 2 + b0 + c] = part[r, c]
     return lab, out, order

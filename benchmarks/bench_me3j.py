@@ -29,6 +29,7 @@ from nuham.basis.lab import make_orbits
 from nuham.nnn.jacobi import JacobiChannel, build_channel
 from nuham.nnn.lab_transform import lab_scalar_device
 from nuham.nnn.me3j import LabMatrix3, me3j_values, write_me3j, write_me3j_fields
+from nuham.nnn.packed import pack_lower
 from nuham.nnn.tcoef import lab_states, make_brackets
 from nuham.runtime import default_workers
 from nuham.timing import StageTimer
@@ -88,7 +89,7 @@ def write_record(
                 lab = lab_states(orb, j2, p, t2, e2max, e3max)
                 if len(lab):
                     m = rng.standard_normal((len(lab), len(lab)), dtype=np.float32)
-                    labs[j2, p, t2] = LabMatrix3.make(lab, m, len(orb))
+                    labs[j2, p, t2] = LabMatrix3.make(lab, pack_lower(m), len(orb))
     t0 = time.perf_counter()
     n = sum(len(c) for c in me3j_values(orb, e2max, e3max, labs, workers=workers))
     enumerate_seconds = time.perf_counter() - t0
@@ -114,7 +115,7 @@ def write_record(
     return {
         "emax": emax, "e2max": e2max, "e3max": e3max, "workers": workers,
         "compress_threads": threads, "worker_formatting": fields, "values": n,
-        "lab_channels": len(labs), "lab_matrices_gb": sum(c.m.nbytes for c in labs.values()) / 1e9,
+        "lab_channels": len(labs), "lab_matrices_gb": sum(c.packed.nbytes for c in labs.values()) / 1e9,  # noqa: E501
         "enumerate_lookup_seconds": enumerate_seconds, "total_write_seconds": write_seconds,
         "values_per_second_lookup": n / enumerate_seconds,
         "values_per_second_total": n / write_seconds, "gz_bytes": size,
