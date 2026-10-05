@@ -2,16 +2,17 @@
 
 ``H0 = T + 3 V_NN + V_3N`` with the kinetic energy and the NN force embedded from the pair (1,2)
 into the non-antisymmetrised (NAS) basis and then antisymmetrised, ``C^T W C``
-(:func:`nuham.nnn.local_force.assembly.antisymmetrize`). The NN force is the isospin-averaged
-charge-independent one without Coulomb: ``t12 = 0`` takes the pn channel, ``t12 = 1`` the mean of
-pp, pn and nn. Relative ``j12`` above the file's ``jmax`` has no NN force. Nothing here depends on
-the SRG flow; :mod:`nuham.nnn.srg3` evolves the matrices.
+(:func:`nuham.nnn.local_force.assembly.antisymmetrize`, on the device). The NN force is the
+isospin-averaged charge-independent one without Coulomb: ``t12 = 0`` takes the pn channel,
+``t12 = 1`` the mean of pp, pn and nn. Relative ``j12`` above the file's ``jmax`` has no NN
+force. Nothing here depends on the SRG flow; :mod:`nuham.nnn.srg3` evolves the matrices.
 """
 
 from collections.abc import Sequence
 from dataclasses import dataclass
 from functools import cached_property
 
+import jax
 import numpy as np
 import scipy.sparse as sp
 
@@ -155,11 +156,11 @@ def nn_nas(nas: np.ndarray, iso: IsospinNN) -> sp.csr_array:
     return sp.csr_array((np.concatenate(vv), (np.concatenate(ii), np.concatenate(jj))), shape=shape)
 
 
-def kinetic_jacobi(channel: JacobiChannel, hw: float) -> np.ndarray:
-    """Relative kinetic energy of three nucleons in the AS basis of ``channel`` (MeV)."""
+def kinetic_jacobi(channel: JacobiChannel, hw: float) -> jax.Array:
+    """Relative kinetic energy of three nucleons in the AS basis of ``channel`` (MeV), on device."""
     return antisymmetrize(kinetic_nas(_nas_of(channel), hw), channel)
 
 
-def nn_jacobi(channel: JacobiChannel, iso: IsospinNN) -> np.ndarray:
-    """``3 C^T V_NN C``: the NN force summed over the three pairs, in the AS basis (MeV)."""
+def nn_jacobi(channel: JacobiChannel, iso: IsospinNN) -> jax.Array:
+    """``3 C^T V_NN C``: the NN force summed over the three pairs, in the AS basis (device, MeV)."""
     return 3.0 * antisymmetrize(nn_nas(_nas_of(channel), iso), channel)

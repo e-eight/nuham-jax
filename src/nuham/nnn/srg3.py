@@ -6,34 +6,38 @@ embedded 2-body-evolved NN force being subtracted. The flow runs in units of ``h
 tolerances are well scaled, as in the NN flow.
 """
 
+import jax
 import jax.numpy as jnp
 import numpy as np
 
 from nuham.kernels.srg import srg_alpha, srg_flow_dense_stats
+from nuham.kernels.transfer import to_host
 from nuham.nnn.hamiltonian import IsospinNN, kinetic_jacobi, nn_jacobi
 from nuham.nnn.jacobi import JacobiChannel
 from nuham.timing import StageTimer, stage
 
 
 def evolve_hamiltonian(
-    h0: np.ndarray,
-    t: np.ndarray,
+    h0: np.ndarray | jax.Array,
+    t: np.ndarray | jax.Array,
     hw: float,
     lam: float,
     rtol: float = 1e-10,
     atol: float = 1e-10,
     stats: dict[str, int] | None = None,
-) -> np.ndarray:
+) -> jax.Array:
     """Flow ``h0`` to the cutoff ``lam`` (fm^-1) with generator ``t``; all matrices in MeV.
+
+    The result stays on the device.
 
     If ``stats`` is given it receives the number of integrator steps as ``stats["steps"]``.
     """
     out, steps = srg_flow_dense_stats(
-        jnp.asarray(h0 / hw), jnp.asarray(t / hw), srg_alpha(lam) * hw**2, rtol, atol / hw
+        jnp.asarray(h0) / hw, jnp.asarray(t) / hw, srg_alpha(lam) * hw**2, rtol, atol / hw
     )
     if stats is not None:
         stats["steps"] = int(steps)
-    return np.asarray(out) * hw
+    return out * hw
 
 
 def three_body_operator(
@@ -42,7 +46,7 @@ def three_body_operator(
     lam: float,
     bare: IsospinNN,
     evolved: IsospinNN,
-    v3n: np.ndarray | None = None,
+    v3n: np.ndarray | jax.Array | None = None,
     e3max: int | None = None,
     rtol: float = 1e-10,
     atol: float = 1e-10,
@@ -72,12 +76,16 @@ def three_body_operator(
         t = kinetic_jacobi(channel, hw)
         h0 = t + nn_jacobi(channel, bare)
         if v3n is not None:
-            h0 = h0 + v3n
+            h0 = h0 + jnp.asarray(v3n)
+        h0.block_until_ready()  # the device is asynchronous: charge the work to its own stage
     with stage(timer, "flow"):
         evolved_h = evolve_hamiltonian(h0, t, hw, lam, rtol, atol)
+        evolved_h.block_until_ready()
     with stage(timer, "embed"):
         v3 = evolved_h - t - nn_jacobi(channel, evolved)
-    if e3max is None:
-        return v3
-    keep = sum(len(b.cfp) for b in channel.blocks if b.n_quanta <= e3max)
-    return v3[:keep, :keep]
+        v3.block_until_ready()
+    if e3max is not None:
+        keep = sum(len(b.cfp) for b in channel.blocks if b.n_quanta <= e3max)
+        v3 = v3[:keep, :keep]
+    with stage(timer, "to_host"):
+        return to_host(v3)

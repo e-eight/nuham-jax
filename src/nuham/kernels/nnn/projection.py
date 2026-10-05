@@ -87,3 +87,36 @@ def project_weighted_pairs(
     n_xi = orbitals.shape[-1]
     grids = (weights @ radial).reshape(-1, n_xi, n_xi)
     return jax.vmap(project_pair)(orbitals[lb], orbitals[l3b], orbitals[lk], orbitals[l3k], grids)
+
+
+@partial(jax.jit, donate_argnums=0)
+def scatter_pair_blocks(
+    out: Array, m: Array, rows: Array, cols: Array, mirror: Array, n12: Array, n3: Array
+) -> Array:
+    """Write the blocks of a chunk of channel pairs, and their transposes, into the dense matrix.
+
+    The block of pair ``p`` is ``m[p, n12[a], n3[a], n12[b], n3[b]]`` for the NAS states ``a`` in
+    ``rows[p]`` and ``b`` in ``cols[p]``. Index lists are padded with ``len(out)``: padded entries
+    are dropped by the scatters, so the shapes only depend on the padded lengths. Pairs with
+    ``mirror`` false (the diagonal channel pairs) write the block only once; their transposed copy
+    would overwrite the same entries in no fixed order. ``out`` is donated.
+
+    Parameters
+    ----------
+    out
+        Dense NAS matrix, shape ``(n, n)``.
+    m
+        Output of :func:`project_weighted_pairs`.
+    rows, cols
+        NAS row indices of the bra and ket channel of every pair, shape ``(P, R)`` and ``(P, C)``.
+    mirror
+        Whether to also write the transposed block, shape ``(P,)``.
+    n12, n3
+        ``n12`` and ``n3`` of every NAS state, shape ``(n + 1,)`` (the last entry is padding).
+    """
+    block = jax.vmap(lambda mp, r, c: mp[n12[r][:, None], n3[r][:, None], n12[c], n3[c]])(
+        m, rows, cols
+    )
+    out = out.at[rows[:, :, None], cols[:, None, :]].set(block, mode="drop")
+    mirrored = jnp.where(mirror[:, None], cols, out.shape[0])
+    return out.at[mirrored[:, :, None], rows[:, None, :]].set(block.transpose(0, 2, 1), mode="drop")

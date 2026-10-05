@@ -68,7 +68,7 @@ def test_stage_log_has_one_record_per_channel(nn, force_calls: list[dict], tmp_p
     records = [json.loads(line) for line in log.read_text().splitlines()]
     assert len(records) == len(force_calls) > 0
     assert all(r["kind"] == "jacobi" and r["n_as"] > 0 for r in records)
-    assert set(records[0]["seconds"]) == {"jacobi_basis", "force", "embed", "flow"}
+    assert set(records[0]["seconds"]) == {"jacobi_basis", "force", "embed", "flow", "to_host"}
     # the run total is the sum of the channels
     total = sum(r["seconds"]["flow"] for r in records)
     assert timer.seconds["flow"] == pytest.approx(total, abs=1e-4 * len(records))
