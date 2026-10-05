@@ -26,6 +26,7 @@ from run_nn import environment, peak_device_bytes
 
 import nuham  # noqa: F401  sets JAX allocation defaults before the first device use
 from nuham.basis.lab import make_orbits
+from nuham.kernels.nnn.lab import block_diagonal_operator, congruence_block
 from nuham.nnn.jacobi import JacobiChannel, build_channel
 from nuham.nnn.lab_transform import lab_scalar_device
 from nuham.nnn.me3j import LabMatrix3, me3j_values, write_me3j, write_me3j_fields
@@ -69,6 +70,10 @@ def lab_record(
     return {
         "emax": emax, "e2max": e2max, "e3max": e3max, "j2": j2, "parity": parity, "t2": t2,
         "lab_states": len(lab), "matrix_gb": m.nbytes / 1e9,
+        "compiled_kernels": {
+            "congruence_block": congruence_block._cache_size(),
+            "block_diagonal_operator": block_diagonal_operator._cache_size(),
+        },
         "runs": repeats,
         "stages": {k: round(x, 3) for k, x in timer.seconds.items()},
         "peak_host_rss_gb": resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1e6,

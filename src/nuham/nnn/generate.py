@@ -213,7 +213,7 @@ def jacobi_operators(
                                 meshes, force.cutoff, force.power, nmax + 2
                             )
                         v3n = local_3nf_matrix(
-                            channel, hw, meshes, tables[nmax], force.lecs, workers=workers
+                            channel, hw, meshes, tables[nmax], force.lecs, workers=workers, timer=ct
                         )
                 v3 = three_body_operator(
                     channel, hw, lam, bare, evolved, v3n, e3max, rtol=rtol, atol=rtol, timer=ct
