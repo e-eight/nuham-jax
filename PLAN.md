@@ -182,8 +182,8 @@ vectorised and has not been redone since. Host stages that remain, each develope
 Job settings: `--mem=120g` (billing counts requested memory: 180g cost 1623 against 1082, and Slurm capped the allocation at 113 GB anyway), 72 CPUs (CPUs are not billed), `OMP_NUM_THREADS=8` to test, 3 h limit (the V3
 cache resumes a run that stops), `--stop-after jacobi` first if the Jacobi part is to be timed alone. Then: one verification job (ramp 32 Jacobi part again, `--js 11,13,19,27,35` with the production ramp for the high-J
 channels at N = 24 that no run has measured, the new settings), then the production run. Ask before every job.
-Decision still open for the user: the genuine force at all J_rel (NuHamil's default, what the code does) or cut above J = 9/2 (`--j3max-3nf 9`): the cut changes values by up to 0.036 MeV at 8/16/8 (rms 4.4e-4 MeV)
-and removes most of the force time.
+Decision (2026-10-05, the user): the production run uses the genuine force at all relative J (NuHamil's default, what the code does, no `--j3max-3nf`). The cut stays available as an option to explore
+later: `--j3max-3nf 9` (above doubled J = 9, i.e. J > 9/2, only the induced force is kept) changes values by up to 0.036 MeV at 8/16/8 (rms 4.4e-4 MeV) and removes most of the force time.
 After the production run: 5.5 with the production file (4He and 16O, NN+3N; imsrg++ needs about 25-30 GB for emax 14, so a smaller model space or the cluster).
 
 Order: 5.1 and 5.1b first and in parallel (5.1b decides the riskiest design question early), then 5.2 and 5.3 (independent of each other, both need 5.1), then 5.4, then 5.5. 5.0's numpy oracle is built incrementally as each step needs
