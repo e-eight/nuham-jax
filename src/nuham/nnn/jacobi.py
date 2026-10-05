@@ -205,9 +205,12 @@ def antisymmetric_basis(a: np.ndarray) -> np.ndarray:
 
     The trace of ``a`` is the integer AS dimension and ``a`` must be symmetric and idempotent
     (asserted to 1e-9; NuHamil only checks its eigenvalues to 1e-2). The basis is the first
-    ``n_as`` columns of the column-pivoted QR of ``a`` with ``R``'s diagonal positive, so it is a
-    deterministic function of ``a`` (an eigensolver would return an arbitrary basis of the
-    degenerate unit eigenspace). Any orthonormal basis of the same space is equally valid.
+    ``n_as`` columns of the column-pivoted QR of ``a`` with ``R``'s diagonal positive, so on one
+    platform it is a function of ``a`` (an eigensolver would return an arbitrary basis of the
+    degenerate unit eigenspace). It is not portable: the columns of the real projectors tie in
+    norm (relative gaps of 0 to 1e-16 at the pivot choice), so another LAPACK, or a device, may
+    pivot differently and give another gauge. Any orthonormal basis of the same space is equally
+    valid, and cached operators are keyed on the exact ``cfp`` (:func:`basis_digest`).
 
     Raises
     ------

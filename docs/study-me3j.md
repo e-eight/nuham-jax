@@ -119,6 +119,13 @@ triangle is a property of the stored row order and not of the lookup). Check on 
 (equal md5 of the decompressed stream), and the J=9/2+ T=1/2 matrix at e3max 12 (7221 states) takes 0.104 GB instead of 0.209 GB. The production estimate of 45 GiB to 23 GiB of float32 and the effect on the
 97.7 GB host peak are not measured on the GH200 yet.
 
+**Device QR for the Jacobi basis (item 4): measured, not implemented.** (a) On the GH200 (`benchmarks/baseline_gh200_3n_qr.json`) the device pivoted QR matches SciPy's pivots on a random projector but is
+only 1.4x faster (11.2 s against 15.8 s at n = 10 400, 1.07 against 1.61 s at 5000); the device `eigh` is 15x faster (1.0 s) but returns an arbitrary basis of the unit eigenspace. (b) Time split on this
+CPU for J=5/2 at N = 24: building the antisymmetrizers 3.4 s, projector check 0.2 s, pivoted QR 1.3 s; the QR grows with n^3 and the build with n^2, so the QR dominates at the N = 40 blocks. (c) The
+pivots are not robust: in real antisymmetrizer blocks (J = 1/2, 5/2, 9/2 at N = 10-22) the pivot columns tie in norm (relative gaps 0 to 1e-16 at 1 to 9 pivots per block), and a pivoted Cholesky
+replica chose other pivots than LAPACK in two of five blocks. So the gauge is already a property of the platform, whichever QR is used, which is why cached operators are keyed on the exact `cfp`.
+The basis is cached after the first run and the saving is of the order of 20-25 s for the largest channel, a few minutes over the whole production run at most, so the item was not done.
+
 **What the profiles show** (main process of the flat16 run, 849 s): 162 s in 382 JAX compilations, 118 s in eager gathers of the force assembly (`_index_to_gather`, fixed afterwards by
 `project_pairs_indexed`), waiting for workers 190 s, forking worker pools 15 s. In the workers (profiled on one CPU, J=11/2, N=20, `cProfile`) 95% of the force time is the **pure-Python angular coefficient
 loops** (`_coefficients_tpe` and `_tpe_spin_sum`, 18 million scalar calls for one channel): the force is not limited by the projection or the device.
