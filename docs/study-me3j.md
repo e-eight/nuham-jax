@@ -81,6 +81,30 @@ With the formatting in the workers and 8 compression threads the production file
 and the writer formatting in the main process; 5 min 13 s in job 3309469 with the force on 30 workers (72 s), the flows 18 s, the lab stage 186 s (host T coefficients dominate), the write 6.5 s, NN projection
 16 s, peak host memory 8.9 GB. The two files have the same size, 1 413 800 052 bytes.
 
+## The production run (DeltaAI job 3324394, 2026-10-06, node `gh078`, commit `bff090e`, 32 workers, 30 min 11 s, max RSS 77.1 GB)
+
+14/28/16, hw 16, lambda 2.0, EM500, local N2LO 3NF400 at all relative J, ramp 40-5-36-7-32-9-28-11-24, float32 lab matrices. Stage log: `benchmarks/gh200_stages_production_e14.jsonl` (72 Jacobi and 72 lab records).
+Output `/projects/bhhk/soham/nuham/out/N3LO_3NF400_hw16_e14_e2_28_e3_16.me3j.gz` on DeltaAI: **6 367 911 165 values** (the count of spec 5d), 31 532 859 061 bytes, `gzip -t` passed, header and first values
+read back. No checksum yet (it should run in a batch job, not on the login node).
+
+| stage | seconds |
+|---|---|
+| NN projection and flows | 7.7 |
+| Jacobi basis (39 of 72 read from the cache of earlier jobs) | 400.0 |
+| force (of it projection 70.5, scatter 38.6, antisymmetrize 43.2) | 197.6 |
+| embed | 44.8 |
+| flow | 246.1 |
+| lab transform (T coefficients waited for 89.2, products 91.3, upload 7.1) | 188.6 |
+| write | 76.6 |
+
+The job file was done at 16:52 (20 min after the start); the other 10 minutes of the 30 are the `gzip -t` of the 31.5 GB file, which the script runs after the write. 24 of the 72 Jacobi channels (2J = 5 and the five high-J values of
+verification B) were read from the V3 cache of the verification jobs, so the table has 48 computed channels (basis 394 s, force 198, embed 45, flow 246); adding the verification measurements of those 24 gives a
+Jacobi side of about 22.6 min against the 21 min estimated above, and a whole run of about 27 min against 26. The largest computed channels are 2J = 7 (N = 36, 10 254 AS states: basis 69.7 s, force 13.3 s, flow 25.8 s);
+the largest lab channel is 15/2+ T=1/2 (24 699 states, products 18.8 s). Peak host memory 77.1 GB of the 113 GB Slurm allows (97.7 GB for the flat16 run with full-square lab matrices).
+
+What is checked and what is not: the value count, the gzip stream and the format at the start of the file. The chain behind the file was compared with NuHamil's me3j file at 4/8/4 (24 890 values, 2e-6) and
+imsrg++ reproduces the 4He energies from our 4/8/4 file; nothing has compared this file's values yet (5.5).
+
 ## Production estimate after verification B (14/28/16, ramp 40-5-36-7-32-9-28-11-24; 2026-10-06)
 
 Supersedes the two older estimates below (about 1 hour, and 1-2 hours), which predate the vectorised coefficients, the device chain and the no-autotune kernels.
