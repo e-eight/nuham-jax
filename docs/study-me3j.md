@@ -126,6 +126,33 @@ pivots are not robust: in real antisymmetrizer blocks (J = 1/2, 5/2, 9/2 at N = 
 replica chose other pivots than LAPACK in two of five blocks. So the gauge is already a property of the platform, whichever QR is used, which is why cached operators are keyed on the exact `cfp`.
 The basis is cached after the first run and the saving is of the order of 20-25 s for the largest channel, a few minutes over the whole production run at most, so the item was not done.
 
+## Verification A on the GH200 (DeltaAI job 3317204, 2026-10-05, node `gh005`, commit `3a4e8a1`, 32 CPUs, 13 min 7 s, max RSS 22.6 GB)
+
+Records: `benchmarks/gh200_stages_verify_a_j5.jsonl`, `benchmarks/baseline_gh200_me3j_lab_j9_v3.json`. 63 tests passed on the GPU backend (3 min 56 s) and the V3 reference test passed, elements included
+(the aarch64 LAPACK gave the same gauge as this machine for those two small channels; nothing is shown for the large blocks).
+
+**Jacobi part of 2J = 5 at N = 40** (production ramp, cold compile cache, Jacobi caches rebuilt because the old files had no version), seconds per channel:
+
+| channel | AS / NAS | basis | force | of it: projection / scatter / antisymmetrize | embed | flow |
+|---|---|---|---|---|---|---|
+| 5/2+ T=1/2 | 11 340 / 34 020 | 77.6 | 29.0 | 2.8 / 1.1 / 20.9 | 3.1 | 32.7 |
+| 5/2- T=1/2 | 10 527 / 31 580 | 60.4 | 21.2 | 2.2 / 1.0 / 16.8 | 2.7 | 30.2 |
+| 5/2+ T=3/2 | 5 670 / 17 010 | 9.3 | 11.5 | 0.5 / 0.6 / 9.7 | 1.4 | 6.6 |
+| 5/2- T=3/2 | 5 263 / 15 789 | 8.1 | 4.5 | 0.5 / 0.6 / 2.9 | 0.7 | 5.9 |
+
+Against the earlier GH200 numbers for 5/2+ T=1/2 (basis 93, `cfp W cfp^T` 46, scatter 11, three embeddings 31, flow 28): the scatter is 10x faster (1.1 s), the three embeddings 10x (3.1 s), the flow and the
+basis are as before (the earlier force numbers also predate the vectorised angular coefficients, so the force total, 119 s then and 29 s now, is not an effect of item 1 alone). `to_host` takes 1 ms and
+`device_wait` nothing.
+
+**Not as estimated:** `cfp W cfp^T` inside the force takes 20.9 s, not the 1 s that the 3e13 flops suggest, although the same kernel runs three times in `embed` for 3.1 s in all. The force is the first
+call with a given shape and the cache was cold, and the time falls with the matrix size faster than the flops would (2.9 s at 15 789 states): the most likely cause is the compilation (and GEMM autotuning)
+of one large kernel per channel shape, about 15-20 s each, but this is a guess until a warm-cache run (or `XLA_FLAGS=--xla_gpu_autotune_level=0`) is measured.
+
+**Lab transform of the largest channel** (J=9/2+ T=1/2, 32 259 states), cold / warm: products and copies 45.9 s / 4.2 s (before 46 s / 4.2 s), 21 + 21 compiled kernels (about 90 before), T coefficients 44 s,
+peak host 20.4 GB and device 14.6 GB (both as before). The packed matrix is 2.08 GB (a full square would be 4.16 GB). So item 3 halves the stored matrix as intended, and item 2 cut the number of kernels
+without cutting the cold time: 42 kernels in about 42 s, 1 s each instead of 0.4-0.5 s. The coarser ladder made the kernels bigger and did not pay; what a compile costs here is an open question,
+the same one as for `cfp W cfp^T`.
+
 **What the profiles show** (main process of the flat16 run, 849 s): 162 s in 382 JAX compilations, 118 s in eager gathers of the force assembly (`_index_to_gather`, fixed afterwards by
 `project_pairs_indexed`), waiting for workers 190 s, forking worker pools 15 s. In the workers (profiled on one CPU, J=11/2, N=20, `cProfile`) 95% of the force time is the **pure-Python angular coefficient
 loops** (`_coefficients_tpe` and `_tpe_spin_sum`, 18 million scalar calls for one channel): the force is not limited by the projection or the device.
