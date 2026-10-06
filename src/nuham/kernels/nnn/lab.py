@@ -17,6 +17,8 @@ import jax
 import jax.numpy as jnp
 from jax import Array
 
+from nuham.kernels.compile import NO_AUTOTUNE
+
 
 @partial(jax.jit, static_argnames=("shape",))
 def block_diagonal_operator(
@@ -39,7 +41,7 @@ def block_diagonal_operator(
     return jnp.zeros(shape, v_flat.dtype).at[rows, cols].add(v_flat[src])
 
 
-@partial(jax.jit, static_argnames=("dtype",))
+@partial(jax.jit, static_argnames=("dtype",), compiler_options=NO_AUTOTUNE)
 def congruence_block(
     t_bra: Array, t_ket: Array, v_bd: Array, scale: float, dtype: type = jnp.float64
 ) -> Array:

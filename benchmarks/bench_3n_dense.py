@@ -13,6 +13,10 @@ Three independent measurements, chosen with a sub-command:
 ``flow``   the 3-body SRG flow (hw 16, lambda 2.0) of one ``(J, P, T)`` at ``Nmax = n`` for several
            tolerances: Dopri8 steps, time, deviation of ``V3`` from the tightest tolerance,
            stiffness estimate, optional eigenvalue drift; ``--genuine`` adds the local 3NF400.
+``antisym`` ``cfp W cfp^T`` of one channel with synchronised stage times: the NAS matrix of the
+           force once, then the antisymmetrisation of it three times and of the sparse kinetic
+           energy twice, to tell the first call (compilation) from repeats and a dense from a
+           sparse input.
 ``force``  the local N2LO 3N force of one ``(J, P, T)`` at ``N3max = n`` in the AS Jacobi basis
            (:func:`nuham.nnn.local_force.assembly.local_3nf_matrix`), with stage times: Jacobi
            basis, radial tables, Racah coefficients, radial sums, device projection, scatter,
@@ -43,9 +47,9 @@ from nuham.basis.lab import make_orbits
 from nuham.fetch import find_nn_file
 from nuham.kernels.srg import srg_alpha
 from nuham.nn.input_file import read_nn_mom
-from nuham.nnn.hamiltonian import isospin_nn, kinetic_jacobi, nn_jacobi
-from nuham.nnn.jacobi import build_channel
-from nuham.nnn.local_force.assembly import local_3nf_matrix
+from nuham.nnn.hamiltonian import isospin_nn, kinetic_jacobi, kinetic_nas, nn_jacobi
+from nuham.nnn.jacobi import build_channel, load_or_build_channel
+from nuham.nnn.local_force.assembly import antisymmetrize, local_3nf_matrix, nas_matrix
 from nuham.nnn.local_force.radial import nuhamil_meshes, radial_tables
 from nuham.nnn.srg3 import evolve_hamiltonian
 from nuham.nnn.tcoef import (
@@ -186,6 +190,32 @@ def gemm_record(m: int, k: int) -> dict:
     }  # fmt: skip
 
 
+def antisym_record(n: int, j2: int, parity: int, t2: int, workers: int, cache: str | None) -> dict:
+    """Time ``cfp W cfp^T`` per stage for the dense force matrix and the sparse kinetic energy."""
+    lecs = {"c1": -0.81, "c3": -3.2, "c4": 5.4, "cD": -0.2, "cE": 0.098}
+    meshes = nuhamil_meshes()
+    channel = load_or_build_channel(j2, parity, t2, n, cache_dir=cache)
+    nas = np.concatenate([b.nas for b in channel.blocks])
+    timer = StageTimer()
+    w = nas_matrix(
+        nas, j2, t2, 16.0, meshes, radial_tables(meshes, 400.0, 2, n + 2), lecs, workers=workers,
+        timer=timer,
+    )  # fmt: skip
+    rec: dict = {"n3max": n, "j2": j2, "parity": parity, "t2": t2, "nas": len(nas),
+                 "nas_matrix_stages": {k: round(x, 3) for k, x in timer.seconds.items()},
+                 "calls": []}  # fmt: skip
+    for label, operand in (("dense", w), ("dense", w), ("dense", w)) + (
+        ("sparse", kinetic_nas(nas, 16.0)),
+    ) * 2:
+        t = StageTimer()
+        t0 = time.perf_counter()
+        antisymmetrize(operand, channel, timer=t).block_until_ready()
+        rec["calls"].append({"input": label, "seconds": round(time.perf_counter() - t0, 3),
+                             "stages": {k: round(x, 3) for k, x in t.seconds.items()}})  # fmt: skip
+    rec["peak_device_bytes"] = peak_device_bytes()
+    return rec
+
+
 def force_record(n: int, j2: int, parity: int, t2: int, workers: int) -> dict:
     """Time the local 3N force of one channel at ``N3max = n`` (3NF400, hw 16, NuHamil's meshes)."""
     lecs = {"c1": -0.81, "c3": -3.2, "c4": 5.4, "cD": -0.2, "cE": 0.098}
@@ -293,6 +323,13 @@ def main() -> None:
     f.add_argument("--parity", type=int, default=1)
     f.add_argument("--t2", type=int, default=1)
     f.add_argument("--workers", type=int, default=None, help="default: all CPUs")
+    a = sub.add_parser("antisym")
+    a.add_argument("--n", type=int, nargs="+", default=[16])
+    a.add_argument("--j2", type=int, default=1)
+    a.add_argument("--parity", type=int, default=1)
+    a.add_argument("--t2", type=int, default=1)
+    a.add_argument("--workers", type=int, default=None, help="default: all CPUs")
+    a.add_argument("--jacobi-cache", default=None, help="directory of cached Jacobi bases")
     fl = sub.add_parser("flow")
     fl.add_argument("--n", type=int, nargs="+", default=[8, 12, 16])
     fl.add_argument("--j2", type=int, default=1)
@@ -317,6 +354,11 @@ def main() -> None:
         calls = [(qr_record, (n,)) for n in args.sizes]
     elif args.what == "tcoef":
         calls = [(tcoef_record, (n, args.reference)) for n in args.n]
+    elif args.what == "antisym":
+        calls = [
+            (antisym_record, (n, args.j2, args.parity, args.t2, args.workers, args.jacobi_cache))
+            for n in args.n
+        ]
     elif args.what == "force":
         calls = [(force_record, (n, args.j2, args.parity, args.t2, args.workers)) for n in args.n]
     elif args.what == "flow":

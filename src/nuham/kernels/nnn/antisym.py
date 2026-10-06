@@ -13,6 +13,8 @@ import jax
 import jax.numpy as jnp
 from jax import Array
 
+from nuham.kernels.compile import NO_AUTOTUNE
+
 
 @partial(jax.jit, static_argnames="shape")
 def dense_from_coo(rows: Array, cols: Array, values: Array, shape: tuple[int, int]) -> Array:
@@ -24,7 +26,7 @@ def dense_from_coo(rows: Array, cols: Array, values: Array, shape: tuple[int, in
     return jnp.zeros(shape, dtype=values.dtype).at[rows, cols].add(values, mode="drop")
 
 
-@jax.jit
+@partial(jax.jit, compiler_options=NO_AUTOTUNE)
 def antisymmetrize(w: Array, c: Array) -> Array:
     """Return ``C W C^T`` for a symmetric ``w``, symmetrised against rounding.
 

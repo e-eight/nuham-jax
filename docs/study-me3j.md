@@ -153,6 +153,25 @@ peak host 20.4 GB and device 14.6 GB (both as before). The packed matrix is 2.08
 without cutting the cold time: 42 kernels in about 42 s, 1 s each instead of 0.4-0.5 s. The coarser ladder made the kernels bigger and did not pay; what a compile costs here is an open question,
 the same one as for `cfp W cfp^T`.
 
+## Verification C: what the first call costs (DeltaAI job 3317317, 2026-10-05, node `gh048`, commit `fc44232`)
+
+Records: `benchmarks/gh200_stages_verify_c1_warm.jsonl`, `gh200_stages_verify_c2_autotune0.jsonl`, `baseline_gh200_me3j_lab_j9_autotune0.json`. 2J = 5 at N = 40, four channels, seconds summed:
+
+| run | force (of it antisymmetrize) | embed | flow |
+|---|---|---|---|
+| A: cold compile cache, default | 66.2 (50.3) | 7.9 | 75.5 |
+| C1: warm compile cache, default | 63.5 (44.2) | 7.3 | 74.8 |
+| C2: `XLA_FLAGS=--xla_gpu_autotune_level=0`, empty cache | 29.1 (12.5) | 17.2 | 137.5 |
+
+The 20.9 s of `cfp W cfp^T` in the first channel is **not compilation**: a warm compile cache gives the same 21.1 s. It is XLA's GEMM autotuning, which runs a few dozen algorithms on each new product
+shape (2.6e13 flops each here), in every process and per channel shape; the same kernel inside `embed` is quick because the shape has been tuned by then. With autotuning off the antisymmetrisation is 4.2 s, but
+the flow's products get 2x slower (62 s against 32 s for the first channel) and the embeddings 2.5x, so the global flag loses overall (183.8 s against 145.6 s for the three stages). The lab benchmark of the
+largest channel with autotuning off: products cold 14.4 s (45.9 s), warm 5.6 s (4.2 s), peak device memory 11.4 GB (14.6 GB). So the cold lab cost of job A was autotuning too, not compilation (21 + 21
+kernels in 14 s), and the coarser ladder of item 2 was not the lever.
+
+Action: `kernels.compile.NO_AUTOTUNE` is set per kernel (`jit(..., compiler_options=...)`) on the antisymmetrisation and on the lab contraction, so the flow keeps its tuned products. Expected for the
+production run, from the numbers above and not yet measured: about 15 s less for each large channel's antisymmetrisation, about 30 s less cold lab stage, over all channels some 10-20 minutes.
+
 **What the profiles show** (main process of the flat16 run, 849 s): 162 s in 382 JAX compilations, 118 s in eager gathers of the force assembly (`_index_to_gather`, fixed afterwards by
 `project_pairs_indexed`), waiting for workers 190 s, forking worker pools 15 s. In the workers (profiled on one CPU, J=11/2, N=20, `cProfile`) 95% of the force time is the **pure-Python angular coefficient
 loops** (`_coefficients_tpe` and `_tpe_spin_sum`, 18 million scalar calls for one channel): the force is not limited by the projection or the device.

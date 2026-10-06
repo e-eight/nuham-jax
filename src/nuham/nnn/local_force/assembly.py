@@ -204,20 +204,36 @@ def _padded_entries(
 
 
 def antisymmetrize(
-    w: np.ndarray | jax.Array | sp.csr_array, channel: JacobiChannel, blocks: list | None = None
+    w: np.ndarray | jax.Array | sp.csr_array,
+    channel: JacobiChannel,
+    blocks: list | None = None,
+    timer: StageTimer | None = None,
 ) -> jax.Array:
     """Return ``cfp W cfp^T`` (block-diagonal ``cfp`` in ``N``) as a dense device array.
 
     ``blocks`` default to those of ``channel``. ``w`` may be a SciPy sparse array (the pair
     operators of Phase 5.3 are); it and the block-diagonal ``cfp`` go to the device as entry lists
-    and are made dense there.
+    and are made dense there. With a ``timer`` each step waits for the device and is charged to
+    ``as_cfp`` (``C`` on the device), ``as_w`` (``W`` on the device) or ``as_gemm`` (the products),
+    so the stages are real times and not dispatch times.
     """
     blocks = list(channel.blocks) if blocks is None else blocks
     n_nas = sum(len(b.nas) for b in blocks)
     n_as = sum(len(b.cfp) for b in blocks)
-    c = sp.coo_array(sp.block_diag([b.cfp for b in blocks]))
-    c_dev = dense_from_coo(*_padded_entries(c.row, c.col, c.data, n_as), (n_as, n_nas))
-    return antisymmetrize_dense(_to_device_dense(w, n_nas), c_dev)
+    with stage(timer, "as_cfp"):
+        c = sp.coo_array(sp.block_diag([b.cfp for b in blocks]))
+        c_dev = dense_from_coo(*_padded_entries(c.row, c.col, c.data, n_as), (n_as, n_nas))
+        if timer is not None:
+            c_dev.block_until_ready()
+    with stage(timer, "as_w"):
+        w_dev = _to_device_dense(w, n_nas)
+        if timer is not None:
+            w_dev.block_until_ready()
+    with stage(timer, "as_gemm"):
+        out = antisymmetrize_dense(w_dev, c_dev)
+        if timer is not None:
+            out.block_until_ready()
+    return out
 
 
 def local_3nf_matrix(
@@ -236,6 +252,6 @@ def local_3nf_matrix(
         nas, channel.j2, channel.t2, hw, meshes, tables, lecs, workers=workers, timer=timer
     )
     with stage(timer, "antisymmetrize"):
-        v = antisymmetrize(w, channel)
+        v = antisymmetrize(w, channel, timer=timer)
         v.block_until_ready()
     return v
