@@ -172,6 +172,28 @@ kernels in 14 s), and the coarser ladder of item 2 was not the lever.
 Action: `kernels.compile.NO_AUTOTUNE` is set per kernel (`jit(..., compiler_options=...)`) on the antisymmetrisation and on the lab contraction, so the flow keeps its tuned products. Expected for the
 production run, from the numbers above and not yet measured: about 15 s less for each large channel's antisymmetrisation, about 30 s less cold lab stage, over all channels some 10-20 minutes.
 
+## Verification D: the per-kernel no-autotune option on the GH200 (DeltaAI job 3317423, 2026-10-05, node `gh015`, commit `ca13a3b`, 5 min, max RSS 21.4 GB)
+
+Records: `benchmarks/baseline_gh200_3n_antisym_j5_n40.json`, `baseline_gh200_me3j_lab_j9_v4.json`, `gh200_stages_verify_d_j5.jsonl`.
+
+- **Antisymmetrisation, 2J = 5 +, T = 1/2, N = 40** (n_as 11 340, n_nas 34 020, synchronised stages): first call 3.9 s (`as_cfp` 0.59, `as_gemm` 3.30), repeats 2.65 s (0.45 / 2.20), the same for a sparse input (2.7 and 2.6 s;
+  the sparse matrix costs 0.1 s to go up). Job A: 20.9 s. Peak device memory of this benchmark 26.7 GB (the dense W, C and the intermediate).
+- **Lab transform, largest channel** (J=9/2+ T=1/2): products cold 14.5 s, warm 5.5 s (job A: 45.9 / 4.2), peak device 11.3 GB (14.6), peak host 19.8 GB, T coefficients 44 s as before.
+- **2J = 5 at N = 40, four channels, summed seconds**, default flags, V3 removed, compile cache holding the new antisymmetrisation kernel from D1:
+
+| | A (cold, autotuned) | D3 |
+|---|---|---|
+| force | 66.2 | 15.6 |
+| of it antisymmetrize | 50.3 | 3.6 (`as_cfp` 1.3, `as_gemm` 2.3) |
+| embed | 7.9 | 6.8 |
+| flow | 75.5 | 60.9 |
+
+For 5/2+ T=1/2 alone: force 6.6 s (A: 29.0), antisymmetrize 1.5 s (20.9), embed 2.9 s, flow 27.3 s (32.7). The flow did not get slower, which is the point of setting the option per kernel instead of globally.
+The `as_gemm` of 0.9 s here against 2.2 s in the benchmark process for the same shape is not explained (the benchmark's first call also compiled, and its process held the dense W alongside); nothing relies on it.
+
+Summary of the three verification jobs for the items of the production-run list: item 1 (device antisymmetrisation, scatter and embeddings) took the force of the largest channel from 119 s (before the vectorised coefficients, too) to
+6.6 s and the embeddings from 31 s to 2.9 s; item 3 halves the stored lab matrices; item 2's ladder was not the lever, autotuning was, now off for the two GEMM-heavy kernels; item 4 not done.
+
 **What the profiles show** (main process of the flat16 run, 849 s): 162 s in 382 JAX compilations, 118 s in eager gathers of the force assembly (`_index_to_gather`, fixed afterwards by
 `project_pairs_indexed`), waiting for workers 190 s, forking worker pools 15 s. In the workers (profiled on one CPU, J=11/2, N=20, `cProfile`) 95% of the force time is the **pure-Python angular coefficient
 loops** (`_coefficients_tpe` and `_tpe_spin_sum`, 18 million scalar calls for one channel): the force is not limited by the projection or the device.

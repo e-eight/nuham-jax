@@ -1,0 +1,77 @@
+{
+ "benchmark": "antisym",
+ "environment": {
+  "host": "gh015.hsn.cm.delta.internal.ncsa.edu",
+  "platform": "Linux-6.4.0-150600.23.53-64kb-aarch64-with-glibc2.38",
+  "cpu_count": 288,
+  "python": "3.12.11",
+  "jax": "0.11.2",
+  "backend": "gpu",
+  "device": "gpu:NVIDIA GH200 120GB",
+  "x64": true,
+  "git_commit": "ca13a3b"
+ },
+ "rows": [
+  {
+   "n3max": 40,
+   "j2": 5,
+   "parity": 1,
+   "t2": 1,
+   "nas": 34020,
+   "nas_matrix_stages": {
+    "coefficients": 0.048,
+    "projection": 2.976,
+    "scatter": 0.857,
+    "device_wait": 0.0
+   },
+   "calls": [
+    {
+     "input": "dense",
+     "seconds": 3.884,
+     "stages": {
+      "as_cfp": 0.586,
+      "as_w": 0.0,
+      "as_gemm": 3.296
+     }
+    },
+    {
+     "input": "dense",
+     "seconds": 2.651,
+     "stages": {
+      "as_cfp": 0.445,
+      "as_w": 0.0,
+      "as_gemm": 2.204
+     }
+    },
+    {
+     "input": "dense",
+     "seconds": 2.652,
+     "stages": {
+      "as_cfp": 0.446,
+      "as_w": 0.0,
+      "as_gemm": 2.203
+     }
+    },
+    {
+     "input": "sparse",
+     "seconds": 2.713,
+     "stages": {
+      "as_cfp": 0.448,
+      "as_w": 0.098,
+      "as_gemm": 2.164
+     }
+    },
+    {
+     "input": "sparse",
+     "seconds": 2.62,
+     "stages": {
+      "as_cfp": 0.447,
+      "as_w": 0.007,
+      "as_gemm": 2.164
+     }
+    }
+   ],
+   "peak_device_bytes": 26747885568
+  }
+ ]
+}
