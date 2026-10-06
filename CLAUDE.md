@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 A from-scratch JAX package (`nuham`) that produces the same physics output as
 [NuHamil](https://github.com/Takayuki-Miyagi/NuHamil-public) (NN and later 3N matrix elements for imsrg++).
 It is not a translation of the Fortran code; NuHamil is a numerical oracle only.
-Scope now: EM500 NN, Hamiltonian only, `me2j` output readable by imsrg++. 3N (local N2LO) comes later.
+Scope now: EM500 NN, Hamiltonian only, `me2j` output readable by imsrg++ (done), and the local N2LO 3N force with `me3j` output (done, production file made; validation with imsrg++ is next).
 Develop and test on this CPU-only machine (float64, small cases); large runs go to a GPU cluster (Delta),
 so nothing may assume a device.
 
