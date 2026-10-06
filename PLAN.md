@@ -177,7 +177,7 @@ meshes (80 points to 15 fm, 100 p-points to 8 fm^-1) available as an option to v
 **Production run (14/28/16, ramp 40-5-36-7-32-9-28-11-24, 3NF400, hw 16, lambda 2.0, genuine force at all relative J) — DONE 2026-10-06.**
 Result: job 3324394 on one GH200 (32 CPUs, 120 GB): 30 min wall (about 20 min of work, then 10 min of `gzip -t` in the script), 6 367 911 165 values, 31.5 GB of gzip, peak host memory 77.1 GB; 24 of the 72 Jacobi
 channels were read from the V3 cache of the verification jobs. Estimate before the run: 26 min (20-40). Stage times: `docs/study-me3j.md`, `benchmarks/gh200_stages_production_e14.jsonl`. The file is
-`/projects/bhhk/soham/nuham/out/N3LO_3NF400_hw16_e14_e2_28_e3_16.me3j.gz` on DeltaAI, with no copy elsewhere and no checksum yet. Only the value count, `gzip -t` and the format at the start were checked.
+`/projects/bhhk/soham/nuham/out/N3LO_3NF400_hw16_e14_e2_28_e3_16.me3j.gz` on DeltaAI, with no copy elsewhere and no checksum (by decision). Only the value count, `gzip -t` and the format at the start were checked.
 
 The four host-side items that were done first (each tested on the CPU, then checked on the GH200 in jobs 3317204, 3317317, 3317423 and 3317876; details in `docs/study-me3j.md`):
 1. Device-resident antisymmetrisation, NAS scatter and embeddings (`kernels/nnn/antisym.py`, `scatter_pair_blocks`): scatter 11 to 1.1 s, three embeddings 31 to 2.9 s, `cfp W cfp^T` 46 to 1.5-3.9 s. It is two dense GEMMs
@@ -195,8 +195,8 @@ Jobs (`scripts/deltaai/`: `common.sh`, `verify_a..d.sbatch`, `production.sbatch`
 113 GB anyway), `OMP_NUM_THREADS=1`, 3 h limit, a check that aborts the job if the worker count differs from the allocated CPUs, V3 cache resumes a run that stops. 72 CPUs and `OMP_NUM_THREADS=8` were not tried.
 Ask before every job. Decision (2026-10-05, the user): the production run uses the genuine force at all relative J (NuHamil's default). The cut stays an option to explore later: `--j3max-3nf 9` (above doubled J = 9,
 i.e. J > 9/2, only the induced force is kept) changes values by up to 0.036 MeV at 8/16/8 (rms 4.4e-4 MeV) and removes most of the force time.
-Not measured: the compile counts of a whole run, and the 72-CPU and BLAS-thread variants. Next: a checksum and a second copy of the file (batch job, not the login node), then 5.5 (4He and 16O, NN+3N;
-imsrg++ needs about 25-30 GB for emax 14, so a smaller model space or the cluster).
+Not measured: the compile counts of a whole run, and the 72-CPU and BLAS-thread variants. Decision (2026-10-06, the user): no checksum or second copy of the file for now (regenerating takes about 15 min of GPU with the caches, 27 without, plus the queue wait). Next: 5.5 (4He and 16O, NN+3N;
+imsrg++ needs about 25-30 GB for emax 14, so a smaller model space or the cluster; a smaller-emax file with the same e2max and e3max is a prefix of the production file, so a prefix suffices for small model spaces).
 
 Order: 5.1 and 5.1b first and in parallel (5.1b decides the riskiest design question early), then 5.2 and 5.3 (independent of each other, both need 5.1), then 5.4, then 5.5. 5.0's numpy oracle is built incrementally as each step needs
 it, in `refs/` (provenance rule: nothing transcribed from NuHamil in `src/`). Open items from the specs that are closed: the sign phases `(-1)^x` and factor 3 for cD (5.2.1), the lab factor 6 and the T_NAS phases (5.1b), the antisymmetrizer threshold at Nmax 40 (5.1: replaced by an
