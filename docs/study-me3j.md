@@ -194,6 +194,21 @@ The `as_gemm` of 0.9 s here against 2.2 s in the benchmark process for the same 
 Summary of the three verification jobs for the items of the production-run list: item 1 (device antisymmetrisation, scatter and embeddings) took the force of the largest channel from 119 s (before the vectorised coefficients, too) to
 6.6 s and the embeddings from 31 s to 2.9 s; item 3 halves the stored lab matrices; item 2's ladder was not the lever, autotuning was, now off for the two GEMM-heavy kernels; item 4 not done.
 
+## Verification B: the Jacobi side with the production ramp (DeltaAI job 3317876, 2026-10-05, node `gh149`, commit `6fec19b`, 32 CPUs, 9 min 43 s, max RSS 13.8 GB)
+
+Records: `benchmarks/gh200_stages_verify_b_ramp32.jsonl` (70 channels), `gh200_stages_verify_b_highj.jsonl` (20 channels). Both runs exited 0 with no error; no Jacobi cache existed in the new format, so the bases were rebuilt.
+
+| ramp32, Jacobi part, all 70 channels | basis | force | embed | flow |
+|---|---|---|---|---|
+| before (`gh200_stages_jacobi_ramp32.jsonl`) | 101.9 s | 757.2 s | 34.1 s | 118.2 s |
+| now | 99.3 s | 112.8 s | 24.3 s | 49.9 s |
+
+The force of 2J = 5 at N = 32 is 4.1 s (49.9 s before), of it 1.7 s in the antisymmetrisation. The old force numbers predate both the vectorised angular coefficients and the device chain, so the factor 6.7 is
+not the effect of one change. The flow got faster too (118 to 50 s); I did not look into why (the old run was another node and another commit). The basis is unchanged and is now the largest stage (99 of 286 s).
+
+High-J channels with the production ramp, `--js 11,13,19,27,35` (20 channels, N = 28 for 2J = 11, N = 24 above): basis 93.5 s, force 77.9 s, embed 10.2 s, flow 52.0 s, 233 s in all. The largest, 11/2+ at N = 28
+(5794 AS states), takes 25.5 s for the basis, 7.2 s for the force, 1.4 s for the embeddings and 5.1 s for the flow. These channels had not been measured at the production ramp before; nothing went wrong in them.
+
 **What the profiles show** (main process of the flat16 run, 849 s): 162 s in 382 JAX compilations, 118 s in eager gathers of the force assembly (`_index_to_gather`, fixed afterwards by
 `project_pairs_indexed`), waiting for workers 190 s, forking worker pools 15 s. In the workers (profiled on one CPU, J=11/2, N=20, `cProfile`) 95% of the force time is the **pure-Python angular coefficient
 loops** (`_coefficients_tpe` and `_tpe_spin_sum`, 18 million scalar calls for one channel): the force is not limited by the projection or the device.

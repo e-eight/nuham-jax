@@ -182,6 +182,11 @@ vectorised and has not been redone since. Host stages that remain, each develope
 Job settings: `--mem=120g` (billing counts requested memory: 180g cost 1623 against 1082, and Slurm capped the allocation at 113 GB anyway), 72 CPUs (CPUs are not billed), `OMP_NUM_THREADS=8` to test, 3 h limit (the V3
 cache resumes a run that stops), `--stop-after jacobi` first if the Jacobi part is to be timed alone. Then: one verification job (ramp 32 Jacobi part again, `--js 11,13,19,27,35` with the production ramp for the high-J
 channels at N = 24 that no run has measured, the new settings), then the production run. Ask before every job.
+Status (2026-10-06): the verification jobs are done (A 3317204, C 3317317, D 3317423, B 3317876; `docs/study-me3j.md`). The Jacobi part of the ramp32 run takes 286 s (it was 17 minutes), the high-J channels at the
+production ramp run without trouble (233 s), and the lab products of the largest channel take 14.5 s cold. What is left is the production run itself (jobs on the same pattern, `scripts/deltaai/`, 3 h limit, V3 cache
+resumes); a rough estimate from these numbers is of the order of 20-30 minutes in all (Jacobi part about 10, lab stage a few minutes with the host T coefficients dominant, writer about 90 s), not measured as one run.
+The first production run builds the Jacobi caches in the new format, the largest basis (2J = 5 at N = 40) takes about 80 s of it. Not yet measured on the GH200: the peak host memory of a whole run with the packed lab
+matrices (the old estimate 97.7 GB of the 113 GB Slurm allows), the compile counts of a whole run.
 Decision (2026-10-05, the user): the production run uses the genuine force at all relative J (NuHamil's default, what the code does, no `--j3max-3nf`). The cut stays available as an option to explore
 later: `--j3max-3nf 9` (above doubled J = 9, i.e. J > 9/2, only the induced force is kept) changes values by up to 0.036 MeV at 8/16/8 (rms 4.4e-4 MeV) and removes most of the force time.
 After the production run: 5.5 with the production file (4He and 16O, NN+3N; imsrg++ needs about 25-30 GB for emax 14, so a smaller model space or the cluster).
