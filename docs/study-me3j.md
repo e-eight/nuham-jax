@@ -81,7 +81,22 @@ With the formatting in the workers and 8 compression threads the production file
 and the writer formatting in the main process; 5 min 13 s in job 3309469 with the force on 30 workers (72 s), the flows 18 s, the lab stage 186 s (host T coefficients dominate), the write 6.5 s, NN projection
 16 s, peak host memory 8.9 GB. The two files have the same size, 1 413 800 052 bytes.
 
-## Production estimate after the GH200 measurements (14/28/16, ramp 40-5-36-7-32-9-28-11-24)
+## Production estimate after verification B (14/28/16, ramp 40-5-36-7-32-9-28-11-24; 2026-10-06)
+
+Supersedes the two older estimates below (about 1 hour, and 1-2 hours), which predate the vectorised coefficients, the device chain and the no-autotune kernels.
+
+**Jacobi side, 72 channels: 21 min** (1257 s: basis 651, force 268, embed 48, flow 290). 24 channels are measured at the production ramp (2J = 5 at N = 40 from jobs 3317204 and 3317423, 2J = 11, 13, 19, 27, 35
+from job 3317876). The other 48 are the ramp32 run's channels (each production N is 8 above the ramp32 one) scaled by the measured ratios, grouped by the ramp32 N (16, 20, 32) and interpolated in the
+logarithm for 24 and 28: new/old of basis 19.2, 11.2, 4.6 at N = 16, 20, 32; force 3.1, 2.2, 1.4; embed 1.7, 2.8, 1.9; flow 4.9, 6.8, 6.3. With the Jacobi bases cached (every run after the first) it is 10 min,
+the basis being 651 s of the 1257 s.
+**Lab stage: about 3 min.** The flat16 run took 286 s (T coefficients waited for 76 s, products with compilation 201 s); the cold products are now about a third (largest channel 45.9 to 14.5 s), the host
+coefficients are unchanged. **Writer about 1.5 min** (77 s measured at 82 M values/s, 90 s with the workers formatting). NN projection and start-up about 1 min.
+
+**Total about 26 min on one GH200 for the first run, about 15 min for a repeat with cached bases**, as a sum of stages (no end-to-end run). The uncertainty is mostly in the 48 scaled channels (ratios from
+only three N values, four channels each at the two largest) and in the lab stage, so I would say 20-40 min. The 3 h limit and the resumable V3 cache are far above that. Not covered: the peak host memory of the
+whole run (97.7 GB before the packed lab matrices).
+
+## Earlier production estimate (superseded), after the first GH200 measurements (14/28/16, ramp 40-5-36-7-32-9-28-11-24)
 
 | stage | estimate | basis |
 |---|---|---|
@@ -219,7 +234,7 @@ of states (0.7 s at 35/2). A fit `ln t = -5.56 + 0.78 ln n_NAS + 0.85 ln(2J+1) -
 J >= 13/2 at N=24, which no run has measured yet (the smaller ramps put those at N=16). With the underestimate at the large end I take 2400-4800 s for the force. The basis (about 300-600 s the first time,
 cached afterwards), embeddings (about 100-200 s) and flows (about 200-300 s) add up to 600-1100 s.
 
-**Estimate of the production run** on 32 CPUs: Jacobi side 50-100 minutes, lab 5 minutes (286 s measured), write 1.5 minutes (77 s measured), NN projection and compilation 5 minutes: **about 1-2 hours**.
+**Estimate of the production run** (superseded, see the section after verification B) on 32 CPUs: Jacobi side 50-100 minutes, lab 5 minutes (286 s measured), write 1.5 minutes (77 s measured), NN projection and compilation 5 minutes: **about 1-2 hours**.
 Dominated by the angular coefficients, which parallelise over the CPUs of the node (a GH200 node has 72 cores per GPU).
 
 **The genuine force at high `J`** (`LocalForce.jmax3`, `--j3max-3nf`; NuHamil's `J3max_initial_3nf`, default all `J`): dropping it above J = 9/2 changes the me3j values at 8/16/8 by up to 0.036 MeV
