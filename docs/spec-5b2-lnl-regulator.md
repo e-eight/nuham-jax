@@ -19,7 +19,7 @@ The example script's defaults are `TNF = "N3LOEMlnl"`, the ramp `ramp40-5-36-7-3
 
 1. `work` = NAS matrix of the local force (all five LEC terms added, as for `Local`).
 2. `DMat = CFPᵀ work CFP` (antisymmetric basis, size `north`): our `local_3nf_matrix` returns exactly this (`antisymmetrize(w, channel)`).
-3. Regulator (only for LNL): `R` = matrix of `F` in the NAS basis (section 3), `Fa = CFPᵀ R CFP` (the same antisymmetrizer call),
+3. Regulator (only for LNL): `R` = matrix of `F` in the NAS basis (section 3), `Fa = CFPᵀ R CFP` (our `cfp` rows are the transposed NuHamil `cfp`, so `Fa = cfp R cfp^T`, which is what `antisymmetrize` returns),
    `DMat <- Faᵀ DMat Fa`. The regulator multiplies once on each side and is applied **before the SRG flow** (the flow sees the regulated force).
 
 ## 3. The matrix R
@@ -56,9 +56,9 @@ The `(-1)ⁿ` is the Fourier-transform phase of the HO function (the `i^l` facto
   truncated operators, intermediate sums stay in this space. NuHamil does the same, and the space is the same ramp, so no deviation is expected. R is not diagonal in N
   (it couples different `n12, n3`): the truncation error of `F` at high N (where `F` is small for Λ_nl = 500 MeV and hw 16: `F` has fallen to e⁻¹ at `(p²+k²)/2 hc² = Λ²`)
   is NuHamil's too.
-- **Mesh error is a real part of the reference:** 500 points to `pmax = 150/√hw` with HO functions up to `n = 20`, `l = 40`: the highest functions
-  oscillate fast (about `√(4n + 2l + 3) · b` fm⁻¹ turning point, `b ≈ 2.2 fm` at hw 16, so up to `p ≈ 10 fm⁻¹`), so 500 points over 37.5 fm⁻¹ may be thin at the top of the ramp.
-  D1 includes a convergence study of `R` against the mesh; D3 tells whether NuHamil's fixed mesh matters at N ≤ 12.
+- **Mesh error: none to speak of (D1, `refs/regulator_mesh_study.py`).** For Lambda_nl = 500, n = 2, hw 16 and 20, N <= 12, 24 and 40 and every `(l12, l3)`, NuHamil's
+  500-point mesh, 250 points, 1000 points and a 1500-point mesh to twice `pmax` agree to 5e-13 (the floor of the double-precision quadrature). The regulator is smooth and the
+  HO functions end well inside `pmax` (about 14 fm⁻¹ at N = 40 against 37.5), so NuHamil's mesh is converged and any difference found in D3 is not mesh error of `R`.
 - **Local part of LNL:** unchanged code path with `cutoff = 650`, `power = n`, cD = 0.7, cE = -0.06. Nothing new except the LECs and cutoff.
 - **Symmetry check available without NuHamil:** `F` commutes with the antisymmetrizer (it depends on the hyperradius only), so `R` restricted to the antisymmetric
   subspace must satisfy `(1 - A) R A = 0` on the states away from the truncation edge, and `Fa` must be symmetric with eigenvalues in `(0, 1]`.
@@ -73,8 +73,11 @@ The `(-1)ⁿ` is the Fourier-transform phase of the HO function (the `i^l` facto
 
 ## 6. Checks (D1-D3)
 
+(D1: `tests/test_nnn_regulator.py`, all of 1-3 and the Fourier-transform check of the phase.)
+
 1. `R -> 1` as `Λ_nl -> ∞`; `n = 1`: `F` factorises, so `R = R12 ⊗ R3` with 1D integrals (independent code path in the test).
 2. `R` symmetric, positive; `(1 - A) R A` small; `Fa` eigenvalues in `(0, 1]`.
-3. Mesh convergence of `R` (points 250/500/1000, `pmax` factor 1/1.5/2) at N 12, 24, 40.
+3. Mesh convergence of `R` (points 250/500/1000/1500, `pmax` factor 1 and 2) at N 12, 24, 40: done, 5e-13.
+   Phase: `momentum_radial` equals the Fourier transform of the position-space functions the force is built with, up to one `i^l` per `l`, for all `n` (so the `(-1)^n` is the right phase; dropping it changes `Fa` by 0.1).
 4. Against NuHamil: 4/8/4 and 6/12/6 `me3j` files with the preset, tolerance 1e-5 (as F, G, H); 6/12/12 if needed.
 5. Regression: `nonlocal_cutoff=None` gives the 3NF400 files unchanged (existing `tests/test_v3_reference.py`).
