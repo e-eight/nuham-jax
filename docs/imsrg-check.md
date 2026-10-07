@@ -205,5 +205,5 @@ at value 139 691 025), no value above 1e-5 (and none above 1e-3); the decompress
 backends; the number of differing values was not counted. Stage times, GPU / CPU backend: force 49.5 / 64.4 s, embed 10.5 / 7.9 s, flow 23.6 / 29.1 s, lab 24.2 / 27.3 s (the local x86 CPU run with 2 workers took 245 s for the lab stage),
 write 3.3 / 4.0 s. The files are on DeltaAI in `/projects/bhhk/soham/nuham/out/gapA_{gpu,cpu}_e6_e3_12.me3j.gz`.
 
-With the local x86 CPU file equal to NuHamil's to 5.65e-6 (above), this gives a chain NuHamil - x86 CPU - aarch64 CPU - GPU for this case. The GPU file itself has not been compared with NuHamil's directly (NuHamil's file is only on the
-local machine); fetching the GPU file and running `scripts/compare_me3j.py` against `nnn_3NF400_e6_e3_12.me3j.gz` would close that last link. The case has N3max 12; the production ramp (N3max 24-40) is covered only by gap B.
+**The GPU file against NuHamil's, fetched and compared here (2026-10-07):** 144 345 500 values, **maximum difference 5.650e-6** (at value 3: 13.82467937 against NuHamil's 13.82468502, the same maximum and the same value
+as for the local x86 CPU file), none above 1e-5. The GPU file against the local x86 CPU file: maximum difference 1.2e-7 (at value 2 356 618), none above 1e-5. So the GPU path agrees with NuHamil as well as the CPU path does, for this case (N3max 12). The case has N3max 12; the production ramp (N3max 24-40) is covered only by gap B.
