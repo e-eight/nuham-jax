@@ -128,7 +128,7 @@ e3hf that grows with e3max, in NuHamil's own files too, so it is not a property 
 N3max as small as e3max (4 to 12 here; production uses 24-40) leaves the induced 3N force unconverged and large. What the runs do show: (i) our 6/12/6 file equals NuHamil's over all 456 320 values, maximum
 difference 4.1e-6, nothing above 1e-5, largest value 24.6 (this is the N > 4 check that 5.1b had asked for, up to N = 6); (ii) the values of our 6/12/12 file (144 345 500, 719 MB) are all below 14 in magnitude
 with no NaN; (iii) NuHamil at 6/12/12 (N3max 12) takes 30 min for the Jacobi part and over 2 hours for its lab transform on this machine (started 18:37; it took 14 min per 2J step from 2J = 7 to 9), so the
-element-wise comparison of that file is still running. The README table of NuHamil is for another 3N force (`N3LOEMlnl`) and cannot be matched.
+element-wise comparison of that file is now done (below). The README table of NuHamil is for another 3N force (`N3LOEMlnl`) and cannot be matched.
 
 What can be done instead: imsrg++ on a prefix of the production file (its N3max is 24-40). A model space of emax 4 needs the first 13.1 million values (about 70 MB of gzip), emax 6 the first 693 million
 (about 3.4 GB), emax 8 the first 3.4e9 (about 17 GB).
@@ -145,3 +145,17 @@ the file order (counted from `nuham.nnn.me3j`), so the prefix property and the e
 EMP2 -22.878 MeV. IMSRG(2) (Magnus, imaginary-time generator, short flow): **E = -119.824798 MeV** in 119 s and 138 MB; it was -119.8247965 at s = 0.7, so the short flow is converged to 1e-6.
 For scale: the README of NuHamil gives -115.540 MeV for 16O at emax 4, hw 16, e3max 16, lambda 2.0 with the `N3LOEMlnl` 3N force, a different force (local plus non-local regulator), so this is context and not a reference.
 This is the first 16O result with the 3N force of the production file; nothing independent confirms it yet (see the 6/12/12 comparison in PLAN.md 5.5).
+
+
+**Our 6/12/12 file against NuHamil's, element by element (2026-10-06).** NuHamil (3NF400, hw 16, lambda 2.0, emax 6, e2max 12, e3max 12, N3max 12, jmax3 27, flat ramp; Jacobi part 30 min, lab transform about
+1 h 45 min, 8154 s in all on this CPU with 16 threads, up to 7 GB) wrote 144 345 500 values, as does `nuham` (8 min with 2 workers). All values agree: **maximum difference 5.65e-6, no value off by more than 1e-5**
+(largest value 13.8). This covers N up to 12, all 56 channels (2J up to 27, both T and parities) and the writer's value order. Together with the 6/12/6 file (456 320 values, 4.1e-6) and the 4/8/4 file
+(24 890 values, 1.2e-6) it is the independent correctness check of the code against NuHamil; the production file's own settings (Jacobi flow space N3max 24-40 by J, N from 13 to 16, e3max 16) have no NuHamil
+reference at that size. The imsrg++ numbers in the table above for "ours 6/12/12" (e3hf +494) therefore are what NuHamil's own file gives too: a small N3max, not a bug.
+
+**16O at emax 6 on the production file (smax 2, flow not settled).** The reader took 693 209 575 values (2.58 GB), again exactly the number that precedes the first bra with a leading orbit above e = 6.
+HF converged in 30 iterations: e1hf 294.702, e2hf -419.590, e3hf +30.087, EHF -94.802 MeV (emax 4: -94.093). The IMSRG(2) flow does not settle at emax 6 with imsrg++'s default step control: E alternates between two
+values on consecutive steps (-126.34 and -126.24 at s = 2 for model e3max 16; -126.35 and -126.32 for e3max 12), ||Eta_2|| stays at about 11-13, and the last step, which lands on s = smax, gives another value
+(-126.480 and -126.569), so no energy is quoted. The same happens with NN only (-160.05 and -159.88, ||Eta_2|| about 11-15, final -159.996), so it is a property of the flow at this size and not of the 3N file.
+Model e3max 12 against 16 differs by 0.06-0.08 MeV along the flow and by 1.7e-4 MeV in EHF. The 3N shift at fixed s is similar at both emax: +30.9 MeV at emax 4 (-150.756 to -119.825) and about +33.7 MeV at emax 6.
+Memory: imsrg++ 5.6 GB for e3max 16 and 3.4 GB for e3max 12 at emax 6; 811 s and 545 s on this CPU for 240 steps.
