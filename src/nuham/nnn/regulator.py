@@ -7,9 +7,8 @@ sources and the convention.
 
 from collections import defaultdict
 
-import jax
-import jax.numpy as jnp
 import numpy as np
+import scipy.sparse as sp
 
 from nuham.constants import M_REDUCED_PN, oscillator_length_sq
 from nuham.kernels.nnn.regulator import regulator_table
@@ -27,12 +26,14 @@ def regulator_matrix(
     power: int,
     n_points: int = N_POINTS,
     p_max: float | None = None,
-) -> jax.Array:
-    """Return the regulator ``R`` on the NAS states ``nas`` as a dense device array.
+) -> sp.csr_array:
+    """Return the regulator ``R`` on the NAS states ``nas`` as a sparse host matrix.
 
     Rows of ``nas`` are ``n12 l12 s12 j12 t12 n3 l3 j3`` (``nnn.jacobi.NAS_FIELDS``). ``R`` is
-    nonzero only between states of equal ``l12, s12, j12, t12, l3, j3`` and does not depend on
-    ``s12, j12, t12, j3`` otherwise. ``p_max`` defaults to NuHamil's ``150 / sqrt(hw)``.
+    nonzero only between states of equal ``l12, s12, j12, t12, l3, j3``, so it is block diagonal
+    after a permutation and sparse; :func:`nuham.nnn.local_force.assembly.antisymmetrize` takes
+    it as it is (a dense ``R`` and one device scatter per block cost ``blocks * n_nas^2``).
+    ``p_max`` defaults to NuHamil's ``150 / sqrt(hw)``.
 
     Parameters
     ----------
@@ -49,14 +50,18 @@ def regulator_matrix(
     groups: dict[tuple[int, ...], list[int]] = defaultdict(list)
     for i, (_, l12, s12, j12, t12, _, l3, j3) in enumerate(nas):
         groups[l12, l3, s12, j12, t12, j3].append(i)
-    tables: dict[tuple[int, int], jax.Array] = {}
-    out = jnp.zeros((len(nas), len(nas)))
-    for (l12, l3, *_), rows in groups.items():
+    tables: dict[tuple[int, int], np.ndarray] = {}
+    rows, cols, vals = [], [], []
+    for (l12, l3, *_), members in groups.items():
         if (l12, l3) not in tables:
-            tables[l12, l3] = regulator_table(l12, l3, n_max, b, cutoff, power, p, w)
-        n12 = jnp.asarray(nas[rows, 0])
-        n3 = jnp.asarray(nas[rows, 5])
+            tables[l12, l3] = np.asarray(regulator_table(l12, l3, n_max, b, cutoff, power, p, w))
+        ix = np.array(members)
+        n12, n3 = nas[ix, 0], nas[ix, 5]
         block = tables[l12, l3][n12[:, None], n12[None, :], n3[:, None], n3[None, :]]
-        ix = jnp.asarray(rows)
-        out = out.at[ix[:, None], ix[None, :]].set(block)
-    return out
+        rows.append(np.broadcast_to(ix[:, None], block.shape).ravel())
+        cols.append(np.broadcast_to(ix[None, :], block.shape).ravel())
+        vals.append(block.ravel())
+    shape = (len(nas), len(nas))
+    return sp.coo_array(
+        (np.concatenate(vals), (np.concatenate(rows), np.concatenate(cols))), shape
+    ).tocsr()

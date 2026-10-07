@@ -23,9 +23,10 @@ from nuham.nn.input_file import MomentumNN, read_nn_mom
 from nuham.nnn.hamiltonian import JMAX_NN, N2MAX_FLOW, isospin_nn
 from nuham.nnn.jacobi import JacobiChannel, basis_digest, load_or_build_channel, ramp_nmax
 from nuham.nnn.lab_transform import contract_blocks
-from nuham.nnn.local_force.assembly import local_3nf_matrix
+from nuham.nnn.local_force.assembly import antisymmetrize, local_3nf_matrix
 from nuham.nnn.local_force.radial import RadialTables, nuhamil_meshes, radial_tables
 from nuham.nnn.me3j import LabMatrix3, me3j_values, write_me3j, write_me3j_fields
+from nuham.nnn.regulator import regulator_matrix
 from nuham.nnn.srg3 import three_body_operator
 from nuham.nnn.tcoef import LabBlock, lab_t_blocks, make_brackets, warm_brackets
 from nuham.runtime import (
@@ -40,9 +41,12 @@ from nuham.timing import StageTimer, stage
 
 @dataclass(frozen=True)
 class LocalForce:
-    """Parameters of the local N2LO 3N force (NuHamil's ``Regulator="Local"``).
+    """Parameters of the local N2LO 3N force (NuHamil's ``Regulator="Local"`` or ``"LNL"``).
 
-    The defaults are the 3NF400 set used for the NuHamil reference run.
+    The defaults are the 3NF400 set used for the NuHamil reference run. A ``nonlocal_cutoff``
+    makes it NuHamil's ``LNL`` force: ``cutoff`` is then the local cutoff and the non-local
+    Gaussian regulator of ``docs/spec-5b2-lnl-regulator.md`` (same ``power``) multiplies the
+    antisymmetrised force on both sides before the flow.
     """
 
     lecs: dict[str, float] = field(
@@ -55,6 +59,31 @@ class LocalForce:
     induced force of the NN interaction is kept, as for NuHamil's ``J3max_initial_3nf``
     (``None``: all channels, NuHamil's default). The angular coefficients of the high-``J``
     channels are most of the cost of a production run."""
+    nonlocal_cutoff: float | None = field(default=None, repr=False)
+    """Cutoff (MeV) of the non-local regulator, ``None`` for the purely local force. Left out of
+    ``repr`` so that the cache keys of local runs stay as they were; :func:`_force_key` adds it."""
+
+
+PRESETS: dict[str, LocalForce] = {
+    "3NF400": LocalForce(),
+    "3NF500": LocalForce(
+        {"c1": -0.81, "c3": -3.2, "c4": 5.4, "cD": 0.83, "cE": -0.052}, cutoff=500.0
+    ),
+    "N3LOEMlnl": LocalForce(
+        {"c1": -0.81, "c3": -3.2, "c4": 5.4, "cD": 0.7, "cE": -0.06},
+        cutoff=650.0,
+        nonlocal_cutoff=500.0,
+    ),
+}
+"""NuHamil's named forces for the EM500 NN interaction (``NuHamil_3BME.py``): 3NF400, 3NF500
+(``3NF500-BetaDecay-Local``) and the local plus non-local ``N3LOEMlnl``."""
+
+
+def _force_key(force: LocalForce | None) -> object:
+    """Cache-key part of ``force``: its ``repr``, plus the non-local cutoff when there is one."""
+    if force is None or force.nonlocal_cutoff is None:
+        return force
+    return (force, force.nonlocal_cutoff)
 
 
 CACHE_VERSION = 2
@@ -178,7 +207,9 @@ def jacobi_operators(
     tables: dict[int, RadialTables] = {}
     ops, chans = {}, {}
     tag = hashlib.sha1(
-        repr((CACHE_VERSION, _nn_digest(nn), hw, lam, e3max, rtol, force, n2max, jmax_nn)).encode()
+        repr(
+            (CACHE_VERSION, _nn_digest(nn), hw, lam, e3max, rtol, _force_key(force), n2max, jmax_nn)
+        ).encode()
     ).hexdigest()[:16]
     for t2 in (1, 3):
         for j2 in range(1, (2 * e3max + 3 if jmax3 is None else jmax3) + 1, 2):
@@ -215,6 +246,13 @@ def jacobi_operators(
                         v3n = local_3nf_matrix(
                             channel, hw, meshes, tables[nmax], force.lecs, workers=workers, timer=ct
                         )
+                    if force.nonlocal_cutoff is not None:
+                        with ct.stage("regulator"):
+                            nas = np.concatenate([b.nas for b in channel.blocks])
+                            r = regulator_matrix(nas, hw, force.nonlocal_cutoff, force.power)
+                            fa = antisymmetrize(r, channel)
+                            v3n = fa @ v3n @ fa
+                            v3n.block_until_ready()
                 v3 = three_body_operator(
                     channel, hw, lam, bare, evolved, v3n, e3max, rtol=rtol, atol=rtol, timer=ct
                 )
@@ -438,8 +476,23 @@ def run_config(args: argparse.Namespace, workers: int, writer: WriterOptions) ->
         "hw": args.hw, "lam": args.lam, "genuine_3nf": not args.no_3nf,
         "lab_dtype": args.lab_dtype, "rtol": args.rtol, "stop_after": args.stop_after,
         "jacobi_cache": args.jacobi_cache, "stage_log": args.stage_log, "js": args.js,
-        "j3max_3nf": args.j3max_3nf,
+        "j3max_3nf": args.j3max_3nf, "force": None if args.no_3nf else repr(force_from_args(args)),
+        "cutoff_nl": None if args.no_3nf else force_from_args(args).nonlocal_cutoff,
     }  # fmt: skip
+
+
+def force_from_args(args: argparse.Namespace) -> LocalForce:
+    """Return the preset ``args.preset`` with every option given on the command line applied."""
+    base = PRESETS[args.preset]
+    given = {k: getattr(args, k) for k in base.lecs}
+    lecs = {k: base.lecs[k] if v is None else v for k, v in given.items()}
+    return LocalForce(
+        lecs,
+        base.cutoff if args.cutoff is None else args.cutoff,
+        base.power if args.power is None else args.power,
+        args.j3max_3nf,
+        base.nonlocal_cutoff if args.cutoff_nl is None else args.cutoff_nl,
+    )
 
 
 def main() -> None:
@@ -461,8 +514,22 @@ def main() -> None:
         "--jmax3", type=int, default=None, help="largest doubled J (default 2 e3max + 3)"
     )
     p.add_argument("--no-3nf", action="store_true", help="induced 3N force of the NN force only")
-    p.add_argument("--cutoff", type=float, default=400.0, help="local 3NF regulator cutoff (MeV)")
-    p.add_argument("--power", type=int, default=2, help="local regulator power")
+    p.add_argument(
+        "--preset",
+        choices=sorted(PRESETS),
+        default="3NF400",
+        help="named force of NuHamil_3BME.py (default 3NF400); the options below override it",
+    )
+    p.add_argument("--cutoff", type=float, default=None, help="local 3NF regulator cutoff (MeV)")
+    p.add_argument(
+        "--cutoff-nl",
+        type=float,
+        default=None,
+        help="cutoff (MeV) of the non-local regulator (LNL force); the local force alone if unset",
+    )
+    p.add_argument(
+        "--power", type=int, default=None, help="regulator power, local and non-local (default 2)"
+    )
     p.add_argument(
         "--j3max-3nf",
         type=int,
@@ -473,8 +540,8 @@ def main() -> None:
     p.add_argument(
         "--js", default=None, help="comma-separated doubled J: only these Jacobi channels (timing)"
     )
-    for name, default in (("c1", -0.81), ("c3", -3.2), ("c4", 5.4), ("cD", -0.2), ("cE", 0.098)):
-        p.add_argument(f"--{name}", type=float, default=default)
+    for name in ("c1", "c3", "c4", "cD", "cE"):
+        p.add_argument(f"--{name}", type=float, default=None)
     p.add_argument("--rtol", type=float, default=1e-8, help="flow tolerance (rtol = atol / hw)")
     p.add_argument("--lab-dtype", choices=("float32", "float64"), default="float32")
     p.add_argument(
@@ -507,8 +574,7 @@ def main() -> None:
         enable_compilation_cache(args.compile_cache)
     force = None
     if not args.no_3nf:
-        lecs = {k: getattr(args, k) for k in ("c1", "c3", "c4", "cD", "cE")}
-        force = LocalForce(lecs, args.cutoff, args.power, args.j3max_3nf)
+        force = force_from_args(args)
     timer = StageTimer()
     profiler = cProfile.Profile() if args.cprofile else None
     if profiler is not None:

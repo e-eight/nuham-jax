@@ -81,7 +81,7 @@ def test_commutes_with_the_antisymmetriser(
     """
     channel = build_channel(j2, parity, t2, 8, table)
     nas = np.concatenate([b.nas for b in channel.blocks])
-    r = np.asarray(regulator_matrix(nas, HW, 500.0, 2))
+    r = regulator_matrix(nas, HW, 500.0, 2).toarray()
     cfp = np.zeros((channel.n_as, channel.n_nas))
     i = k = 0
     for b in channel.blocks:
