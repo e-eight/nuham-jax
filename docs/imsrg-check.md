@@ -207,3 +207,16 @@ write 3.3 / 4.0 s. The files are on DeltaAI in `/projects/bhhk/soham/nuham/out/g
 
 **The GPU file against NuHamil's, fetched and compared here (2026-10-07):** 144 345 500 values, **maximum difference 5.650e-6** (at value 3: 13.82467937 against NuHamil's 13.82468502, the same maximum and the same value
 as for the local x86 CPU file), none above 1e-5. The GPU file against the local x86 CPU file: maximum difference 1.2e-7 (at value 2 356 618), none above 1e-5. So the GPU path agrees with NuHamil as well as the CPU path does, for this case (N3max 12). The case has N3max 12; the production ramp (N3max 24-40) is covered only by gap B.
+
+## Gaps F, G and H: further comparisons with NuHamil (2026-10-07)
+
+All are 4/8/4 files (3NF400 unless noted, N3LO_EM500, `--jmax3 11`), ours made on the local CPU, NuHamil's in the podman image, compared with `scripts/compare_me3j.py`. Each has 24 890 values and none differs by more than 1e-5.
+
+| Gap | Case | Max difference |
+|---|---|---|
+| F | `ramp8-5-6-9-4`, hw 16, lambda 2.0 | 1.23e-6 |
+| G | `flat8`, hw 20, lambda 2.0 | 3.34e-6 |
+| G | `flat8`, hw 16, lambda 1.8 | 2.03e-6 |
+| H | `flat6`, hw 16, lambda 2.0, 3NF500 (cD 0.83, cE -0.052), the `n500_N6` reference | 1.55e-6 |
+
+F: NuHamil's `GetRampNmax` (`ThreeBodyJacobiSpaceIso.F90`) switches to the next N when doubled J is greater than the threshold, as `ramp_nmax` does. The ramp changes the result: NuHamil's `flat8` file and its ramp file differ by up to 0.60 (8148 values above 1e-5), so the agreement tests the boundaries. The NuHamil inputs and `run_fg.sh` are in `refs/work/nnn3f/{f_ramp,g_hw20,g_lam18}`; the me3j files are not tracked.
