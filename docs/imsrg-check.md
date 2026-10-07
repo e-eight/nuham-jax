@@ -159,3 +159,39 @@ values on consecutive steps (-126.34 and -126.24 at s = 2 for model e3max 16; -1
 (-126.480 and -126.569), so no energy is quoted. The same happens with NN only (-160.05 and -159.88, ||Eta_2|| about 11-15, final -159.996), so it is a property of the flow at this size and not of the 3N file.
 Model e3max 12 against 16 differs by 0.06-0.08 MeV along the flow and by 1.7e-4 MeV in EHF. The 3N shift at fixed s is similar at both emax: +30.9 MeV at emax 4 (-150.756 to -119.825) and about +33.7 MeV at emax 6.
 Memory: imsrg++ 5.6 GB for e3max 16 and 3.4 GB for e3max 12 at emax 6; 811 s and 545 s on this CPU for 240 steps.
+
+
+## Why the 16O flow stalled at emax 6, and the settings that work (2026-10-07)
+
+**Cause.** imsrg++'s imaginary-time generator is `eta = H_od * sign(denominator)` (`Generator.cc`), a discontinuous function: a matrix element whose denominator is near zero flips sign from step to step. The step size is
+`ds = domega / ||eta||` (`domega` 0.1 by default), so a generator that does not decay (||Eta_2|| of 11-35 here) gives tiny steps (0.0075), the flow alternates between two energies on consecutive steps, and the energy
+depends on the step size. It is independent of our file: NN only behaves the same. The HF reference is fine (holes at -48.3, -22.7, -12.2 MeV, the lowest particle orbit 0d5/2 well above them).
+
+16O, emax 6, e2max 12, NN only (our me2j), smax 1 unless noted; E near the end of the flow in MeV, ||Eta_2|| at the end, and whether the flow settled:
+
+| setting | E | ||Eta_2|| | settled |
+|---|---|---|---|
+| imaginary-time, default (`domega=0.1`, smax 2) | about -160.05 and -159.88 alternating, last step -159.996 | 11 | no |
+| `domega=0.5` | -158.24 and -158.66 alternating | 34 | no |
+| `domega=0.02` | -160.26 (chatter 6 keV, drift 11 keV over s) | 2-3 | yes |
+| `omega_norm_max=1.0` | -160.13 and -159.92 alternating | 10-15 | no |
+| `core_generator=white`, smax 1 | -156.69, still falling | 0.5 | smooth, too short |
+| `core_generator=white`, smax 30 | **-160.352995** | 8e-4 | yes (70 steps, 86 s) |
+
+**Recommendation:** use the `white` generator with `smax` 30 (`GEN=white`, smax 30 in `refs/imsrg/run_he4.sh`), or the imaginary-time generator with `domega` 0.02 or smaller; never imaginary-time with the default `domega` at emax 6 and above.
+With `white` the flow is smooth, takes 70 steps (the `white` flow can take steps up to `dsmax` 0.5) and is converged to 1e-5 MeV.
+
+**16O, hw 16, SRG lambda 2.0, 3NF400 (production file read as a prefix), E(IMSRG(2)) in MeV:**
+
+| | emax 4 (model e3max 12) | emax 6 (model e3max 16) |
+|---|---|---|
+| `white`, smax 30, NN only | -150.796767 | -160.352995 |
+| `white`, smax 30, NN + 3N | **-119.946195** | **-126.741247** |
+| 3N shift | +30.85 | +33.61 |
+| imaginary-time (emax 4: default, converged; emax 6: `domega=0.02`, smax 2), NN + 3N | -119.824798 | -126.533 (chatter 3 keV, ||Eta_2|| 2) |
+| HF energy (EHF) | -94.093 | -94.802 |
+
+The generators differ by 0.04 (NN only) and 0.12 MeV (3N) at emax 4, and by 0.09 and 0.21 MeV at emax 6, where the imaginary-time flow is the less converged one; the generator dependence of IMSRG(2) is normally of this size, so quote
+the generator with the number. Going from emax 4 to 6 lowers the energy by 6.80 MeV (`white`) or 6.71 MeV (imaginary-time). NuHamil's README (another 3N force, `N3LOEMlnl`, e3max 16) has -115.540 and -123.445 MeV
+at emax 4 and 6, a step of 7.9 MeV: the same order, no more can be said. imsrg++ used 5.6 GB at emax 6 (e3max 16); 940 s for the imaginary-time flow of 314 steps and 565 s for `white` (including about 4 minutes of reading the 693 million values).
+Logs of these runs are in the session scratch only; the commands are `refs/imsrg/run_he4.sh` with `NUC=O16 A=16`, `BME3`, `BME3_INPLACE=1`, `F3EMAX=14 F3E3MAX=16 E3MAX=<model>`, `EXTRA="file3e2max=28"`.
