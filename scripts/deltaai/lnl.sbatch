@@ -17,10 +17,12 @@
 # (about 22 min) and the lab side is far smaller at emax 6; the Jacobi bases come from the cache, the V3 cache starts empty for LNL.
 # The V3 cache resumes a run that stops: submit the same script again.
 source /projects/bhhk/soham/nuham/repo/scripts/deltaai/common.sh
-OUT=$ROOT/out/N3LO_N3LOEMlnl_hw16_e6_e2_16_e3_16.me3j.gz
-STAGES=$ROOT/bench3n/lnl_stages_$SLURM_JOB_ID.jsonl
+# EMAX (default 6) is the emax of the file: `sbatch --export=ALL,EMAX=8 lnl.sbatch` makes the emax 8 file (the emax 6 and 4 models read prefixes of it).
+EMAX=${EMAX:-6}
+OUT=$ROOT/out/N3LO_N3LOEMlnl_hw16_e${EMAX}_e2_16_e3_16.me3j.gz
+STAGES=$ROOT/bench3n/lnl_e${EMAX}_stages_$SLURM_JOB_ID.jsonl
 echo "=== LNL run, output $OUT"
-run_checked $ROOT/out/lnl_$SLURM_JOB_ID.log $PY -m nuham.nnn.generate $NN $OUT --preset N3LOEMlnl --hw 16 --lam 2.0 --emax 6 --e2max 16 \
+run_checked $ROOT/out/lnl_$SLURM_JOB_ID.log $PY -m nuham.nnn.generate $NN $OUT --preset N3LOEMlnl --hw 16 --lam 2.0 --emax $EMAX --e2max 16 \
   --e3max 16 --ramp ramp40-5-36-7-32-9-28-11-24 --jacobi-cache $ROOT/cache/jacobi --stage-log $STAGES
 echo "=== checks"
 ls -la $OUT
