@@ -127,8 +127,8 @@ With NN only 16O behaves (the flow settles at E = -150.7559425 MeV by s = 2 and 
 e3hf that grows with e3max, in NuHamil's own files too, so it is not a property of ours. The induced-only file (no genuine local force) fails the same way and the genuine force adds only +6.6 MeV to e3hf at 4/8/4, so the locality of the 3NF400 force is not what breaks HF. Likely cause (not confirmed): a model space of emax 4 needs the 3N force up to e3max = 12, and a Jacobi flow space
 N3max as small as e3max (4 to 12 here; production uses 24-40) leaves the induced 3N force unconverged and large. What the runs do show: (i) our 6/12/6 file equals NuHamil's over all 456 320 values, maximum
 difference 4.1e-6, nothing above 1e-5, largest value 24.6 (this is the N > 4 check that 5.1b had asked for, up to N = 6); (ii) the values of our 6/12/12 file (144 345 500, 719 MB) are all below 14 in magnitude
-with no NaN; (iii) NuHamil at 6/12/12 (N3max 12) takes 30 min for the Jacobi part and over 2 hours for its lab transform on this machine (started 18:37; it took 14 min per 2J step from 2J = 7 to 9), so the
-element-wise comparison of that file is now done (below). The README table of NuHamil is for another 3N force (`N3LOEMlnl`) and cannot be matched.
+with no NaN; (iii) NuHamil at 6/12/12 (N3max 12) took 2 h 08 min for its 3N step on this machine (about 30 min of Jacobi part and 1 h 38 min of lab transform and write, with the machine shared with other runs
+and the process paused for a few minutes), so the element-wise comparison of that file is now done (below). The README table of NuHamil is for another 3N force (`N3LOEMlnl`) and cannot be matched.
 
 What can be done instead: imsrg++ on a prefix of the production file (its N3max is 24-40). A model space of emax 4 needs the first 13.1 million values (about 70 MB of gzip), emax 6 the first 693 million
 (about 3.4 GB), emax 8 the first 3.4e9 (about 17 GB).
@@ -147,9 +147,9 @@ For scale: the README of NuHamil gives -115.540 MeV for 16O at emax 4, hw 16, e3
 This is the first 16O result with the 3N force of the production file; nothing independent confirms it yet (see the 6/12/12 comparison in PLAN.md 5.5).
 
 
-**Our 6/12/12 file against NuHamil's, element by element (2026-10-06).** NuHamil (3NF400, hw 16, lambda 2.0, emax 6, e2max 12, e3max 12, N3max 12, jmax3 27, flat ramp; Jacobi part 30 min, lab transform about
-1 h 45 min, 8154 s in all on this CPU with 16 threads, up to 7 GB) wrote 144 345 500 values, as does `nuham` (8 min with 2 workers). All values agree: **maximum difference 5.65e-6, no value off by more than 1e-5**
-(largest value 13.8). This covers N up to 12, all 56 channels (2J up to 27, both T and parities) and the writer's value order. Together with the 6/12/6 file (456 320 values, 4.1e-6) and the 4/8/4 file
+**Our 6/12/12 file against NuHamil's, element by element (2026-10-06).** NuHamil (3NF400, hw 16, lambda 2.0, emax 6, e2max 12, e3max 12, N3max 12, jmax3 27, flat ramp; the 3N step took 7677 s = 2 h 08 min, 17:59 to 20:15 for NN plus 3N, with 16 threads and up to 7 GB, on a shared machine and with a pause, so not a clean timing; its NN step took 477 s) wrote 144 345 500 values, as does `nuham` (8 min with 2 workers). All values agree: **maximum difference 5.65e-6, no value off by more than 1e-5**
+(largest value 13.8). This covers N up to 12, all 56 channels (2J up to 27, both T and parities) and the writer's value order. **Which file of ours:** the one generated locally on this CPU (`nuham.nnn.generate --emax 6 --e2max 12 --e3max 12 --ramp flat12`, 2 workers, 8 min), not the production file from DeltaAI, which has N3max 24-40 and e3max 16 and
+was made on the GH200; the production run's backend is therefore not covered by this comparison. Together with the 6/12/6 file (456 320 values, 4.1e-6) and the 4/8/4 file
 (24 890 values, 1.2e-6) it is the independent correctness check of the code against NuHamil; the production file's own settings (Jacobi flow space N3max 24-40 by J, N from 13 to 16, e3max 16) have no NuHamil
 reference at that size. The imsrg++ numbers in the table above for "ours 6/12/12" (e3hf +494) therefore are what NuHamil's own file gives too: a small N3max, not a bug.
 
