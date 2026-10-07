@@ -108,3 +108,26 @@ keeps the induced 3N force large (spec 5c, section 3.4); the run only checks tha
 **`file3e2max` must be given.** With the default (-1) this imsrg++ build stores zero 3N values ("Stored 0 floating point numbers", no error, `e3hf = 0`), for NuHamil's file as well as ours;
 the run then gives the NN-only energies. Spec 5d section 7.3 said the default is fine: it is not. Run with `BME3=FILE E3MAX=4 EXTRA="file3e2max=8" refs/imsrg/run_he4.sh FILE2 4 8 500`
 (`GREP=` overrides the output filter; check that "Stored N floating point numbers" equals the file's value count).
+
+
+## 16O with 3N at small size (2026-10-06): not a usable comparison, and why
+
+Step 1 of 5.5 was imsrg++ on 16O (emax 4, hw 16, EM500 SRG 2.0, 3NF400) with NuHamil's 4/8/4 files against ours. It cannot be done at this size. Run with the helper `refs/imsrg/run_he4.sh` (now `NUC=O16 A=16`; the
+full imsrg++ output goes to `$WORK/imsrg/run/last_run.log`, one flow-table line per step), model space emax 4, e2max 8, short flow (smax 3):
+
+| 3N file (model e3max) | NN file | HF | e1hf | e2hf | e3hf | EHF (MeV) |
+|---|---|---|---|---|---|---|
+| none (NN only, NuHamil) | NuHamil emax 4 | converged, 31 iterations | 350.0 | -480.6 | - | -130.6 |
+| NuHamil 4/8/4, N3max 8 (4) | NuHamil emax 4 | not converged after 800 iterations | 263.8 | -118.8 | +10.0 | +155.0 |
+| NuHamil 6/12/6, N3max 6 (6, read as a prefix of emax 6) | NuHamil emax 6 | not converged after 800 iterations | 336.9 | -97.9 | +53.6 | +292.5 |
+| ours 6/12/12, N3max 12 (12, prefix of emax 6) | ours emax 6 | converged, 45 iterations | 200.0 | -149.3 | +493.6 | +544.3 |
+
+With NN only 16O behaves (the flow settles at E = -150.7559425 MeV by s = 2 and only drifts at 1e-9 to 1e-6 after that; with smax 500 it would run for hours). With any of these 3N files HF fails or gives a huge
+e3hf that grows with e3max, in NuHamil's own files too, so it is not a property of ours. Likely cause (not confirmed): a model space of emax 4 needs the 3N force up to e3max = 12, and a Jacobi flow space
+N3max as small as e3max (4 to 12 here; production uses 24-40) leaves the induced 3N force unconverged and large. What the runs do show: (i) our 6/12/6 file equals NuHamil's over all 456 320 values, maximum
+difference 4.1e-6, nothing above 1e-5, largest value 24.6 (this is the N > 4 check that 5.1b had asked for, up to N = 6); (ii) the values of our 6/12/12 file (144 345 500, 719 MB) are all below 14 in magnitude
+with no NaN; (iii) NuHamil at 6/12/12 (N3max 12) takes 30 min for the Jacobi part and over 2 hours for its lab transform on this machine (started 18:37; it took 14 min per 2J step from 2J = 7 to 9), so the
+element-wise comparison of that file is still running. The README table of NuHamil is for another 3N force (`N3LOEMlnl`) and cannot be matched.
+
+What can be done instead: imsrg++ on a prefix of the production file (its N3max is 24-40). A model space of emax 4 needs the first 13.1 million values (about 70 MB of gzip), emax 6 the first 693 million
+(about 3.4 GB), emax 8 the first 3.4e9 (about 17 GB).
