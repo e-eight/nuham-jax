@@ -231,3 +231,27 @@ F: NuHamil's `GetRampNmax` (`ThreeBodyJacobiSpaceIso.F90`) switches to the next 
 | 6/12/6, `flat6`, jmax3 15 | 456 320 | 4.13e-6 | 0 |
 
 The regulator changes the force (unit test: the Jacobi operators differ by more than 1e-2 from the local force), so the agreement tests it. The mesh study (`refs/regulator_mesh_study.py`, spec 5b2) shows NuHamil's 500-point mesh is converged to 5e-13 up to N = 40, so the agreement at N <= 8 carries over to the mesh at the production N. What is not tested against NuHamil is N3max above 8 (as for gap B).
+
+## Gap D4: imsrg++ with the LNL force against NuHamil's README table (2026-10-07)
+
+Files: `N3LO_N3LOEMlnl_hw16_e6_e2_16_e3_16.me3j.gz` (DeltaAI job 3330416, 11 min 19 s on the GH200, 693 209 575 values, 3 336 434 168 bytes, `gzip -t` ok; the same count as the production file's prefix for emax 6, as it must be) and the emax 8 file (job 3330462, 8 min 38 s with the Jacobi cache of the first job, 3 424 228 845 values, 16.9 GB). Both: `N3LOEMlnl` (EM500, c1, c3, c4, cD, cE = -0.81, -3.2, 5.4, 0.7, -0.06, Lambda_local 650, Lambda_nonlocal 500, n = 2), hw 16, lambda 2.0, ramp 40-5-36-7-32-9-28-11-24, e3max 16; `--e2max 16` because the generator requires e3max <= e2max (the file is the same as with e2max 12: emax 2 test, byte-identical). The emax 4 and 6 models read prefixes of these files. NN: our me2j at the model's emax (hw 16, lambda 2.0, Coulomb on). imsrg++ at `2acba947`: x86 in podman (local) and aarch64 in Apptainer on DeltaAI (`scripts/deltaai/imsrg.def`, `imsrg_build.sbatch`, `imsrg_run.sbatch`; the build takes 81 s; it needs `--cleanenv` because the host sets CXX=CC, and the build directory must be named `build`).
+
+**4He** (smax 500, imaginary-time; `file3e2max=16`, model e3max 12 at emax 4 and 16 at emax 6), core energy in MeV:
+
+| emax | ours, local x86 | ours, DeltaAI aarch64 | NuHamil README | ours minus README |
+|---|---|---|---|---|
+| 4 | -27.224725 (95 s) | -27.224725 (11 s) | -27.221 | -3.7 keV |
+| 6 | -28.218471 (821 s, 5.6 GB) | -28.218471 (771 s) | -28.221 | +2.5 keV |
+
+e3hf is -0.0202 MeV (emax 4) and -0.0088 MeV (emax 6): the 3N file is read and enters. The x86 and aarch64 builds agree in all printed digits (e1hf, e2hf, EHF, core energy).
+
+**16O** (model e3max 12 at emax 4, 16 at emax 6):
+
+| emax | generator, smax | core energy (MeV) | README | difference |
+|---|---|---|---|---|
+| 4 | white, 30 | -115.282590 (50 s; DeltaAI aarch64: identical, 8 s) | -115.540 | +0.257 |
+| 4 | white, 100 | -115.282592 | | +0.257 |
+| 4 | imaginary-time, 100 and 500 | -115.101066 | | +0.439 |
+| 6 | white, 30 | -123.089793 (548 s, 5.6 GB) | -123.445 | +0.355 |
+
+The emax 4 to 6 step is 7.807 MeV (white; the README 7.905). White is converged in smax (30 against 100: 2e-6); the generator changes 16O at emax 4 by 0.18 MeV, neither reaches the README's value, which has no recorded imsrg++ settings (generator, step control, normal-ordering options; nothing in NuHamil's repository states them). 4He, which is much more sensitive to the 3N force, agrees to 4 keV, so the difference in 16O is attributed to the IMSRG(2) settings and not to the file. This is plausibility agreement, not a bit-level reference.
