@@ -12,13 +12,13 @@
 #SBATCH --output=/projects/bhhk/soham/nuham/imsrg_build_%j.log
 # Compile imsrg++ for aarch64 inside the Apptainer image built from scripts/deltaai/imsrg.def (the compute nodes have no
 # internet: the image and the source checkout are made on the login node first, see docs/deltaai-run.md). The same recipe
-# as refs/imsrg/build.sh: gcc 13 needs -include cstdint, and libIMSRG.so needs -fPIC. About 10 minutes with 32 cores.
+# as refs/imsrg/build.sh (--cleanenv: the host sets CC, CXX and FC to the Cray wrappers, which do not exist in the image): gcc 13 needs -include cstdint, and libIMSRG.so needs -fPIC. About 10 minutes with 32 cores.
 set -euo pipefail
 AP=/projects/bhhk/soham/apptainer
 SRC=/projects/bhhk/soham/imsrg
 echo "host: $(hostname) $(date -Is) imsrg commit: $(git -C $SRC rev-parse --short HEAD)"
 mkdir -p $SRC/build-aarch64
-apptainer exec --bind $SRC:/work $AP/imsrg-dev.sif bash -c \
+apptainer exec --cleanenv --bind $SRC:/work $AP/imsrg-dev.sif bash -c \
   "cd /work/build-aarch64 && cmake -DIMSRG_BUILD_PYTHON_BINDINGS=OFF -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
    -DCMAKE_CXX_FLAGS='-include cstdint' ../src > cmake.log 2>&1 && make -j$SLURM_CPUS_PER_TASK imsrg++ > make.log 2>&1"
 ls -la $SRC/build-aarch64/imsrg++
