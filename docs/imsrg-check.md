@@ -118,12 +118,13 @@ full imsrg++ output goes to `$WORK/imsrg/run/last_run.log`, one flow-table line 
 | 3N file (model e3max) | NN file | HF | e1hf | e2hf | e3hf | EHF (MeV) |
 |---|---|---|---|---|---|---|
 | none (NN only, NuHamil) | NuHamil emax 4 | converged, 31 iterations | 350.0 | -480.6 | - | -130.6 |
+| NuHamil 4/8/4, N3max 8, **induced only** (4) | NuHamil emax 4 | not converged after 800 iterations | 271.5 | -109.3 | +3.4 | +165.6 |
 | NuHamil 4/8/4, N3max 8 (4) | NuHamil emax 4 | not converged after 800 iterations | 263.8 | -118.8 | +10.0 | +155.0 |
 | NuHamil 6/12/6, N3max 6 (6, read as a prefix of emax 6) | NuHamil emax 6 | not converged after 800 iterations | 336.9 | -97.9 | +53.6 | +292.5 |
 | ours 6/12/12, N3max 12 (12, prefix of emax 6) | ours emax 6 | converged, 45 iterations | 200.0 | -149.3 | +493.6 | +544.3 |
 
 With NN only 16O behaves (the flow settles at E = -150.7559425 MeV by s = 2 and only drifts at 1e-9 to 1e-6 after that; with smax 500 it would run for hours). With any of these 3N files HF fails or gives a huge
-e3hf that grows with e3max, in NuHamil's own files too, so it is not a property of ours. Likely cause (not confirmed): a model space of emax 4 needs the 3N force up to e3max = 12, and a Jacobi flow space
+e3hf that grows with e3max, in NuHamil's own files too, so it is not a property of ours. The induced-only file (no genuine local force) fails the same way and the genuine force adds only +6.6 MeV to e3hf at 4/8/4, so the locality of the 3NF400 force is not what breaks HF. Likely cause (not confirmed): a model space of emax 4 needs the 3N force up to e3max = 12, and a Jacobi flow space
 N3max as small as e3max (4 to 12 here; production uses 24-40) leaves the induced 3N force unconverged and large. What the runs do show: (i) our 6/12/6 file equals NuHamil's over all 456 320 values, maximum
 difference 4.1e-6, nothing above 1e-5, largest value 24.6 (this is the N > 4 check that 5.1b had asked for, up to N = 6); (ii) the values of our 6/12/12 file (144 345 500, 719 MB) are all below 14 in magnitude
 with no NaN; (iii) NuHamil at 6/12/12 (N3max 12) takes 30 min for the Jacobi part and over 2 hours for its lab transform on this machine (started 18:37; it took 14 min per 2J step from 2J = 7 to 9), so the
