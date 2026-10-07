@@ -132,3 +132,16 @@ element-wise comparison of that file is still running. The README table of NuHam
 
 What can be done instead: imsrg++ on a prefix of the production file (its N3max is 24-40). A model space of emax 4 needs the first 13.1 million values (about 70 MB of gzip), emax 6 the first 693 million
 (about 3.4 GB), emax 8 the first 3.4e9 (about 17 GB).
+
+
+## 16O on the production file (2026-10-06)
+
+The production file (14/28/16, 3NF400, N3max 24-40, `out/N3LO_3NF400_hw16_e14_e2_28_e3_16.me3j.gz`, 31 532 859 061 bytes, fetched from DeltaAI with the same size) read by imsrg++ in place (`BME3_INPLACE=1`; the
+container mounts its directory read-only) with a small model space. NN: our own me2j (hw 16, SRG 2.0, Coulomb on) at the model's emax. The run script takes the file's limits (`F3EMAX=14`, `F3E3MAX=16`,
+`EXTRA="file3e2max=28"`) apart from the model's (`E3MAX`).
+
+**emax 4, e2max 8, model e3max 12 (the full 3N of the space), smax 3:** imsrg++ read **13 131 655** values and stopped, exactly the number of values that precede the first bra with a leading orbit above e = 4 in
+the file order (counted from `nuham.nnn.me3j`), so the prefix property and the enumeration agree with the reader. HF converged in 29 iterations: e1hf 295.472, e2hf -419.004, e3hf +29.439, EHF -94.093 MeV,
+EMP2 -22.878 MeV. IMSRG(2) (Magnus, imaginary-time generator, short flow): **E = -119.824798 MeV** in 119 s and 138 MB; it was -119.8247965 at s = 0.7, so the short flow is converged to 1e-6.
+For scale: the README of NuHamil gives -115.540 MeV for 16O at emax 4, hw 16, e3max 16, lambda 2.0 with the `N3LOEMlnl` 3N force, a different force (local plus non-local regulator), so this is context and not a reference.
+This is the first 16O result with the 3N force of the production file; nothing independent confirms it yet (see the 6/12/12 comparison in PLAN.md 5.5).
