@@ -11,8 +11,8 @@ Paths: NuHamil `src/...` is `/home/soham/Projects/nuclear-physics/NuHamil-public
 `ThreeBodyLabOpsIso{Half,Single,Double}.F90` wrappers, so line numbers below are valid for all three variants.
 
 Status tags as in spec-3: **[V]** verified numerically (against the reference run or by an independent count),
-**[S]** read from source, **[?]** unsure. Throwaway scripts used for the checks are in the session scratchpad only
-(`count3.py`, `dims3.py`, `nas3.py`), not in the repo.
+**[S]** read from source, **[?]** unsure. Throwaway scripts used for the checks are `refs/count3.py`, `refs/dims3.py` and
+`refs/nas3.py` (run with `EMAX E2MAX E3MAX`; committed 2026-10-07 and rerun: `count3.py 6 12 6 file` gives 456 320 values, `dims3.py 4 8 8` the logged 113 and 79).
 
 Reference run (read-only inputs): `nnn/Input_3n_e4.dat`, `log_3n_e4.txt`, `nnn_3NF400_e4.me3j.gz` in the session scratchpad:
 3NF400 local N2LO, SRG lambda 2.0, hw 16, emax 4, e2max 8, e3max 4, N3max 8, jmax3 11, `ramp=flat8`, double precision.

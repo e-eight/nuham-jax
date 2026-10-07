@@ -361,7 +361,7 @@ j) **Nested Nmax**: AS dimension at Nmax = e3max (4) is the N<=4 count; `C` for 
 
 (a) to (d) and (f) are verified by the scratch scripts in
 `/tmp/claude-1000/-home-soham-Projects-nuclear-physics-nuhamil-alt/b6aad67b-aa74-41b6-a308-3216b5d25052/scratchpad/a5/`
-(`anti.py`, `grid.py`, `tab.py`, `chk.py`, `cmp.py`; not part of the repo).
+(`anti.py`, `grid.py`, `tab.py`, `chk.py`, `cmp.py`; not part of the repo; the antisymmetrizer check of `anti.py` is covered by `tests/test_jacobi3.py` and the file was removed on 2026-10-07).
 
 ---------------------------------------------------------------------------------------------------
 
