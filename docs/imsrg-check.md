@@ -195,3 +195,15 @@ The generators differ by 0.04 (NN only) and 0.12 MeV (3N) at emax 4, and by 0.09
 the generator with the number. Going from emax 4 to 6 lowers the energy by 6.80 MeV (`white`) or 6.71 MeV (imaginary-time). NuHamil's README (another 3N force, `N3LOEMlnl`, e3max 16) has -115.540 and -123.445 MeV
 at emax 4 and 6, a step of 7.9 MeV: the same order, no more can be said. imsrg++ used 5.6 GB at emax 6 (e3max 16); 940 s for the imaginary-time flow of 314 steps and 565 s for `white` (including about 4 minutes of reading the 693 million values).
 Logs of these runs are in the session scratch only; the commands are `refs/imsrg/run_he4.sh` with `NUC=O16 A=16`, `BME3`, `BME3_INPLACE=1`, `F3EMAX=14 F3E3MAX=16 E3MAX=<model>`, `EXTRA="file3e2max=28"`.
+
+
+## Gap A: the GPU path against the CPU path (DeltaAI job 3327601, 2026-10-07)
+
+The 6/12/12 case (3NF400, hw 16, lambda 2.0, emax 6, e2max 12, e3max 12, `flat12`) was made twice on one node (`gh058`, commit `0ccc1a7`, 32 workers, 7 min 10 s in all, max RSS 12 GB): once on the GPU backend and once with
+`JAX_PLATFORMS=cpu` (the aarch64 host). Both exited 0, both wrote 144 345 500 values (738 MB each, `gzip -t` ok). Element by element (`scripts/compare_me3j.py`): **maximum difference 1.0e-8** (one unit of the last printed decimal,
+at value 139 691 025), no value above 1e-5 (and none above 1e-3); the decompressed texts differ (different md5), through the last printed digit of some values, which comes from rounding differences between the
+backends; the number of differing values was not counted. Stage times, GPU / CPU backend: force 49.5 / 64.4 s, embed 10.5 / 7.9 s, flow 23.6 / 29.1 s, lab 24.2 / 27.3 s (the local x86 CPU run with 2 workers took 245 s for the lab stage),
+write 3.3 / 4.0 s. The files are on DeltaAI in `/projects/bhhk/soham/nuham/out/gapA_{gpu,cpu}_e6_e3_12.me3j.gz`.
+
+With the local x86 CPU file equal to NuHamil's to 5.65e-6 (above), this gives a chain NuHamil - x86 CPU - aarch64 CPU - GPU for this case. The GPU file itself has not been compared with NuHamil's directly (NuHamil's file is only on the
+local machine); fetching the GPU file and running `scripts/compare_me3j.py` against `nnn_3NF400_e6_e3_12.me3j.gz` would close that last link. The case has N3max 12; the production ramp (N3max 24-40) is covered only by gap B.
