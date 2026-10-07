@@ -1,0 +1,13 @@
+Bootstrap: docker
+From: ubuntu:24.04
+
+# Build environment of imsrg++ for DeltaAI (aarch64). The same packages as refs/imsrg/Containerfile (the x86
+# podman image used locally); the compile itself is done by scripts/deltaai/imsrg_build.sbatch inside this image.
+%post
+  export DEBIAN_FRONTEND=noninteractive
+  apt-get update
+  apt-get install -y --no-install-recommends \
+    build-essential gcc g++ cmake libomp-dev libopenblas-dev liblapack-dev libgsl-dev \
+    libhdf5-dev zlib1g-dev libboost-all-dev python3 git ca-certificates
+  apt-get clean
+  rm -rf /var/lib/apt/lists/*
