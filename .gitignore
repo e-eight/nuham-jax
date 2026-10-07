@@ -28,3 +28,6 @@ refs/work/nnn3f/n400_N8_bare*/
 refs/work/nnn3f/n400_N6_bare*/cfp/
 refs/work/nnn3f/n400_N16*/
 refs/work/nnn3f/n400_N24*/
+
+# production me3j file fetched from DeltaAI (31.5 GB), never commit
+/out/
