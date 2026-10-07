@@ -198,6 +198,19 @@ i.e. J > 9/2, only the induced force is kept) changes values by up to 0.036 MeV 
 Not measured: the compile counts of a whole run, and the 72-CPU and BLAS-thread variants. Decision (2026-10-06, the user): no checksum or second copy of the file for now (regenerating takes about 15 min of GPU with the caches, 27 without, plus the queue wait). Next: 5.5 (4He and 16O, NN+3N;
 imsrg++ needs about 25-30 GB for emax 14, so a smaller model space or the cluster; a smaller-emax file with the same e2max and e3max is a prefix of the production file, so a prefix suffices for small model spaces).
 
+**Validation coverage and gaps of the production file (2026-10-06).** Checked against NuHamil, all with small files generated on the local CPU (not the production file): 4/8/4 (24 890 values, 1.2e-6), 6/12/6 (456 320 values,
+N <= 6, 4.1e-6) and 6/12/12 (144 345 500 values, N <= 12, all 56 channels, 5.65e-6); imsrg++ on 4He with our 4/8/4 file (5e-6). Checked on the production file itself (made on the GH200): value count, `gzip -t`, exactly
+the expected number of values read by imsrg++ at emax 4 (13 131 655) and emax 6 (693 209 575), HF converges and 16O at emax 4 gives -119.8248 MeV (plausible, no reference). Gaps, decided with the user (2026-10-06):
+we will not close all of them now and will target the cheaper ones first (A and C).
+
+| | Gap | Why it matters | How to close | Cost | Status |
+|---|---|---|---|---|---|
+| A | GH200 path against the CPU path: the NuHamil agreement was only shown on the CPU | the production run used the GPU backend, the no-autotune kernels and device-resident matrices | generate the same 6/12/12 (`flat12`) case on the GH200, compare with the local file and NuHamil's | one short job, estimate about 10 min, under 0.2 GPU-hours (not measured), needs approval | to do (cheap) |
+| B | Production settings have no NuHamil reference: Jacobi flow space N3max 24-40, N from 13 to 16, e3max 16 | exactly what the production file uses | NuHamil cannot run it here (its README: about 2 days with 32 threads, about 200 GB); only self-consistency and convergence checks (for example values from different ramps) | no NuHamil reference possible | not now |
+| C | imsrg++'s IMSRG(2) flow does not settle at emax 6 with default step control (also for NN only) | no 16O energy beyond emax 4 can be quoted | try looser and tighter `ode_tolerance` and `dsmax` at emax 6; or compare HF and MBPT energies | about 10 min per try on the local CPU | to do (cheap) |
+| D | No independent reference for 16O NN+3N: NuHamil's README table is for another 3N force (`N3LOEMlnl`) | no external number to match | plausibility and convergence checks only, unless the LNL regulator is built | LNL is a large task | not now |
+| E | Most of the file has not been read by imsrg++ (only the first 13 and 693 million of 6.4 billion values) | the rest is checked only by the count and the gzip stream | imsrg++ at larger emax on a machine with enough RAM (a cluster; imsrg++ is not built on DeltaAI) | needs an imsrg++ build on a large-memory machine | not now |
+
 Order: 5.1 and 5.1b first and in parallel (5.1b decides the riskiest design question early), then 5.2 and 5.3 (independent of each other, both need 5.1), then 5.4, then 5.5. 5.0's numpy oracle is built incrementally as each step needs
 it, in `refs/` (provenance rule: nothing transcribed from NuHamil in `src/`). Open items from the specs that are closed: the sign phases `(-1)^x` and factor 3 for cD (5.2.1), the lab factor 6 and the T_NAS phases (5.1b), the antisymmetrizer threshold at Nmax 40 (5.1: replaced by an
 idempotence assert), the number of flow steps at 3N size (5.3: 15-16 Dopri8 steps). Still open: the `hw_target` conversion and non-kinetic generators (not analysed).
