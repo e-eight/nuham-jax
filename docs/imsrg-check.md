@@ -220,3 +220,14 @@ All are 4/8/4 files (3NF400 unless noted, N3LO_EM500, `--jmax3 11`), ours made o
 | H | `flat6`, hw 16, lambda 2.0, 3NF500 (cD 0.83, cE -0.052), the `n500_N6` reference | 1.55e-6 |
 
 F: NuHamil's `GetRampNmax` (`ThreeBodyJacobiSpaceIso.F90`) switches to the next N when doubled J is greater than the threshold, as `ramp_nmax` does. The ramp changes the result: NuHamil's `flat8` file and its ramp file differ by up to 0.60 (8148 values above 1e-5), so the agreement tests the boundaries. The NuHamil inputs and `run_fg.sh` are in `refs/work/nnn3f/{f_ramp,g_hw20,g_lam18}`; the me3j files are not tracked.
+
+## Gap D3: the LNL force against NuHamil (2026-10-07)
+
+`N3LOEMlnl` of `NuHamil_3BME.py`: N3LO_EM500, `Regulator="LNL"`, power 2, c1, c3, c4, cD, cE = -0.81, -3.2, 5.4, 0.7, -0.06, `lambda_3nf_local` 650, `lambda_3nf_nonlocal` 500, hw 16, lambda 2.0. Ours with `--preset N3LOEMlnl`, local CPU; compared with `scripts/compare_me3j.py`. Inputs, logs and `run_lnl.sh` are in `refs/work/nnn3f/lnl_448` and `lnl_6126`.
+
+| Case | Values | Max difference | Above 1e-5 |
+|---|---|---|---|
+| 4/8/4, `flat8`, jmax3 11 | 24 890 | 1.98e-6 | 0 |
+| 6/12/6, `flat6`, jmax3 15 | 456 320 | 4.13e-6 | 0 |
+
+The regulator changes the force (unit test: the Jacobi operators differ by more than 1e-2 from the local force), so the agreement tests it. The mesh study (`refs/regulator_mesh_study.py`, spec 5b2) shows NuHamil's 500-point mesh is converged to 5e-13 up to N = 40, so the agreement at N <= 8 carries over to the mesh at the production N. What is not tested against NuHamil is N3max above 8 (as for gap B).

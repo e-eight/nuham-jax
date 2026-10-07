@@ -1,0 +1,23 @@
+&input
+  rank=3
+  hw=16
+  renorm="srg"
+  lambda=2.0
+  emax=6
+  e2max=12
+  e3max=6
+  N3max=6
+  jmax3=15
+  ramp="flat6"
+  NNInt="N3LO_EM500"
+  input_nn_file="/root/NuHamil-public/input_nn_files/N3LO_EM500_kmax8_N100_Jmax8.bin"
+  genuine_3bf=.true.
+  save_3nf_before_lec=.true.
+  Regulator="LNL"
+  RegulatorPower=2
+  LECs=-0.81,-3.2,5.4,0.7,-0.06
+  lambda_3nf_local=650
+  lambda_3nf_nonlocal=500
+  file_name_3n="nnn.me3j.gz"
+  lab_3bme_precision="double"
+&end
