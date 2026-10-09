@@ -94,7 +94,9 @@ def three_body_operator(
         v3.block_until_ready()
     if hw_target is not None and hw_target != hw:
         with stage(timer, "frequency"):
-            u = antisymmetrize(frequency_overlap(nas_of(channel), hw, hw_target), channel)
+            u = antisymmetrize(
+                frequency_overlap(nas_of(channel), hw, hw_target), channel, symmetric=False
+            )
             v3 = u.T @ v3 @ u
             v3.block_until_ready()
     if e3max is not None:

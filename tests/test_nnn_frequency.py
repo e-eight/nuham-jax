@@ -4,6 +4,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+import scipy.sparse as sp
 
 import nuham  # noqa: F401  (enables float64)
 from nuham.angmom.moshinsky_table import MoshinskyTable
@@ -75,10 +76,30 @@ def test_conversion_carries_the_kinetic_energy_to_the_target_basis(channel) -> N
     assert np.abs(wrong[np.ix_(low, low)] - exact[np.ix_(low, low)]).max() > 1.0
 
 
+def _antisymmetrized_overlap(channel, nas, hw: float, hw_target: float) -> np.ndarray:
+    """``U = C W C^T`` through the package's ``antisymmetrize``, keeping the odd part of ``W``."""
+    w = frequency_overlap(nas, hw, hw_target)
+    return np.asarray(antisymmetrize(w, channel, symmetric=False))
+
+
+def test_antisymmetrized_overlap_is_the_explicit_cfp_product(channel) -> None:
+    """``W`` is not symmetric: symmetrising ``C W C^T`` (right for the forces) drops its odd part.
+
+    The overlap of the lowest states of ``J = 1/2``, ``T = 1/2`` is ``U[1, 0] = -0.0197`` in
+    NuHamil's debug output; that odd element was the first thing a symmetrised product lost.
+    """
+    nas = np.concatenate([b.nas for b in channel.blocks])
+    c = sp.block_diag([b.cfp for b in channel.blocks]).toarray()
+    w = frequency_overlap(nas, 30.0, 16.0)
+    u = _antisymmetrized_overlap(channel, nas, 30.0, 16.0)
+    assert np.abs(u - c @ w.toarray() @ c.T).max() < 1e-12
+    assert np.abs(u - u.T).max() > 1e-3
+
+
 def test_converted_channel_is_orthogonal_on_the_low_states(channel) -> None:
     """``U^T U`` is the identity on states far below the truncation and not above it."""
     nas = np.concatenate([b.nas for b in channel.blocks])
-    u = np.asarray(antisymmetrize(frequency_overlap(nas, 20.0, 16.0), channel))
+    u = _antisymmetrized_overlap(channel, nas, 20.0, 16.0)
     low = sum(len(b.cfp) for b in channel.blocks if b.n_quanta <= 2)
     gram = u.T @ u
     assert np.abs(gram[:low, :low] - np.eye(low)).max() < 0.05
@@ -107,7 +128,7 @@ def test_conversion_is_u_transpose_v_u_in_the_full_channel(nn) -> None:
     conv, _ = jacobi_operators(nn, 20.0, 2.0, 3, "flat3", LocalForce(), js=[3], hw_target=16.0)
     for key, v in ops.items():
         nas = np.concatenate([b.nas for b in chans[key].blocks])
-        u = np.asarray(antisymmetrize(frequency_overlap(nas, 20.0, 16.0), chans[key]))
+        u = _antisymmetrized_overlap(chans[key], nas, 20.0, 16.0)
         assert np.abs(conv[key] - u.T @ v @ u).max() < 1e-9
         assert np.abs(conv[key] - v).max() > 1e-3
         assert np.abs(conv[key] - conv[key].T).max() < 1e-9

@@ -208,8 +208,11 @@ def antisymmetrize(
     channel: JacobiChannel,
     blocks: list | None = None,
     timer: StageTimer | None = None,
+    symmetric: bool = True,
 ) -> jax.Array:
     """Return ``cfp W cfp^T`` (block-diagonal ``cfp`` in ``N``) as a dense device array.
+
+    The result is symmetrised unless ``symmetric=False`` (for a ``w`` that is not symmetric).
 
     ``blocks`` default to those of ``channel``. ``w`` may be a SciPy sparse array (the pair
     operators of Phase 5.3 are); it and the block-diagonal ``cfp`` go to the device as entry lists
@@ -230,7 +233,7 @@ def antisymmetrize(
         if timer is not None:
             w_dev.block_until_ready()
     with stage(timer, "as_gemm"):
-        out = antisymmetrize_dense(w_dev, c_dev)
+        out = antisymmetrize_dense(w_dev, c_dev, symmetric)
         if timer is not None:
             out.block_until_ready()
     return out

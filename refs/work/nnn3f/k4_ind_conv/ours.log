@@ -1,0 +1,5 @@
+config: {"workers": 16, "cpus_available": 16, "compress_threads": 8, "omp_num_threads": null, "backend": "cpu", "devices": ["cpu:0"], "emax": 4, "e2max": 8, "e3max": 4, "ramp": "flat8", "hw": 30.0, "hw_target": 16.0, "lam": 2.0, "genuine_3nf": false, "lab_dtype": "float32", "rtol": 1e-08, "stop_after": "write", "jacobi_cache": null, "stage_log": null, "js": null, "j3max_3nf": null, "force": null, "cutoff_nl": null}
+/home/soham/.local/share/uv/python/cpython-3.12.9-linux-x86_64-gnu/lib/python3.12/multiprocessing/popen_fork.py:66: RuntimeWarning: os.fork() was called. os.fork() is incompatible with multithreaded code, and JAX is multithreaded, so this will likely lead to a deadlock.
+  self.pid = os.fork()
+wrote 24890 values to refs/work/nnn3f/k4_ind_conv/ours.me3j.gz
+stages: {'nn_relative': 5.9, 'jacobi_basis': 1.3, 'embed': 2.5, 'flow': 8.9, 'frequency': 1.8, 'to_host': 0.0, 'brackets': 0.0, 'tcoef_wait': 0.3, 'upload': 0.0, 'gemm': 0.2, 'lab': 1.0, 'write': 0.7}

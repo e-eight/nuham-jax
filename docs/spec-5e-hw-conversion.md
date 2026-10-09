@@ -40,7 +40,10 @@ history has one import commit (2023-01-12) for the script and for the README tab
   directly at `hw_target` by the tail of the overlap beyond `Nmax`. This is the effect to be measured (gap K5/K6).
 - The scale transformation acts on both Jacobi coordinates alike, so it commutes with permutations and `U` can be
   antisymmetrised like the regulator `R` (`nnn/regulator.py`, `antisymmetrize`): `U_A = C W C^T` in our orientation
-  (`antisymmetrize` returns `cfp W cfp^T`).
+  (`antisymmetrize(..., symmetric=False)` returns `cfp W cfp^T`).
+  `W` is not symmetric (the overlap of `n` with `n'` differs from that of `n'` with `n`), so the default of `antisymmetrize`,
+  which symmetrises its result (right for the forces), must not be used: it drops the odd part and gave a file that
+  disagreed with NuHamil by 10 MeV (found by K4).
 - The flow, the NN potentials, `T` and `V3n` all stay at `hw`; only the final `V3` is converted. The lab transform
   (`T` coefficients, brackets) does not depend on the frequency.
 - Cache: the cached `V3` of a channel is the one after the cut, so the conversion must be done before the cache write and
@@ -56,3 +59,20 @@ history has one import commit (2023-01-12) for the script and for the README tab
 - Large basis: the rows of the lowest states of `O` are orthonormal (`sum_n' O_{n n'}^2 -> 1`) with `n'` up to 40.
 - Round trip `hw -> hw' -> hw` is the identity on the low block.
 - Against NuHamil (gap K4): 4/8/4 and 6/12/6 at `hw 30 -> 16`, and `hw 30 -> 20`, element by element, tolerance 1e-5.
+
+### Result of K4 (2026-10-09)
+
+All against NuHamil (`refs/work/nnn3f/k4_*`, absolute difference per element, none above 1e-5):
+
+| case | values | max difference |
+|---|---|---|
+| 4/8/4, flat8, full 3NF400, `hw 30 -> 16` | 24 890 | 7.4e-6 |
+| 4/8/4, induced only, `hw 30 -> 16` | 24 890 | 3.8e-6 |
+| 4/8/4, induced only, `hw 30 -> 20` | 24 890 | 4.5e-6 |
+| 4/8/4, induced only, `hw 30 -> 12` | 24 890 | 2.7e-6 |
+| 6/12/6, flat8, full 3NF400, `hw 30 -> 16` | 456 320 | 3.1e-6 |
+| 4/8/4, `hw 30`, no conversion | 24 890 | 9.7e-6 |
+
+NuHamil's conversion is continuous (`hw_target = 30.001` changes nothing), and its radial overlaps equal ours to 1e-15, so the
+quadrature (500 points) is not a concern. The first comparison failed (max 10) only because of the symmetrised
+antisymmetrisation described in section 3.

@@ -317,3 +317,12 @@ Oscillator basis with the other settings (`BASIS=oscillator` in `refs/imsrg/run_
 | `white`, 30, `Moller_Plesset` | -115.293041 | -115.341686 | -48.6 keV |
 
 The basis effect is 45 to 54 keV for every generator and denominator choice, so it adds to the others independently. The most bound result of the whole scan, -115.341686 (`white`, Moller_Plesset, oscillator), is still 0.198 MeV above the README (-115.540). The emax 6 run with `white`, smax 30 and the oscillator basis was killed with exit status 137 (SIGKILL, most likely the out-of-memory killer; not confirmed, `dmesg` is not readable here) right after `Solving` on the 19 GB local machine; the HF basis needs 5.6 GB at this size, the HO-basis normal ordering evidently more. DeltaAI job 3346009 (the same run with `basis=oscillator`, 120 GB, 1 h limit) was OOM-killed after 6 min 29 s (Slurm `oom_kill event`, state OUT_OF_MEMORY) right after printing EMP2 = -40.617391, so the HO-basis normal ordering of the 3N force at emax 6, e3max 16 needs more than 120 GB (the HF basis needs 5.6 GB); the emax dependence of the basis effect is not measured, and a larger-memory node would be needed to measure it.
+
+## Gap K4: the frequency conversion against NuHamil (2026-10-09)
+
+Our `hw 30 -> hw_target` file equals NuHamil's (`NuHamil_3BME`-style input with `hw_target`) element by element: 4/8/4 full 3NF400 at 16 MeV 7.4e-6, induced only at 16, 20 and 12 MeV 3.8e-6, 4.5e-6, 2.7e-6, and 6/12/6 (456 320 values) 3.1e-6; none above 1e-5 (details in `docs/spec-5e-hw-conversion.md`, runs in `refs/work/nnn3f/k4_*`). The first attempt disagreed by 10 MeV because `antisymmetrize` symmetrised `C W C^T` and the frequency overlap `W` is not symmetric; the kernel now takes `symmetric=False` for it. K5 and K6 (imsrg++ on a converted file, DeltaAI) are not run yet.
+
+### Oscillator-basis memory (cause of job 3346009, analysis only)
+
+The OOM above is not intrinsic to the 3N size. In `../imsrg/src/imsrg++.cc` the oscillator branch calls `Hbare.DoNormalOrdering()`; `Operator::DoNormalOrdering3` ends with `ThreeBody.SetMode("pn")`, which allocates a zero-filled pn 3-body block (17.07 GB at emax 6, e3max 16) that stays attached to the operator (particle rank 3, IMSRG3 off). Every flow operator then carries it (17.5 GB each; 85.8 GB at the first Magnus step), so 120 GB, sized from HF runs, was too little. The HF branch uses `GetNormalOrderedH(2)`, which returns a rank-2 operator. A small imsrg++ patch (return rank 2 unless IMSRG3) should bring the run to about 10 GB; it is not applied (on hold by the user).
+
