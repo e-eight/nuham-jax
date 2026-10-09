@@ -16,10 +16,14 @@
 # stops: submit the same script again and finished channels are read from $ROOT/cache/jacobi/v3 (the key holds
 # the physics settings and the exact basis). The file stays in $ROOT/out; nothing is deleted at the end.
 source /projects/bhhk/soham/nuham/repo/scripts/deltaai/common.sh
-OUT=$ROOT/out/N3LO_3NF400_hw16_e14_e2_28_e3_16.me3j.gz
+# HW_SRC (default: none) flows at that frequency and converts to hw 16 afterwards (gap K, as in lnl.sbatch); the file is then
+# named ..._hw${HW_SRC}to16_... The default run is unchanged.
+HW_SRC=${HW_SRC:-}
+if [ -n "$HW_SRC" ]; then HWARGS="--hw $HW_SRC --hw-target 16"; TAG=hw${HW_SRC}to16; else HWARGS="--hw 16"; TAG=hw16; fi
+OUT=$ROOT/out/N3LO_3NF400_${TAG}_e14_e2_28_e3_16.me3j.gz
 STAGES=$ROOT/bench3n/production_stages_$SLURM_JOB_ID.jsonl
 echo "=== production run, output $OUT"
-run_checked $ROOT/out/production_$SLURM_JOB_ID.log $PY -m nuham.nnn.generate $NN $OUT --hw 16 --lam 2.0 --emax 14 --e2max 28 --e3max 16 \
+run_checked $ROOT/out/production_$SLURM_JOB_ID.log $PY -m nuham.nnn.generate $NN $OUT $HWARGS --lam 2.0 --emax 14 --e2max 28 --e3max 16 \
   --ramp ramp40-5-36-7-32-9-28-11-24 --jacobi-cache $ROOT/cache/jacobi --stage-log $STAGES
 echo "=== checks"
 ls -la $OUT
