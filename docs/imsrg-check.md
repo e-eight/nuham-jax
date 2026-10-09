@@ -255,3 +255,14 @@ e3hf is -0.0202 MeV (emax 4) and -0.0088 MeV (emax 6): the 3N file is read and e
 | 6 | white, 30 | -123.089793 (548 s, 5.6 GB) | -123.445 | +0.355 |
 
 The emax 4 to 6 step is 7.807 MeV (white; the README 7.905). White is converged in smax (30 against 100: 2e-6); the generator changes 16O at emax 4 by 0.18 MeV, neither reaches the README's value, which has no recorded imsrg++ settings (generator, step control, normal-ordering options; nothing in NuHamil's repository states them). 4He, which is much more sensitive to the 3N force, agrees to 4 keV, so the difference in 16O is attributed to the IMSRG(2) settings and not to the file. This is plausibility agreement, not a bit-level reference.
+
+**emax 8 (DeltaAI jobs 3335164 and 3335165, 2026-10-07/08, aarch64).** Model emax 8, e2max 16, e3max 16, reading the whole emax 8 file (3 424 228 845 values, 12.76 GB stored). Both runs used `white`, smax 30 (4 He earlier used imaginary-time, smax 500). HF converged (24 iterations for 16O, 28 for 4He). The 16O run took 18 min 33 s, the 4He run 17 min 14 s; both used 27.5 GB of imsrg++ memory.
+
+| nucleus | EHF | EMP2 | core energy (MeV) | README | difference |
+|---|---|---|---|---|---|
+| 4He | -21.897947 | -6.293158 | -28.576389 | -28.569 | -7 keV |
+| 16O | -85.320499 | -36.454081 | -125.851198 | -126.270 | +0.419 |
+
+Convergence of the flow (from `imsrg_run/<jobid>/imsrg.log`): 16O took 73 steps, the energy changed by 6e-8 MeV on the last step and the MBPT correction is -1.4e-7 MeV, so it is converged. 4He took 63 steps; the energy was still falling by 8e-6 MeV per step and the MBPT correction is -1.1e-5 MeV, so it is converged to about 1e-5 MeV, which does not matter here.
+
+Steps from emax 6 to 8: 16O 2.761 MeV (README 2.825), 4He 0.358 MeV (README 0.348; this uses the imaginary-time emax 6 value, the generators differ). The 16O offset to the README is +0.257, +0.355 and +0.419 MeV at emax 4, 6 and 8: it is smooth and slowly growing, always on the same side. 4He agrees to under 10 keV at all three emax. Reading: the 3N file is right (4He is the sensitive test) and the 16O offset comes from IMSRG(2) settings the README does not record; the generator alone moves 16O by 0.18 MeV at emax 4. This was not tested further. Not done: other generators at emax 6 or 8, and the 4He emax 8 run with imaginary-time.
