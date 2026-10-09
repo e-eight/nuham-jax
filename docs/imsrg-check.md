@@ -266,3 +266,23 @@ The emax 4 to 6 step is 7.807 MeV (white; the README 7.905). White is converged 
 Convergence of the flow (from `imsrg_run/<jobid>/imsrg.log`): 16O took 73 steps, the energy changed by 6e-8 MeV on the last step and the MBPT correction is -1.4e-7 MeV, so it is converged. 4He took 63 steps; the energy was still falling by 8e-6 MeV per step and the MBPT correction is -1.1e-5 MeV, so it is converged to about 1e-5 MeV, which does not matter here.
 
 Steps from emax 6 to 8: 16O 2.761 MeV (README 2.825), 4He 0.358 MeV (README 0.348; this uses the imaginary-time emax 6 value, the generators differ). The 16O offset to the README is +0.257, +0.355 and +0.419 MeV at emax 4, 6 and 8: it is smooth and slowly growing, always on the same side. 4He agrees to under 10 keV at all three emax. Reading: the 3N file is right (4He is the sensitive test) and the 16O offset comes from IMSRG(2) settings the README does not record; the generator alone moves 16O by 0.18 MeV at emax 4. This was not tested further. Not done: other generators at emax 6 or 8, and the 4He emax 8 run with imaginary-time.
+
+## Gap D4 extension: 16O at emax 10 and where the imsrg++ time goes (2026-10-09)
+
+Approved by the user for this one run. LNL file for emax 10 (DeltaAI job 3345248, 12 min 21 s, 5 486 676 675 values, 27.2 GB, `gzip -t` ok), then imsrg++ 16O on it (job 3345249, 33 min 37 s of a 1.5 h limit, same settings as emax 8: `white`, smax 30, e3max 16, 32 CPUs, aarch64 container).
+
+16O emax 10: EHF -85.3657815, EMP2 -36.97602077, core energy **-126.569920 MeV**. HF converged in 24 iterations (e3hf 30.22 MeV). The flow took 75 steps to s = 30 and the energy changed by 4e-8 MeV on the last step. Step from emax 8 (-125.8512): -0.719 MeV; the README's step is about 0.75, so the size is right. The README value at emax 10 was not looked up, only its step; with the README's emax 8 value minus 0.75 the offset would be about +0.45 MeV, continuing the drift (+0.257, +0.355, +0.419). 4He was not run at emax 10.
+
+**Where the imsrg++ time goes** (the `TIMES (s)` block of `imsrg.log`, profiler of imsrg++; `Read_3body_file` = `Read_3BME` (serial text parse) + `Store_3BME` (OpenMP) + a few seconds):
+
+| job | values read | Read_3BME | Store_3BME | Read_3body_file | whole run (`real`) | memory |
+|---|---|---|---|---|---|---|
+| emax 6 (3330502, DeltaAI) | 6.93e8 | 154 s | 98 s | 253 s | 305 s | 5.6 GB |
+| emax 8 (3335164) | 3.42e9 | 770 s | 142 s | 917 s | 1105 s | 27.5 GB |
+| emax 10 (3345249) | 5.49e9 | 1262 s | 141 s | 1414 s | 1943 s | 45.0 GB |
+
+- The parse runs at 4.4 M values/s at every size, on one thread (`for (i<nread) infile >> ThreeBME[i]` in `ReadWrite.cc`, no OpenMP). Reading is 73% of the emax 10 run and 83% of the emax 8 run. Store scales with the threads and does not matter.
+- Test of the gunzip share (local, emax 6 file, 693 M values, 16 cores): `Read_3BME` 151 s from the `.gz` and 125 s from the same file as plain text (11.2 GB); `gzip -dc` alone 47 s, `igzip` 11 s. So gunzip is about 17% of the read and the text parse about 83%; decompressing outside imsrg++ does not pay. Only a parallel parse or a binary format would shorten the read. The same read took 154 s on the GH200 and 151 s here: a faster core does not help.
+- The rest (NN read, HF, normal ordering, flow) took 188 s at emax 8 and 530 s at emax 10 (2.8x); at emax 6 it was about 52 s. Largest items at emax 10: `Standard_BCH_Transform` 307 s and `CommutatorScalarScalar` 332 s (overlapping), `HF_GetNormalOrderedH` 69 s, `HF_Solve` 30 s.
+- The same file read took 154 s and 287 s in two emax 6 jobs (3330502, 3330503): allow a factor 2 in the read time.
+- Forecast, not measured: emax 12 about 50 min (read about 24 min, the file's 6.37e9 values are the limit; rest about 25 min), memory about 55 GB; emax 14 about 1.7 h. Time limits so far were 1.5 to 100 times the run time; the only timeout was 3330668 (4He emax 8 with imaginary-time and smax 500, 1 h), a flow that did not settle, not the read.
