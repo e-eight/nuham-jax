@@ -286,3 +286,34 @@ Approved by the user for this one run. LNL file for emax 10 (DeltaAI job 3345248
 - The rest (NN read, HF, normal ordering, flow) took 188 s at emax 8 and 530 s at emax 10 (2.8x); at emax 6 it was about 52 s. Largest items at emax 10: `Standard_BCH_Transform` 307 s and `CommutatorScalarScalar` 332 s (overlapping), `HF_GetNormalOrderedH` 69 s, `HF_Solve` 30 s.
 - The same file read took 154 s and 287 s in two emax 6 jobs (3330502, 3330503): allow a factor 2 in the read time.
 - Forecast, not measured: emax 12 about 50 min (read about 24 min, the file's 6.37e9 values are the limit; rest about 25 min), memory about 55 GB; emax 14 about 1.7 h. Time limits so far were 1.5 to 100 times the run time; the only timeout was 3330668 (4He emax 8 with imaginary-time and smax 500, 1 h), a flow that did not settle, not the read.
+
+## Gap D4: settings scan for the 16O offset to the README, emax 4 (2026-10-09)
+
+Question: can imsrg++ settings explain the 16O offset (+0.26 MeV at emax 4, growing to about +0.45 at emax 10) while 4He agrees to a few keV? Local x86 podman build, 16O, emax 4, e2max 8, e3max 12, the 13.1 M-value prefix of the emax 6 LNL file, hw 16, `method=magnus`, one setting changed per run from the baseline `white`, smax 30 (about 1 to 2.5 min each). README value: -115.540 MeV. EHF = -84.6017095 and EMP2 = -27.03088631 in every run.
+
+| run | core energy (MeV) | change from baseline |
+|---|---|---|
+| baseline: `white`, smax 30 | -115.282590 | 0 |
+| `white`, smax 100 | -115.282592 | -2e-6 |
+| `white`, `ode_tolerance=1e-8` | -115.282590 | 0 |
+| `white`, `dsmax=0.1` | -115.283059 | -0.5 keV |
+| `atan`, smax 30 | -115.282025 | +0.6 keV |
+| `white`, `denominator_partitioning=Moller_Plesset` | -115.293041 | -10 keV |
+| imaginary-time, smax 500 | -115.101066 | +0.18 MeV |
+| imaginary-time, `Moller_Plesset` | -115.101066 | same as imaginary-time |
+| `white`, `basis=oscillator` | -115.328182 | -45 keV (first attempt gave the baseline: `run_he4.sh` appended `basis=HF` after `EXTRA`, so the option was overridden; the script now takes `BASIS`; HF is skipped, EMP2 = -29.964 instead of -27.031) |
+
+Result: no setting lowers the energy by more than 45 keV (the oscillator basis); the most bound value (-115.328) is still 0.212 MeV above the README. The flow is converged (smax, tolerance and step size move it by at most 0.5 keV). The generator choice moves it by 0.18 MeV in the wrong direction. imsrg++'s default `hw` is 20, but every run here passes hw 16 explicitly, so that is not the cause. Remaining candidates: a perturbative triples correction or another IMSRG truncation in the README's runs, and the Jacobi truncation (our ramp N3max 40 to 24 against the README's, unknown); the second cannot be tested cheaply (about 22 min of GPU for a new file).
+
+Perturbative triples (`perturbative_triples=true`, all 58 246 three-body states kept, dE3max 99, 16O emax 4, same setup; the flow energy is unchanged): `white`, smax 30: -2.66347 MeV, giving -117.94605 MeV in total; imaginary-time, smax 500: -2.60099 MeV, giving -117.70205 MeV. The shift is about ten times the 0.26 MeV offset and has the same sign, so a triples correction does not explain the README value (-115.540): that number is an IMSRG(2) energy. Settings of imsrg++ are therefore not the cause of the offset at emax 4 (every variation above, and this one, misses the README by 0.25 MeV or more in one direction or the other); what remains is the Jacobi truncation of the force and the README's own provenance. 4He, the sensitive test of the force, agrees to a few keV.
+
+Oscillator basis with the other settings (`BASIS=oscillator` in `refs/imsrg/run_he4.sh`, 16O, emax 4, e3max 12; HF skipped, EMP2 = -29.964284 in all runs):
+
+| generator, smax | HF basis (MeV) | oscillator basis (MeV) | change |
+|---|---|---|---|
+| `white`, 30 | -115.282590 | -115.328182 | -45.6 keV |
+| `atan`, 30 | -115.282025 | -115.327261 | -45.2 keV |
+| imaginary-time, 500 | -115.101066 | -115.154671 | -53.6 keV |
+| `white`, 30, `Moller_Plesset` | -115.293041 | -115.341686 | -48.6 keV |
+
+The basis effect is 45 to 54 keV for every generator and denominator choice, so it adds to the others independently. The most bound result of the whole scan, -115.341686 (`white`, Moller_Plesset, oscillator), is still 0.198 MeV above the README (-115.540). The emax 6 run with `white`, smax 30 and the oscillator basis was killed with exit status 137 (SIGKILL, most likely the out-of-memory killer; not confirmed, `dmesg` is not readable here) right after `Solving` on the 19 GB local machine; the HF basis needs 5.6 GB at this size, the HO-basis normal ordering evidently more. It was not repeated on DeltaAI, so the emax dependence of the basis effect is not measured.

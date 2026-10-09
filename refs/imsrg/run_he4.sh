@@ -11,6 +11,7 @@
 # one line per step: step, s, E, ...; HF convergence lines are there too; a flow that does not settle is a sign of a bad reference).
 # For a 3N file bigger than the model space (a prefix is read): F3EMAX, F3E3MAX, EXTRA="file3e2max=...", BME3_INPLACE=1.
 # GEN sets the core generator (default imaginary-time); step control goes in EXTRA (domega, dsmax, omega_norm_max, ode_tolerance).
+# BASIS sets the single-particle basis (HF default, oscillator, NAT).
 # SMAX 500 converges the IMSRG(2) flow at emax 4 (about 90 s on 16 cores); use a small SMAX at larger
 # emax to check only the read and the HF/MBPT energies. hw is fixed to 16 (the hw of the files used).
 set -euo pipefail
@@ -35,5 +36,5 @@ fi
 podman run --rm -e LD_LIBRARY_PATH=/work/build -v "$WORK/imsrg:/work:Z" "${MOUNT3[@]}" -w /work/run imsrg-dev \
   /work/build/imsrg++ 2bme="/work/data/$F" $ARGS3 ${EXTRA:-} emax="$EMAX" e2max="$E2MAX" \
   file2e1max="$FEMAX" file2e2max="$FE2MAX" file2lmax="$FEMAX" hw=16 A="$A" reference="$NUC" \
-  valence_space="$NUC" method=magnus smax="$SMAX" core_generator="${GEN:-imaginary-time}" basis=HF \
+  valence_space="$NUC" method=magnus smax="$SMAX" core_generator="${GEN:-imaginary-time}" basis="${BASIS:-HF}" \
   | tee "$WORK/imsrg/run/last_run.log" | grep -E "${GREP:-^(e1hf|e2hf|EHF|EMP2|Core Energy)|^real:|^Max Used:|not converged|Not converged}"
