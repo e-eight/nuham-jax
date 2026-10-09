@@ -12,8 +12,10 @@ import numpy as np
 
 from nuham.kernels.srg import srg_alpha, srg_flow_dense_stats
 from nuham.kernels.transfer import to_host
-from nuham.nnn.hamiltonian import IsospinNN, kinetic_jacobi, nn_jacobi
+from nuham.nnn.frequency import frequency_overlap
+from nuham.nnn.hamiltonian import IsospinNN, kinetic_jacobi, nas_of, nn_jacobi
 from nuham.nnn.jacobi import JacobiChannel
+from nuham.nnn.local_force.assembly import antisymmetrize
 from nuham.timing import StageTimer, stage
 
 
@@ -51,6 +53,7 @@ def three_body_operator(
     rtol: float = 1e-10,
     atol: float = 1e-10,
     timer: StageTimer | None = None,
+    hw_target: float | None = None,
 ) -> np.ndarray:
     """Return ``V3 = H(s) - T - 3 V_NN(s)`` of ``channel`` in MeV, cut to ``N <= e3max``.
 
@@ -70,7 +73,12 @@ def three_body_operator(
     rtol, atol
         Flow tolerances; ``atol`` in MeV.
     timer
-        Optional stage timer; records ``embed`` (the matrices in the AS basis) and ``flow``.
+        Optional stage timer; records ``embed`` (the matrices in the AS basis), ``flow`` and
+        ``frequency`` (the conversion).
+    hw_target
+        Convert ``V3`` to this oscillator energy (MeV) before the cut to ``e3max``, in the whole
+        space of ``channel`` as NuHamil does (``docs/spec-5e-hw-conversion.md``); ``None`` or ``hw``
+        keeps the operator at ``hw``.
     """
     with stage(timer, "embed"):
         t = kinetic_jacobi(channel, hw)
@@ -84,6 +92,11 @@ def three_body_operator(
     with stage(timer, "embed"):
         v3 = evolved_h - t - nn_jacobi(channel, evolved)
         v3.block_until_ready()
+    if hw_target is not None and hw_target != hw:
+        with stage(timer, "frequency"):
+            u = antisymmetrize(frequency_overlap(nas_of(channel), hw, hw_target), channel)
+            v3 = u.T @ v3 @ u
+            v3.block_until_ready()
     if e3max is not None:
         keep = sum(len(b.cfp) for b in channel.blocks if b.n_quanta <= e3max)
         v3 = v3[:keep, :keep]

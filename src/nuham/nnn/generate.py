@@ -176,6 +176,7 @@ def jacobi_operators(
     js: Sequence[int] | None = None,
     n2max: int = N2MAX_FLOW,
     jmax_nn: int = JMAX_NN,
+    hw_target: float | None = None,
 ) -> tuple[dict[tuple[int, int, int], np.ndarray], dict[tuple[int, int, int], JacobiChannel]]:
     """Evolved three-body operators ``V3`` of all Jacobi channels, cut to ``N <= e3max``.
 
@@ -192,7 +193,10 @@ def jacobi_operators(
     never reads them. ``log`` receives the stage times of every channel. ``js`` restricts the
     channels to those doubled ``J`` (for timing a few channels of a large run). ``n2max`` and
     ``jmax_nn`` are the NN flow's relative space and largest relative ``J`` (NuHamil's values by
-    default); they are part of the cache key like the other physics settings.
+    default); they are part of the cache key like the other physics settings. ``hw_target`` converts
+    each ``V3`` from ``hw`` to that oscillator energy before the cut to ``e3max``
+    (:mod:`nuham.nnn.frequency`); it enters the cache key only when it differs from ``hw``, so
+    the keys of runs without conversion are unchanged.
 
     Returns
     -------
@@ -206,11 +210,10 @@ def jacobi_operators(
     meshes = nuhamil_meshes()
     tables: dict[int, RadialTables] = {}
     ops, chans = {}, {}
-    tag = hashlib.sha1(
-        repr(
-            (CACHE_VERSION, _nn_digest(nn), hw, lam, e3max, rtol, _force_key(force), n2max, jmax_nn)
-        ).encode()
-    ).hexdigest()[:16]
+    key = (CACHE_VERSION, _nn_digest(nn), hw, lam, e3max, rtol, _force_key(force), n2max, jmax_nn)
+    if hw_target is not None and hw_target != hw:
+        key += (("hw_target", hw_target),)
+    tag = hashlib.sha1(repr(key).encode()).hexdigest()[:16]
     for t2 in (1, 3):
         for j2 in range(1, (2 * e3max + 3 if jmax3 is None else jmax3) + 1, 2):
             if js is not None and j2 not in js:
@@ -254,7 +257,17 @@ def jacobi_operators(
                             v3n = fa @ v3n @ fa
                             v3n.block_until_ready()
                 v3 = three_body_operator(
-                    channel, hw, lam, bare, evolved, v3n, e3max, rtol=rtol, atol=rtol, timer=ct
+                    channel,
+                    hw,
+                    lam,
+                    bare,
+                    evolved,
+                    v3n,
+                    e3max,
+                    rtol=rtol,
+                    atol=rtol,
+                    timer=ct,
+                    hw_target=hw_target,
                 )
                 chans[j2, parity, t2] = JacobiChannel(j2, parity, t2, e3max, kept)
                 ops[j2, parity, t2] = v3
@@ -362,6 +375,7 @@ def generate_me3j(
     stop_after: str = "write",
     stage_log: str | Path | None = None,
     js: Sequence[int] | None = None,
+    hw_target: float | None = None,
 ) -> int:
     """Generate the 3N interaction in the lab HO basis and write it as ``me3j``.
 
@@ -405,6 +419,10 @@ def generate_me3j(
     js
         Compute only the Jacobi channels with these doubled ``J`` (needs ``stop_after="jacobi"``:
         the lab transform needs all channels). For timing a few channels of a large run.
+    hw_target
+        Oscillator energy (MeV) of the lab basis if it differs from ``hw``, the frequency of the
+        Jacobi basis: the Jacobi operator is converted before the lab transform, as NuHamil's
+        ``hw_target`` does (``docs/spec-5e-hw-conversion.md``). The file does not store it.
 
     Returns
     -------
@@ -428,7 +446,7 @@ def generate_me3j(
     try:
         ops, chans = jacobi_operators(
             nn, hw, lam, e3max, ramp, force, timer=timer, rtol=rtol, jmax3=jmax3,
-            cache_dir=cache_dir, workers=workers, log=log, js=js,
+            cache_dir=cache_dir, workers=workers, log=log, js=js, hw_target=hw_target,
         )  # fmt: skip
         if stop_after == "jacobi":
             return 0
@@ -473,7 +491,7 @@ def run_config(args: argparse.Namespace, workers: int, writer: WriterOptions) ->
         "backend": jax.default_backend(),
         "devices": [str(d) for d in jax.devices()],
         "emax": args.emax, "e2max": args.e2max, "e3max": args.e3max, "ramp": args.ramp,
-        "hw": args.hw, "lam": args.lam, "genuine_3nf": not args.no_3nf,
+        "hw": args.hw, "hw_target": args.hw_target, "lam": args.lam, "genuine_3nf": not args.no_3nf,
         "lab_dtype": args.lab_dtype, "rtol": args.rtol, "stop_after": args.stop_after,
         "jacobi_cache": args.jacobi_cache, "stage_log": args.stage_log, "js": args.js,
         "j3max_3nf": args.j3max_3nf, "force": None if args.no_3nf else repr(force_from_args(args)),
@@ -503,6 +521,10 @@ def main() -> None:
     p.add_argument("nn_file", help="NuHamil momentum-space *.bin file")
     p.add_argument("output", help="output file, e.g. N3LO_3NF400_hw16_e14_e2_28_e3_16.me3j.gz")
     p.add_argument("--hw", type=float, required=True, help="oscillator energy in MeV")
+    p.add_argument(
+        "--hw-target", type=float, default=None,
+        help="convert the Jacobi operator from --hw to this energy (MeV), as NuHamil's hw_target",
+    )  # fmt: skip
     p.add_argument("--lam", type=float, required=True, help="SRG cutoff in fm^-1")
     p.add_argument("--emax", type=int, required=True)
     p.add_argument("--e2max", type=int, required=True)
@@ -584,6 +606,7 @@ def main() -> None:
         args.e3max, args.ramp, force, timer, writer, args.rtol, args.jmax3,
         getattr(np, args.lab_dtype), workers, args.jacobi_cache, args.stop_after, args.stage_log,
         None if args.js is None else [int(x) for x in args.js.split(",")],
+        hw_target=args.hw_target,
     )  # fmt: skip
     if profiler is not None:
         profiler.disable()

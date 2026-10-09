@@ -102,7 +102,7 @@ def isospin_nn(
     }
 
 
-def _nas_of(channel: JacobiChannel) -> np.ndarray:
+def nas_of(channel: JacobiChannel) -> np.ndarray:
     """NAS states of all blocks of ``channel`` in the order used by :func:`antisymmetrize`."""
     return np.concatenate([b.nas for b in channel.blocks])
 
@@ -168,9 +168,9 @@ def nn_nas(nas: np.ndarray, iso: IsospinNN) -> sp.csr_array:
 
 def kinetic_jacobi(channel: JacobiChannel, hw: float) -> jax.Array:
     """Relative kinetic energy of three nucleons in the AS basis of ``channel`` (MeV), on device."""
-    return antisymmetrize(kinetic_nas(_nas_of(channel), hw), channel)
+    return antisymmetrize(kinetic_nas(nas_of(channel), hw), channel)
 
 
 def nn_jacobi(channel: JacobiChannel, iso: IsospinNN) -> jax.Array:
     """``3 C^T V_NN C``: the NN force summed over the three pairs, in the AS basis (device, MeV)."""
-    return 3.0 * antisymmetrize(nn_nas(_nas_of(channel), iso), channel)
+    return 3.0 * antisymmetrize(nn_nas(nas_of(channel), iso), channel)
