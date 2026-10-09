@@ -326,3 +326,18 @@ Our `hw 30 -> hw_target` file equals NuHamil's (`NuHamil_3BME`-style input with 
 
 The OOM above is not intrinsic to the 3N size. In `../imsrg/src/imsrg++.cc` the oscillator branch calls `Hbare.DoNormalOrdering()`; `Operator::DoNormalOrdering3` ends with `ThreeBody.SetMode("pn")`, which allocates a zero-filled pn 3-body block (17.07 GB at emax 6, e3max 16) that stays attached to the operator (particle rank 3, IMSRG3 off). Every flow operator then carries it (17.5 GB each; 85.8 GB at the first Magnus step), so 120 GB, sized from HF runs, was too little. The HF branch uses `GetNormalOrderedH(2)`, which returns a rank-2 operator. A small imsrg++ patch (return rank 2 unless IMSRG3) should bring the run to about 10 GB; it is not applied (on hold by the user).
 
+## Gap K5/K6: imsrg++ on the file converted from hw 30 to hw 16 (2026-10-09/10)
+
+Files made with `lnl.sbatch` `HW_SRC=30` (`--hw 30 --hw-target 16`, N3LOEMlnl, ramp40-5-36-7-32-9-28-11-24, e3max 16, lambda 2.0): emax 6 (DeltaAI job 3348873, 13 min 44 s, 693 209 575 values) and emax 10 (job 3349285, 12 min 11 s, 5 486 676 675 values, `gzip -t` ok; the emax 8 model reads its prefix). imsrg++ as before (`imsrg_run.sbatch` with `TAG=hw30to16`, HF basis, hw 16, 16O `white` smax 30, 4He imaginary-time smax 500; the NN me2j is the unchanged hw 16 file). Core energies in MeV:
+
+| nucleus, emax | README | hw 16 direct | hw 30 -> 16 (job) | converted minus README | direct minus README |
+|---|---|---|---|---|---|
+| 16O, 4 | -115.540 | -115.2826 | -115.544602 (3348874) | -4.6 keV | +257 keV |
+| 16O, 6 | -123.445 | -123.0898 | -123.449394 (3348875) | -4.4 keV | +355 keV |
+| 16O, 8 | -126.270 | -125.8512 | -126.273402 (3349286) | -3.4 keV | +419 keV |
+| 16O, 10 | -127.016 | -126.5699 | -127.019467 (3349287) | -3.5 keV | +446 keV |
+| 4He, 4 | -27.221 | -27.2247 | -27.217134 (3348876) | +3.9 keV | -3.7 keV |
+| 4He, 6 | -28.221 | -28.2185 | -28.211122 (3348877) | +9.9 keV | +2.5 keV |
+
+Result: the frequency conversion removes the 16O offset to the README at every emax (a few keV, flat in emax, where it grew from +0.26 to +0.45 MeV without conversion). 16O step from emax 8 to 10: -0.746 MeV, README -0.746. 4He moves by 7 to 8 keV in the other direction and stays within 10 keV of the README (the README's 4He generator and step settings are not recorded). Gap K is closed: the direct-hw-16 production file differs from NuHamil's recipe by the conversion, so a production file for comparison with NuHamil-based results should be made with `hw 30 -> 16`. Whether to regenerate it is the user's decision (about 30 min of GH200 plus a cold V3 cache at hw 30).
+
