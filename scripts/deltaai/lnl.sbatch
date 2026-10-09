@@ -19,10 +19,14 @@
 source /projects/bhhk/soham/nuham/repo/scripts/deltaai/common.sh
 # EMAX (default 6) is the emax of the file: `sbatch --export=ALL,EMAX=8 lnl.sbatch` makes the emax 8 file (the emax 6 and 4 models read prefixes of it).
 EMAX=${EMAX:-6}
-OUT=$ROOT/out/N3LO_N3LOEMlnl_hw16_e${EMAX}_e2_16_e3_16.me3j.gz
+# HW_SRC (default: none) is the frequency of the Jacobi flow when it differs from 16: the operator is converted to hw 16 afterwards
+# (gap K, docs/spec-5e-hw-conversion.md); the file is then named ..._hw${HW_SRC}to16_...
+HW_SRC=${HW_SRC:-}
+if [ -n "$HW_SRC" ]; then HWARGS="--hw $HW_SRC --hw-target 16"; TAG=hw${HW_SRC}to16; else HWARGS="--hw 16"; TAG=hw16; fi
+OUT=$ROOT/out/N3LO_N3LOEMlnl_${TAG}_e${EMAX}_e2_16_e3_16.me3j.gz
 STAGES=$ROOT/bench3n/lnl_e${EMAX}_stages_$SLURM_JOB_ID.jsonl
 echo "=== LNL run, output $OUT"
-run_checked $ROOT/out/lnl_$SLURM_JOB_ID.log $PY -m nuham.nnn.generate $NN $OUT --preset N3LOEMlnl --hw 16 --lam 2.0 --emax $EMAX --e2max 16 \
+run_checked $ROOT/out/lnl_$SLURM_JOB_ID.log $PY -m nuham.nnn.generate $NN $OUT --preset N3LOEMlnl $HWARGS --lam 2.0 --emax $EMAX --e2max 16 \
   --e3max 16 --ramp ramp40-5-36-7-32-9-28-11-24 --jacobi-cache $ROOT/cache/jacobi --stage-log $STAGES
 echo "=== checks"
 ls -la $OUT

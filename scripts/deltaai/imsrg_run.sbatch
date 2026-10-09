@@ -23,7 +23,9 @@ SMAX=${SMAX:-500}; GEN=${GEN:-imaginary-time}
 E2MAX=$((2 * EMAX))
 SRC=/projects/bhhk/soham/imsrg
 SIF=/projects/bhhk/soham/apptainer/imsrg-dev.sif
-F3=$ROOT/out/N3LO_N3LOEMlnl_hw16_e${FILE_EMAX}_e2_16_e3_16.me3j.gz
+# TAG names the me3j file's frequency setting (hw16, or hw30to16 for a converted file, lnl.sbatch HW_SRC); the model hw is 16 either way.
+TAG=${TAG:-hw16}
+F3=$ROOT/out/N3LO_N3LOEMlnl_${TAG}_e${FILE_EMAX}_e2_16_e3_16.me3j.gz
 F2=$ROOT/out/NN_N3LO_EM500_srg2.0_hw16_emax${EMAX}_e2max${E2MAX}.me2j.gz
 RUN=$ROOT/imsrg_run/$SLURM_JOB_ID
 mkdir -p $RUN/output
