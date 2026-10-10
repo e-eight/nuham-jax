@@ -25,7 +25,9 @@ SRC=/projects/bhhk/soham/imsrg
 SIF=/projects/bhhk/soham/apptainer/imsrg-dev.sif
 # TAG names the me3j file's frequency setting (hw16, or hw30to16 for a converted file, lnl.sbatch HW_SRC); the model hw is 16 either way.
 TAG=${TAG:-hw16}
-F3=$ROOT/out/N3LO_N3LOEMlnl_${TAG}_e${FILE_EMAX}_e2_16_e3_16.me3j.gz
+# F3NAME replaces the file name, with F3E2MAX the file's e2max (production file: F3NAME=N3LO_3NF400_${TAG}_e14_e2_28_e3_16.me3j.gz, FILE_EMAX=14, F3E2MAX=28).
+F3E2MAX=${F3E2MAX:-16}
+F3=$ROOT/out/${F3NAME:-N3LO_N3LOEMlnl_${TAG}_e${FILE_EMAX}_e2_16_e3_16.me3j.gz}
 F2=$ROOT/out/NN_N3LO_EM500_srg2.0_hw16_emax${EMAX}_e2max${E2MAX}.me2j.gz
 RUN=$ROOT/imsrg_run/$SLURM_JOB_ID
 mkdir -p $RUN/output
@@ -34,7 +36,7 @@ mkdir -p $RUN/output
 echo "=== imsrg++ $NUC emax $EMAX e3max $E3MAX file emax $FILE_EMAX smax $SMAX generator $GEN, commit of imsrg: $(git -C $SRC rev-parse --short HEAD)"
 cd $RUN
 time apptainer exec --cleanenv --bind /projects:/projects --env LD_LIBRARY_PATH=$SRC/build --env OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK \
-  $SIF $SRC/build/imsrg++ 2bme=$F2 3bme=$F3 3bme_type=full file3e1max=$FILE_EMAX file3e3max=16 file3e2max=16 e3max=$E3MAX \
+  $SIF $SRC/build/imsrg++ 2bme=$F2 3bme=$F3 3bme_type=full file3e1max=$FILE_EMAX file3e3max=16 file3e2max=$F3E2MAX e3max=$E3MAX \
   emax=$EMAX e2max=$E2MAX file2e1max=$EMAX file2e2max=$E2MAX file2lmax=$EMAX hw=16 A=$A reference=$NUC valence_space=$NUC \
   method=magnus smax=$SMAX core_generator=$GEN basis=HF $EXTRA > $RUN/imsrg.log 2>&1
 echo "exit status $?"
