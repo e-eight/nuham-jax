@@ -1,0 +1,52 @@
+
+############################################################
+#          NuHamil (Tokyo) code
+############################################################
+
+# Version is main:4d310c14970d9b47fa6f40dfde78d03b61afb526
+# OpenMP number of threads=  16
+
+################### Input Parameters #####################
+# hw =  16.00 MeV
+# renorm: srg, lambda =   2.00
+# Generator of SRG: kinetic
+# 
+# Parameters for two-body system
+# N2max = 100,  Jmax =  12, Jmax(NNint) =   8
+# NN interaction: N3LO_EM500
+# Maximum momentum =   8.00 fm-1,  Number of gauss-legendre mesh points 100
+# input_nn_file = /root/NuHamil-public/input_nn_files/N3LO_EM500_kmax8_N100_Jmax8.bin
+# 
+################### For Output Files #####################
+# emax =   4, e2max =   8
+# file name: R2_srg.op.me2j.gz
+# Calculations will be done for Operators:
+# R2, 
+# directory for temporary files: ./
+############################################################
+           Calculations for NN sector
+############################################################
+
+ NN calculations with isospin formalism is not supported.
+ pn_form is turned to .true.
+Estimated memory for two-body Tcoefs:     0.000342 GB
+
+############################################################
+    Doing transformaion to sp basis ...
+############################################################
+
+
+    summary of time, total =     0:00:12
+
+                                     time,    ncall, time/ncall,   ratio 
+         Storing 6-j couplings       0.001         1     0.00084   0.0001
+         Storing 9-j couplings       0.000         1     0.00046   0.0000
+Storing Talmi-Moshinsky bracke       0.048         1     0.04843   0.0040
+    Transformation coefficient       0.003         1     0.00320   0.0003
+                Read from file       0.169         1     0.16853   0.0140
+                    SRG H flow      10.995        54     0.20362   0.9108
+           SetTwoBodyRelOpChan       0.010        66     0.00015   0.0008
+                TMTransChannel       0.019        55     0.00035   0.0016
+                 Write to file       0.083         1     0.08313   0.0069
+                          misc       0.744                         0.0616
+

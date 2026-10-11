@@ -1,0 +1,12 @@
+&input
+  rank=2
+  hw=16
+  renorm= "srg"
+  lambda=2.0
+  emax=4
+  e2max=8
+  NNInt= "N3LO_EM500"
+  input_nn_file= "/root/NuHamil-public/input_nn_files/N3LO_EM500_kmax8_N100_Jmax8.bin"
+  file_name_nn= "R2_srg.op.me2j.gz"
+  Operators= "R2"
+&end
