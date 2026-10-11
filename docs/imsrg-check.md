@@ -324,7 +324,7 @@ Our `hw 30 -> hw_target` file equals NuHamil's (`NuHamil_3BME`-style input with 
 
 ### Oscillator-basis memory (cause of job 3346009, analysis only)
 
-The OOM above is not intrinsic to the 3N size. In `../imsrg/src/imsrg++.cc` the oscillator branch calls `Hbare.DoNormalOrdering()`; `Operator::DoNormalOrdering3` ends with `ThreeBody.SetMode("pn")`, which allocates a zero-filled pn 3-body block (17.07 GB at emax 6, e3max 16) that stays attached to the operator (particle rank 3, IMSRG3 off). Every flow operator then carries it (17.5 GB each; 85.8 GB at the first Magnus step), so 120 GB, sized from HF runs, was too little. The HF branch uses `GetNormalOrderedH(2)`, which returns a rank-2 operator. A small imsrg++ patch (return rank 2 unless IMSRG3) should bring the run to about 10 GB; it is not applied (on hold by the user).
+The OOM above is not intrinsic to the 3N size. In `../imsrg/src/imsrg++.cc` the oscillator branch calls `Hbare.DoNormalOrdering()`; `Operator::DoNormalOrdering3` ends with `ThreeBody.SetMode("pn")`, which allocates a zero-filled pn 3-body block (17.07 GB at emax 6, e3max 16) that stays attached to the operator (particle rank 3, IMSRG3 off). Every flow operator then carries it (17.5 GB each; 85.8 GB at the first Magnus step), so 120 GB, sized from HF runs, was too little. The HF branch uses `GetNormalOrderedH(2)`, which returns a rank-2 operator. A small imsrg++ patch (return rank 2 unless IMSRG3) should bring the run to about 10 GB; it is not applied: this is a separate project, see `docs/imsrg-oscillator-memory.md`.
 
 ## Gap K5/K6: imsrg++ on the file converted from hw 30 to hw 16 (2026-10-09/10)
 
