@@ -255,6 +255,16 @@ multiplies output, so the writer goes before scans (4d); benchmark at every feat
 DeltaAI budget: account `bhhk-dtai-gh` only; 113 h of 618 left on 2026-10-06 (the account's fair-share factor was 0.14, jobs waited 2-3 h in the queue). Phase 4 used about 2 GPU-hours; the verification and production jobs of 5-6 October
 about 1.2 (billing 1.08 per hour of use); ask before every job.
 
+## Possible future work (not planned; the user asked for it to be recorded, 2026-10-11)
+
+**Scaling the 3N generator beyond one GPU.** Assessed from the code layout and recorded stage times, not measured; no multi-GPU run exists.
+
+- Why it should be easy: the work is hundreds of independent pieces, not one array program. The Jacobi side is 72 channels (2J, parity, 2T), each basis, force, regulator, flow, projection and cache write, with the V3 cache already per channel on disk; the lab side is one block per lab channel, a sum over Jacobi channels of `T^T V T` read from that cache. Kernels are pure functions, and `generate.py` already runs a fork-based process pool. No `pmap`, `shard_map` or device mesh appears in `src/nuham`, and none should be needed: this is job-level parallelism.
+- Jacobi side (about 22 of the 23 minutes of the production run): one process per GPU, each with a subset of the channels, sharing the cache on `/projects`. Channel cost varies a lot with J and N3max, so a cost-sorted work queue beats a static split.
+- Lab side and file: the output is one gzip stream in a fixed tuple order; a concatenation of gzip members is a valid gzip stream, so ranks could write contiguous segments (boundaries on the enumeration order, value counts computable beforehand) that are concatenated afterwards. This also splits the 75.6 GB host memory of the production run, at the price of every node reading the V3 files it needs. Across nodes a Slurm job array plus one concatenation step would do; no MPI.
+- Limits: small cases are dominated by compile and per-channel overhead; host-side formatting, gzip and coefficient builds were already the main remaining cost at the largest sizes, so CPU and I/O limit first; N3max well beyond about 40 needs a distributed dense solver for the largest single channels (the one case that needs real multi-GPU JAX work).
+- Unchecked: per-channel cost balance, whether any shared state (for example the Moshinsky table cache) is written during a run, and whether imsrg++'s reader accepts a concatenated gzip file. Settle these before building anything.
+
 ## Risks
 
 - Numerical stability of Moshinsky brackets/recursion at high emax; SRG stiffness.
