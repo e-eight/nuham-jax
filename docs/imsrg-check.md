@@ -341,3 +341,16 @@ Files made with `lnl.sbatch` `HW_SRC=30` (`--hw 30 --hw-target 16`, N3LOEMlnl, r
 
 Result: the frequency conversion removes the 16O offset to the README at every emax (a few keV, flat in emax, where it grew from +0.26 to +0.45 MeV without conversion). 16O step from emax 8 to 10: -0.746 MeV, README -0.746. 4He moves by 7 to 8 keV in the other direction and stays within 10 keV of the README (the README's 4He generator and step settings are not recorded). Gap K is closed: the direct-hw-16 production file differs from NuHamil's recipe by the conversion, so a production file for comparison with NuHamil-based results should be made with `hw 30 -> 16`. Whether to regenerate it is the user's decision (about 30 min of GH200 plus a cold V3 cache at hw 30).
 
+## The production file at hw 30 -> 16 (2026-10-10)
+
+Regenerated with the frequency conversion: DeltaAI job 3350092 (`production.sbatch`, `HW_SRC=30`, 14/28/16, 3NF400 at all relative J, lambda 2.0, same ramp), 22 min 42 s, 6 367 911 165 values (as the hw 16 file), 31.3 GB, `gzip -t` ok, 75.6 GB peak memory: `out/N3LO_3NF400_hw30to16_e14_e2_28_e3_16.me3j.gz`. imsrg++ reads prefixes of both production files (jobs 3356201-3356204, 16O, `white`, smax 30, HF basis, hw 16, `file3e2max=28`; the hw 16 numbers reproduce the earlier runs):
+
+| emax (model e3max) | file | e3hf | EHF | EMP2 | core energy (MeV) |
+|---|---|---|---|---|---|
+| 4 (12) | hw 16 direct | 29.4393 | -94.0927 | -22.8781 | -119.946195 |
+| 4 (12) | hw 30 -> 16 | 29.1476 | -94.5752 | -23.0389 | -120.574087 |
+| 6 (16) | hw 16 direct | 30.0869 | -94.8019 | -28.9547 | -126.741247 |
+| 6 (16) | hw 30 -> 16 | 29.8131 | -95.3025 | -29.2113 | -127.451782 |
+
+The conversion lowers 16O by 0.63 MeV at emax 4 and 0.71 MeV at emax 6 for the 3NF400 force. The file reads correctly and the values are plausible, but there is no NuHamil reference for these production settings (N3max 24-40); the conversion itself is verified against NuHamil (gap K4) and against the README on the LNL force (gap K5/K6). The hw 30 -> 16 file is the one to use when comparing with NuHamil-based results.
+

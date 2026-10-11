@@ -175,6 +175,8 @@ meshes (80 points to 15 fm, 100 p-points to 8 fm^-1) available as an option to v
 5.2.0, 5.2.1 and 5.2.2 are independent and can run in parallel; 5.2.3 needs 5.2.0; 5.2.4 needs 5.2.3 and 5.1.
 
 **Production run (14/28/16, ramp 40-5-36-7-32-9-28-11-24, 3NF400, hw 16, lambda 2.0, genuine force at all relative J) — DONE 2026-10-06.**
+**Regenerated at hw 30 -> 16 (2026-10-10, job 3350092, 22 min 42 s, 31.3 GB, same 6 367 911 165 values):** `N3LO_3NF400_hw30to16_e14_e2_28_e3_16.me3j.gz` (`production.sbatch` with `HW_SRC=30`, gap K); imsrg++ reads it (`docs/imsrg-check.md`). Use it against NuHamil-based results; the hw 16 file stays.
+
 Result: job 3324394 on one GH200 (32 CPUs, 120 GB): 30 min wall (about 20 min of work, then 10 min of `gzip -t` in the script), 6 367 911 165 values, 31.5 GB of gzip, peak host memory 77.1 GB; 24 of the 72 Jacobi
 channels were read from the V3 cache of the verification jobs. Estimate before the run: 26 min (20-40). Stage times: `docs/study-me3j.md`, `benchmarks/gh200_stages_production_e14.jsonl`. The file is
 `/projects/bhhk/soham/nuham/out/N3LO_3NF400_hw16_e14_e2_28_e3_16.me3j.gz` on DeltaAI, with no copy elsewhere and no checksum (by decision). Only the value count, `gzip -t` and the format at the start were checked.
