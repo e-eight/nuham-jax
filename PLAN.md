@@ -255,6 +255,25 @@ multiplies output, so the writer goes before scans (4d); benchmark at every feat
 DeltaAI budget: account `bhhk-dtai-gh` only; 113 h of 618 left on 2026-10-06 (the account's fair-share factor was 0.14, jobs waited 2-3 h in the queue). Phase 4 used about 2 GPU-hours; the verification and production jobs of 5-6 October
 about 1.2 (billing 1.08 per hour of use); ask before every job.
 
+## Plan, not started: consistently evolved operators (gap L, drafted 2026-10-11)
+
+Goal: operators other than H (radius, then electromagnetic and weak operators) with the same SRG transformation as H, written in the operator `me2j` format that imsrg++ reads (`ReadOperator2b_Miyagi`), so observables other than energies can be computed. Do not start before the user asks.
+
+What NuHamil does (read from the source, not yet run for operators): the SRG solver can carry the unitary transformation `U` with `H` (`HUFlow` mode, `Renormalization.F90`); the operator is built in the relative HO basis and transformed as `U^T O U` (`TwoBodyRelOp::UnitaryTransformationTensor` with separate bra and ket `U`; the operator name `UT` outputs `U` itself, which makes `U` directly comparable); the Moshinsky transform to the lab frame and the writer follow as for `H` (`TwoBodyLabOps.F90`). Operator names in `OperatorDefinitions.F90`: `R2`, `Sigma`, `Sigma_Tauz`, `M1_*`, `E1`, `E2_IS/IV`, `GamowTeller`, `Fermi`, `DFermi`, `DGamowTeller0/2`, `TDM_*`. The file read by imsrg++ has a header line, `J P Z emax e2max`, the zero-body value, one-body values `pp nn np pn` per orbit pair allowed by the triangle and parity rules, then the two-body values.
+
+What we have: the NN flow of `H` only (`kernels/srg.py` integrates `H`, no `U`), the scalar lab transform and the `me2j` writer (rank 0, positive parity), HO matrix elements and brackets.
+
+| Step | Work | Gate |
+|---|---|---|
+| L0 | Spec `docs/spec-6-operators.md`: read the operator path in NuHamil (relative operator construction for `R2` and `Sigma`, `UT`, the lab transform and writer of operators, the exact two-body part of the file format, one-body piece and its normalisation, which operators are scalar); fix the first operator set (scalar `R2`, one more scalar) | sources and checks written down |
+| L1 | `U` from the flow: carry `U` with `H` in the kernel (or integrate `dO/ds = [eta, O]` for the operator), choose by cost and accuracy; padded batches as now | `U` unitary to 1e-10, `U H0 U^T` equals the evolved `H`, `U` equals NuHamil's `UT` operator output on a small channel set (their VODE tolerance, about 3e-7, limits agreement) |
+| L2 | Relative-space scalar operators in the HO basis (closed-form or quadrature matrix elements, no momentum mesh) and their evolution | evolved relative `R2` against NuHamil's relative cache, 1e-5 |
+| L3 | Lab transform of a scalar operator (reuse brackets and `T` coefficients), one-body part, operator `me2j` writer reusing the tuple enumeration and `WriterOptions` | file equals NuHamil's at emax 4 (and 6/12), 1e-6 MeV |
+| L4 | imsrg++ reads our operator file: 4He and 16O radius with our `H` and evolved operator against the same run with NuHamil's operator file | agreement to the tolerance of L3 |
+| L5 | Tensor operators (`E2`, `M1`, `E1`, `GamowTeller`, ranks 1 and 2): lab transform with rank-lambda recoupling (9j), parity-odd operators, isospin-changing operators | one operator at a time against NuHamil |
+
+Not covered by this plan: evolved three-body parts of operators (imsrg++ takes them from a separate file for rank > 2; a three-body operator flow is a separate project like the 3N force), and the lepton-number-violation and parity-violating operators beyond L5. Risks: the relative-space `R2` and the centre-of-mass treatment (intrinsic against lab-frame radius) have to be read from NuHamil before any code is written; carrying `U` in the flow roughly doubles its cost per channel; the operator file's two-body ordering is read from imsrg++ as for `H` but has not been checked for operators.
+
 ## Possible future work (not planned; the user asked for it to be recorded, 2026-10-11)
 
 **Scaling the 3N generator beyond one GPU.** Assessed from the code layout and recorded stage times, not measured; no multi-GPU run exists.
