@@ -100,7 +100,7 @@ input files.
 ## Documentation
 
 - `docs/physics-spec.md` is the summary of the physics; `docs/spec-*.md` give sources and checks.
-- `docs/benchmarks.md` has timing baselines; `docs/deltaai-run.md` and `docs/icrn-run.md` record cluster runs.
+- `docs/benchmarks.md` has timing baselines; `docs/deltaai-run.md` and `docs/icrn-run.md` cover access, setup and job rules for the clusters.
 - `docs/imsrg-check.md` describes the check against imsrg++.
 
 ## Licence

@@ -376,3 +376,103 @@ formatter and 1 compression thread; on an accelerator the device assembler, the 
 (`python -m nuham.nn.generate`, `python -m nuham.nn.scan`) and the benchmark runners share the flags through `add_writer_arguments`; the runners store the resolved options
 under `case.writer` in their JSON, so a record states what ran. Explicit choices always win, and `formatter="device"` requires `assembler="device"`.
 Accelerator defaults were measured on the GH200 only (jobs 3301636 and 3301673); other devices are untested.
+
+## Before the harness (2026-10-03)
+
+Runs made before `benchmarks/run_nn.py` existed; superseded by the sections above, kept as the record of Phase 4a and of why the writer work came first.
+
+### CPU, during Phase 4
+
+Steps on the local CPU (16 cores): the per-block rank updates of the lab contraction were replaced by `kernels/nn/lab.congruence_sum` (padded block stacks, one GEMM; emax 12 cold 302 -> 76 s); a persistent JAX compile cache (about 380 kernels at emax 10, warm CLI 35.7 -> 24.2 s) and a threaded writer with gzip level 1 (level 1: 150 MB/s, ratio 2.89; level 6: 36 MB/s, 3.39); vectorized 6j/9j summed over lam = J-1..J+1 only (`t_matrix` 10.2 -> 2.3 s at emax 12). Warm CLI then: emax 10 18.5 s, emax 12 48 s. XLA's CPU GEMM reached 84-95 GFLOP/s on the contraction shapes against 128-203 for NumPy BLAS; a NumPy CPU path was tried in 4c and dropped.
+
+### ICRN shared H200, first GPU run (2026-10-03)
+
+- Tests (`NUHAM_FETCH=1`, no NuHamil checkout): **566 passed in 121 s** on the GPU backend (float64).
+- Contraction kernel (`congruence_sum`, float64): 23-52 TFLOP/s on the H200 versus 0.084-0.095 TFLOP/s through XLA on the local CPU.
+- Full generation, SRG lambda 2.0, hw 16, e2max = 2 emax:
+
+| emax | first run (builds brackets, compiles) | warm caches, profiled | values | file | peak host RSS | peak GPU |
+|---|---|---|---|---|---|---|
+| 10 | 71.6 s | 14.8 s (unprofiled) | 1.27e7 | 71 MB | 5.1-6.3 GB | 0.1-0.4 GB |
+| 12 | 57.9 s | 33.9 s | 5.07e7 | 278 MB | 6.5-7.5 GB | 0.4 GB |
+| 14 | 120.8 s | 83.7 s | 1.68e8 | 914 MB | 10.7-11.7 GB | 0.8 GB |
+
+  For comparison, the local CPU (16 cores, warm caches, unprofiled) took 18.5 s at emax 10 and 48 s at emax 12.
+  The "first run" numbers include building the Moshinsky tables for the new N range and compiling kernels for new shapes.
+  The profiled numbers carry profiler overhead; an unprofiled warm emax-14 run was not timed.
+- Correctness: the emax-10 file generated on the GPU and the one generated on the local CPU have the same 12,741,400 values;
+  the maximum difference is 0.0 at the file's 8-decimal precision.
+
+#### Where the time goes at emax 14 (warm, profiled, 83 s)
+
+File writing and formatting ~41 s (49%, of which text formatting 14 s, tuple assembly 7.5 s, the rest waiting on the gzip thread);
+lab matrices ~33 s (39%: contraction function 27.6 s, mostly host-side padding/gathers in NumPy (`_select` 4.8 s) and waiting on
+the device 8 s; coefficient build 4.8 s); SRG flow and projection ~10 s. The GPU is no longer the bottleneck: the run is bound by
+host-side Python/NumPy work and the 10-CPU quota.
+
+Device-resident contraction (coefficients uploaded once per channel, accumulation on the device, one copy back) made the ICRN emax 14 run about 10% faster (85-88 -> 75-80 s, shared GPU); the profile was then 41 s of writing, 27 s of lab matrices and 21 s of relative space and flow of 89.6 s.
+
+### DeltaAI GH200, first runs (2026-10-03)
+
+- Tests: 570 passed in 131 s on the GPU backend.
+- Contraction kernel, float64: 39-49 TFLOP/s (ICRN H200: 23-52).
+- Copy paths for a 152 MB float64 result:
+
+| path | time | rate |
+|---|---|---|
+| host fill of a fresh `np.empty` buffer (page faults) | 8.9 ms | 17 GB/s |
+| host fill of an already-touched buffer | 3.5 ms | 43.5 GB/s |
+| device -> host, `np.asarray` into a new buffer (pageable) | 16.8 ms | 9.0 GB/s |
+| device -> host, `device_put` to the `pinned_host` memory kind | 1.0 ms | 145.7 GB/s |
+| host -> device, `jnp.asarray` of a touched array | 8.6 ms | 17.6 GB/s |
+
+  The pageable device-to-host copy runs at about the speed of a fresh-buffer host fill, so it is limited by first-touch page faults,
+  not by the link. Pinned memory is ~16x faster and the pinned array is then readable with no further copy.
+- Largest emax-14 channel (J=6, parity +, 4234 pairs, 7133 rows), warm: coefficient build 0.16 s, upload 0.01 s,
+  contraction for all three isospin cases 0.07 s (ICRN H200: 0.26 / 0.02 / 0.24 s).
+- Full NN generation, SRG lambda 2.0, hw 16, e2max = 2 emax:
+
+| emax | first run | warm run | values | file | peak host RSS | peak GPU |
+|---|---|---|---|---|---|---|
+| 10 | 62.5 s | 14.5 s | 1.27e7 | 71 MB | 1.6-1.8 GB | 0.2-0.3 GB |
+| 12 | 65.0 s | 25.3 s | 5.07e7 | 278 MB | 3.2-3.5 GB | 0.6-0.7 GB |
+| 14 | 114.5 s | 53.7 s | 1.68e8 | 914 MB | 7.2 GB | 1.3-1.4 GB |
+
+  Warm emax 14 on ICRN's shared H200 was 75-80 s. "First run" includes building the bracket tables and compiling kernels
+  (compile cache starts empty on a new machine).
+
+#### Findings that led to Phase 4a
+
+1. **The bracket disk cache is too big and slow.** It stores full zero-padded matrices: 1.52 GB for N <= 28 (421 files). Loading it
+   from `/projects` took 38 s in a fresh process, longer than regenerating the tables (about 15 s). That inflated an earlier profiled run
+   (`t_matrix` 81 s instead of 3 s). Store only the valid block (~0.15 GB) or skip the cache on slow file systems.
+2. **Use pinned host memory for the result copy** on GH200 (16x faster than the pageable copy), and avoid allocating a fresh host
+   buffer for each result.
+3. **File writing is now the main cost.** With tables loaded, warm emax 14 is 43-57 s; in the profile the text formatting expression is
+   24 s, gzip 19.6 s (overlapped in a thread), tuple assembly 8 s. Everything GPU-friendly (contraction 0.07 s per large channel,
+   the SRG flow) is a small share.
+4. Run-to-run variation on a shared node is real (profiled 43.5 s vs unprofiled 56.9 s in one job); compare by alternating runs.
+
+
+### Phase 4a on the GH200 (2026-10-03, job on `gh136`, same node type)
+
+Changes: `MoshinskyTable` keeps and stores only the compact valid block of each bracket matrix (`N<total>_lam<lam>_c.npy`), and
+`lab_matrix` copies its result to the host through `kernels.transfer.to_host` (pinned host memory on accelerator backends,
+`NUHAM_PINNED_COPY=0/1` to override). Output files are unchanged (max difference 0.0 at emax 10 and 12).
+
+| gate | before | after |
+|---|---|---|
+| bracket cache on disk, N <= 28 | 1.55 GB, 421 files | 0.147 GB, 435 files |
+| load the whole cache in a fresh process, from `/projects` | 38.3 s | 0.5 s |
+| peak host memory while loading | ~1.5 GB resident tables | 0.19 GB |
+| cold build of the compact cache (includes compiling the matrix exponential for ~20 padded shapes; 8.3 s locally on the CPU) | n/a | 38.2 s |
+| largest emax-14 channel, `lab_matrix` for tz = -1, 0, +1 | 67.4 ms (pageable copy) | 48.4 ms (pinned copy) |
+| full emax-14 run, warm, alternating | 54.2, 53.8 s (pageable), host RSS 5.9 GB | 55.5, 53.3, 53.2 s (pinned), host RSS 6.4 GB |
+
+Pageable and pinned results are bitwise equal, and the pinned views stay valid after the device arrays are freed. All 581 tests
+pass on the GH200.
+
+Reading: the cache fix is a clear win. The pinned copy is correct and 16x faster per copy, but the copies are a small part of a
+run, so the end-to-end difference is below noise and it costs ~0.5 GB of pinned host memory. It stays on by default for accelerator
+backends (it will matter more when the matrices get larger, as in 3N); `NUHAM_PINNED_COPY=0` turns it off. The same A/B on ICRN's
+PCIe H200 was not run because that server had been shut down (the token cannot start it).
