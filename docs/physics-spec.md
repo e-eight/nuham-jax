@@ -41,8 +41,8 @@ default and evolution; J=9 relative channels zero; single m_red for pn/pp/nn;
 antisymmetrization and pn swap phase. Independently re-run for this page: srg2.0_hw16,
 300 random tuples, max |diff| 5e-9.
 
-Not verified (out of scope or untested): `pn_same_mass=false`; non-kinetic SRG generators;
-isospin formalism and other operators; larger emax (>6) and e2max > 2*emax; high ħω;
+Not verified (out of scope or untested; files at emax 8 and 12 were compared later, `docs/imsrg-check.md`): `pn_same_mass=false`; non-kinetic SRG generators;
+isospin formalism and other operators; e2max > 2*emax; high ħω;
 behaviour when lmax < emax; flowing in a truncated space.
 
 ## Test tolerances (absolute, MeV)
@@ -61,18 +61,11 @@ bare source NuHamil used (gz cache vs .bin) changes results by ~2.5e-6.
 
 ## Consequences for the JAX design
 
-- The SRG flow is the dominant cost in the Fortran run (9.6 s of 11 s at emax=4) and it
-  is **independent of emax**: it always runs in the Nmax=100 space. It is only mildly
-  stiff (Jacobian spectral radius x alpha ~ 80), so an explicit high-order solver
-  (Diffrax Dopri8, rtol=atol=1e-10) is enough and is cheap to batch. Reject non-finite
-  trial steps (scipy DOP853 overflowed in rejected steps once).
-- Channels are independent: batch with `vmap` over padded channel dimensions (about 100-200 states).
-  Whether Nmax=100 is really needed is a Phase 2 experiment (changes results; must be a
-  documented deviation, off by default).
-- The Moshinsky/9j/6j coefficient build is host-side Python in the oracle (slow at high emax).
-  Phase 1 must decide: host NumPy with caching, or JAX kernels. Needed at emax=14, e2max=28.
-- Output ordering and the 4-values-per-tuple convention are fixed by the imsrg++ reader.
-- Keep `refs/oracle_numpy.py` as a regression oracle; it is not part of the package.
+The decisions that followed are in `PLAN.md` (Decisions). Two findings that are not recorded elsewhere:
+- The SRG flow is only mildly stiff (Jacobian spectral radius x alpha ~ 80), so an explicit high-order solver
+  (Dopri8, rtol=atol=1e-10) is enough and batches cheaply. Reject non-finite trial steps (scipy DOP853 overflowed in
+  rejected steps once).
+- In NuHamil the SRG flow is 9.6 s of the 11 s emax=4 run, and it does not depend on emax.
 
 ## Reference set (refs/work)
 

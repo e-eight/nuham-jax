@@ -9,7 +9,7 @@ Source root: `/home/soham/Projects/nuclear-physics/NuHamil-public/src` (abbrevia
 Labels: **[V]** = verified numerically by me against the oracle run (see section 8); **[S]** = read from source
 only; **[?]** = inferred or unsure (see section 9).
 
-Oracle run used: `/tmp/claude-1000/-home-soham-Projects-nuclear-physics-nuhamil-alt/b6aad67b-aa74-41b6-a308-3216b5d25052/scratchpad/nnn/`
+Oracle run used: `refs/work/nnn_e4/`
 (`Input_3n_e4.dat`, `log_3n_e4.txt`, `cfp/cfp_A3_j*p*_t1_Nmax8.bin`). Input: hw=16, emax=4, e2max=8, e3max=4,
 N3max=8, jmax3=11, ramp="flat8", srg lambda 2.0, local 3NF cutoff 400.
 
@@ -359,9 +359,7 @@ i) **SRG-invariance** (later): the five lowest Jacobi eigenvalues printed in the
 j) **Nested Nmax**: AS dimension at Nmax = e3max (4) is the N<=4 count; `C` for Nmax=4 is the N<=4 blocks of the
    Nmax=8 `C` (blocks are independent).
 
-(a) to (d) and (f) are verified by the scratch scripts in
-`/tmp/claude-1000/-home-soham-Projects-nuclear-physics-nuhamil-alt/b6aad67b-aa74-41b6-a308-3216b5d25052/scratchpad/a5/`
-(`anti.py`, `grid.py`, `tab.py`, `chk.py`, `cmp.py`; not part of the repo; the antisymmetrizer check of `anti.py` is covered by `tests/test_jacobi3.py` and the file was removed on 2026-10-07).
+(a) to (d) and (f) are verified by scratch scripts (`anti.py`, `grid.py`, `tab.py`, `chk.py`, `cmp.py`; not part of the repo; the antisymmetrizer check of `anti.py` is covered by `tests/test_jacobi3.py` and the file was removed on 2026-10-07).
 
 ---------------------------------------------------------------------------------------------------
 

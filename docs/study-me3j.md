@@ -99,7 +99,7 @@ read back. No checksum yet (it should run in a batch job, not on the login node)
 
 The job file was done at 16:52 (20 min after the start); the other 10 minutes of the 30 are the `gzip -t` of the 31.5 GB file, which the script runs after the write. 24 of the 72 Jacobi channels (2J = 5 and the five high-J values of
 verification B) were read from the V3 cache of the verification jobs, so the table has 48 computed channels (basis 394 s, force 198, embed 45, flow 246); adding the verification measurements of those 24 gives a
-Jacobi side of about 22.6 min against the 21 min estimated above, and a whole run of about 27 min against 26. The largest computed channels are 2J = 7 (N = 36, 10 254 AS states: basis 69.7 s, force 13.3 s, flow 25.8 s);
+Jacobi side of about 22.6 min against the 21 min of the estimate below, and a whole run of about 27 min against 26. The largest computed channels are 2J = 7 (N = 36, 10 254 AS states: basis 69.7 s, force 13.3 s, flow 25.8 s);
 the largest lab channel is 15/2+ T=1/2 (24 699 states, products 18.8 s). Peak host memory 77.1 GB of the 113 GB Slurm allows (97.7 GB for the flat16 run with full-square lab matrices).
 
 What is checked and what is not: the value count, the gzip stream and the format at the start of the file. The chain behind the file was compared with NuHamil's me3j file at 4/8/4 (24 890 values, 2e-6) and

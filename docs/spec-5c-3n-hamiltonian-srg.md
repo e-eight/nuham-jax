@@ -8,11 +8,10 @@ slices. Spec 2 (`docs/spec-2-srg.md`) describes the NN SRG that is already imple
 
 Reference runs (both made for this spec with the `nuhamil` image, hw=16, lambda=2.0, N3LO_EM500, e3max=4, N3max=8,
 ramp `flat8`, local N2LO 3NF with Lambda=400 for run A):
-- A: `<scratch>/nnn/` = `Input_3n_e4.dat`, `log_3n_e4.txt` (24 channels J<=11/2, 385 s wall, 16 threads), plus `ops/NNN-full_*.bin`.
-- B (made here): `<scratch>/nnn_ind/`, same input with `genuine_3bf=.false.`, `jmax3=5`, `file_name_3n=nnn_ind_e4...` (12 channels,
+- A: `refs/work/nnn_e4/` = `Input_3n_e4.dat`, `log_3n_e4.txt` (24 channels J<=11/2, 385 s wall, 16 threads), plus `ops/NNN-full_*.bin`.
+- B (made here): `refs/work/nnn_e4/Input_ind.dat`, same input with `genuine_3bf=.false.`, `jmax3=5`, `file_name_3n=nnn_ind_e4...` (12 channels,
   48 s), plus `log_ind.txt` and `ops/NNN-ind_*.bin`. B is the NN-only (induced 3N) oracle; recipe in the last section.
-`<scratch>` = `/tmp/claude-1000/-home-soham-Projects-nuclear-physics-nuhamil-alt/b6aad67b-aa74-41b6-a308-3216b5d25052/scratchpad`
-(session scratch, not permanent: regenerate with the recipe at the end).
+Both are committed in `refs/work/nnn_e4/`; the recipe at the end regenerates them.
 
 ## 0. Big picture (one paragraph)
 
@@ -280,7 +279,7 @@ Suggested staged tests (all gauge-invariant):
 
 ## 6. Cost structure at production sizes
 
-All numbers below are my own counts from the NAS enumeration (rule in section 2.1, scratch script `<scratch>/s5c/count.py`; AS = NAS/3, which holds to
+All numbers below are my own counts from the NAS enumeration (rule in section 2.1, a scratch script, not kept; AS = NAS/3, which holds to
 ~1% in the log) for the `NuHamil_3BME.py` settings: ramp `ramp40-5-36-7-32-9-28-11-24`, e3max = 16, jmax3 = 35 (72 channels: J = 1/2..35/2, P = +-, T = 1/2, 3/2).
 
 | J (P=+, T=1/2) | flow Nmax | n_AS (flow) | dense H (GB, float64) | n_AS stored at e3max=16 |

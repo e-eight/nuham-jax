@@ -4,7 +4,7 @@ Scope: Phase 5.0, topic "local N2LO 3NF" (coordinate-space kernel -> HO Jacobi i
 Jacobi SRG and before the Jacobi -> lab transform). Source root: `/home/soham/Projects/nuclear-physics/NuHamil-public/src`
 (abbreviated `src/`). Labels: **[S]** = read from source only; **[D]** = derived by me on paper from the source (not run);
 **[?]** = unsure. Nothing here was run numerically except the reference log timings (section 5). The reference run is
-`scratchpad/nnn/{Input_3n_e4.dat,log_3n_e4.txt}` (3NF400: `Regulator="Local"`, `RegulatorPower=2`, `lambda_3nf_local=400`,
+`refs/work/nnn_e4/{Input_3n_e4.dat,log_3n_e4.txt}` (3NF400: `Regulator="Local"`, `RegulatorPower=2`, `lambda_3nf_local=400`,
 `LECs=-0.81,-3.2,5.4,-0.2,0.098`, hw=16, N3max=8, jmax3=11).
 
 Files: `src/ThreeBody/NNNForceLocal.F90` (module `NNNForceLocal`, "NFL" below, ~1640 lines) builds the kernel and
@@ -267,17 +267,15 @@ Each term has the form `V(alpha, alpha'; i) = sum_a C_a(alpha, alpha') g_a(i)`, 
 
 ---------------------------------------------------------------------------------------------------
 
-## 6. The `LNL` (local + non-local) variant (NFH:263-267, 296-413) [S]
+## 6. The `LNL` (local + non-local) variant
 
-Same local kernel with `lambda_3nf_local` (e.g. 650), then in the **HO NAS basis** a non-local Gaussian regulator on the *Jacobi* momenta acts on both sides:
-`F(p, k) = exp( -( (p^2 + k^2)/2 * hc^2 / Lambda_nl^2 )^n )`, `p` = momentum conjugate to xi1, `k` conjugate to xi2 (equal to `(p^2 + 3q^2/4)` of Hebeler/Nav07 with physical `p,q`),
-`n = RegulatorPower` ("limitation: power of local regulator and non-local regulator have to be same", NFH:681). Its HO matrix `R` (diagonal in `l12,s12,j12,t12,l3,j3` and in nothing else) is computed with a 500-point Gauss-Legendre p-mesh on `[0, pmax]`, `pmax = 25*6/sqrt(hw)` fm^-1 (hw in MeV; NFH:318, comment "x^2 = p^2 m w/hbar ~ 25^2"), using the **momentum-space** HO functions `ho_radial_wf_norm(n,l,a,p) (-1)^n` with `a = hc^2/(2 m_red hw)` (inverse of the position-space `nu`, NFH:400-405). Then `V <- (CFP^T R CFP)^T V (CFP^T R CFP)` (NFH:326-337): the regulator is applied after antisymmetrisation as a full matrix product `F^T V F`, with `F` symmetric. For pure `Local` this step is skipped. The 500-point p-mesh integrals cost `O(nphys^2 x 500^2)` scalar work (OpenMP) before the GEMMs.
+Same local kernel (at `lambda_3nf_local` 650 for the preset), then a non-local Gaussian regulator on the Jacobi momenta on both sides. Settled in `docs/spec-5b2-lnl-regulator.md`.
 
 ---------------------------------------------------------------------------------------------------
 
 ## 7. Numerical checks against the oracle
 
-NuHamil oracle files for the reference run: `scratchpad/nnn/ops/NNN-full_j<J>p<P>t1_Nmax8_Local2_400_c1_-0.81_c3_-3.2_c4_5.4_cD_-0.2_cE_0.098_srg2_hw16.bin` (24 blocks, after SRG) and `UT_...` (SRG unitary). To obtain
+NuHamil oracle files for the reference run: `refs/work/nnn_e4/ops/NNN-full_j<J>p<P>t1_Nmax8_Local2_400_c1_-0.81_c3_-3.2_c4_5.4_cD_-0.2_cE_0.098_srg2_hw16.bin` (24 blocks, after SRG) and `UT_...` (SRG unitary). To obtain
 the **pre-SRG** local matrix (what this spec describes) run with `save_3nf_before_lec=.true.` (NFH:711-737): file `ops/N2LO_3NF_HOPW_J<J>P<+/->T<T>_Nmax8_Local2_400_hw16.bin` per block (name from NFH:509-537), containing a `(j,p,t,Nmax,n)` header then five records of the NAS lower triangle
 (`n(n+1)/2` doubles each, order c1, c3, c4, cD, cE), each holding the bare representative-term element `V_term` (LEC=1, **without** the factor 3: `set_inside` stores `vtmp = v3` and puts `3*v3*lec` only into the matrix, NFH:764-765) [S]. These files are NAS-basis, pre-CFP, pre-SRG, and are the best direct oracle for sections 2-4.
 Independent checks, in order of cost:

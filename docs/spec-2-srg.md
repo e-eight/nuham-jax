@@ -2,7 +2,7 @@
 
 Source root: `/home/soham/Projects/nuclear-physics/NuHamil-public/src` (abbrev. `src/`).
 Status tags: **[V]** = verified (code read AND/OR reproduced numerically), **[U]** = unsure / not checked.
-Scratch scripts: `/tmp/claude-1000/-home-soham-Projects-nuclear-physics-nuhamil-alt/9bd3c06c-e436-4068-8fa0-49a1c11b409e/scratchpad/{srg.py,stiff.py}`.
+Scratch scripts (`srg.py`, `stiff.py`) were not kept; `refs/oracle_numpy.py` reproduces the flow.
 
 ## 0. Which files are actually used
 

@@ -14,7 +14,7 @@ Status tags as in spec-3: **[V]** verified numerically (against the reference ru
 **[S]** read from source, **[?]** unsure. Throwaway scripts used for the checks are `refs/count3.py`, `refs/dims3.py` and
 `refs/nas3.py` (run with `EMAX E2MAX E3MAX`; committed 2026-10-07 and rerun: `count3.py 6 12 6 file` gives 456 320 values, `dims3.py 4 8 8` the logged 113 and 79).
 
-Reference run (read-only inputs): `nnn/Input_3n_e4.dat`, `log_3n_e4.txt`, `nnn_3NF400_e4.me3j.gz` in the session scratchpad:
+Reference run (read-only inputs): `refs/work/nnn_e4/` (`Input_3n_e4.dat`, `log_3n_e4.txt`, `nnn_3NF400_e4.me3j.gz`):
 3NF400 local N2LO, SRG lambda 2.0, hw 16, emax 4, e2max 8, e3max 4, N3max 8, jmax3 11, `ramp=flat8`, double precision.
 
 ---------------------------------------------------------------------------------------------------------------
@@ -444,7 +444,7 @@ Done in this spec:
 
 Proposed tests for the package (to be built; none depends on NuHamil data beyond the one reference file and no `refs/`):
 1. **Reference file at 4/8/4, hw 16**: compare the full value stream element-wise (tolerance 1e-6 MeV absolute after the print rounding, 5e-9 for the transformation itself if
-   the Jacobi input is exact). Needs the Jacobi AS operator; the `ops/NNN-full_*.bin` files in the scratchpad (and `cfp/cfp_A3_*.bin`) are NuHamil's own intermediate Jacobi V and cfp and give an
+   the Jacobi input is exact). Needs the Jacobi AS operator; the `ops/NNN-full_*.bin` files in `refs/work/nnn_e4/` (and `cfp/cfp_A3_*.bin`) are NuHamil's own intermediate Jacobi V and cfp and give an
    **isolated test of the lab transformation** (use them as input; per-channel sizes are small). Their binary layout is described in the Jacobi spec; the file `UT_...` is the SRG transformation (not needed here).
 2. **Identity operator** (no oracle needed): set V_jac = identity on the AS space; the transform must return `6 <abc|A|def> = sum_P sgn(P) <abc|P|def>` for every file tuple, which can be computed
    independently from one-body 6j/9j recoupling in the lab basis (and gives exactly 3 for the rank-one (0s1/2)^3 diagonal element in the pair-coupled basis, a quick check of the factor 6).
