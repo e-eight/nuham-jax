@@ -16,6 +16,13 @@ when checked).
   `UV_PROJECT_ENVIRONMENT=... uv sync` then `uv pip install "jax[cuda12]==0.11.2"` (aarch64 wheels exist).
 - Node: GH200 120GB (97.9 GB usable), driver 595.71, Neoverse-V2 host, 4 sockets x 72 cores, 478 GB RAM.
 
+## Jobs and budget
+
+- Ask the user before every job.
+- Account `bhhk-dtai-gh` only. On 2026-10-06, 113 of 618 hours were left; the fair-share factor was 0.14 and jobs waited 2-3 h. Phase 4 used about 2 GPU-hours, the 3N verification and production jobs of 5-6 October about 1.2 (billing 1.08 per hour).
+- 3N jobs (`scripts/deltaai/`: `common.sh`, `verify_a..d.sbatch`, `production.sbatch`, `lnl.sbatch`, `imsrg_*.sbatch`): 32 CPUs, `--mem=120g` (billing counts requested memory: 180g cost 1623 against 1082 per hour, and Slurm capped the allocation at 113 GB anyway), `OMP_NUM_THREADS=1`, 3 h limit. The script aborts if the worker count differs from the allocated CPUs; the V3 cache resumes a run that stops. 72 CPUs and `OMP_NUM_THREADS=8` were not tried.
+- imsrg++ runs here in Apptainer (aarch64 build, `scripts/deltaai/imsrg.def`; see `docs/imsrg-check.md`).
+
 ## Results
 
 - Tests: 570 passed in 131 s on the GPU backend.

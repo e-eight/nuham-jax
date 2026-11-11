@@ -105,33 +105,13 @@ the largest lab channel is 15/2+ T=1/2 (24 699 states, products 18.8 s). Peak ho
 What is checked and what is not: the value count, the gzip stream and the format at the start of the file. The chain behind the file was compared with NuHamil's me3j file at 4/8/4 (24 890 values, 2e-6) and
 imsrg++ reproduces the 4He energies from our 4/8/4 file; nothing has compared this file's values yet (5.5).
 
-## Production estimate after verification B (14/28/16, ramp 40-5-36-7-32-9-28-11-24; 2026-10-06)
+## Production estimate before the run (2026-10-06)
 
-Supersedes the two older estimates below (about 1 hour, and 1-2 hours), which predate the vectorised coefficients, the device chain and the no-autotune kernels.
+Summed from stage measurements (24 channels at the production ramp, the other 48 scaled from the ramp32 run): about 26 min on one GH200 (Jacobi side 21 min, lab 3 min, writer 1.5 min), 20-40 min with its uncertainty, 15 min with cached Jacobi bases. The run above took 20 min of work (about 27 min with the 24 cached channels counted), so the estimate held. Two earlier estimates (about 1 hour, 1-2 hours) predate the vectorised coefficients, the device chain and the no-autotune kernels.
 
-**Jacobi side, 72 channels: 21 min** (1257 s: basis 651, force 268, embed 48, flow 290). 24 channels are measured at the production ramp (2J = 5 at N = 40 from jobs 3317204 and 3317423, 2J = 11, 13, 19, 27, 35
-from job 3317876). The other 48 are the ramp32 run's channels (each production N is 8 above the ramp32 one) scaled by the measured ratios, grouped by the ramp32 N (16, 20, 32) and interpolated in the
-logarithm for 24 and 28: new/old of basis 19.2, 11.2, 4.6 at N = 16, 20, 32; force 3.1, 2.2, 1.4; embed 1.7, 2.8, 1.9; flow 4.9, 6.8, 6.3. With the Jacobi bases cached (every run after the first) it is 10 min,
-the basis being 651 s of the 1257 s.
-**Lab stage: about 3 min.** The flat16 run took 286 s (T coefficients waited for 76 s, products with compilation 201 s); the cold products are now about a third (largest channel 45.9 to 14.5 s), the host
-coefficients are unchanged. **Writer about 1.5 min** (77 s measured at 82 M values/s, 90 s with the workers formatting). NN projection and start-up about 1 min.
+## Cache safety
 
-**Total about 26 min on one GH200 for the first run, about 15 min for a repeat with cached bases**, as a sum of stages (no end-to-end run). The uncertainty is mostly in the 48 scaled channels (ratios from
-only three N values, four channels each at the two largest) and in the lab stage, so I would say 20-40 min. The 3 h limit and the resumable V3 cache are far above that. Not covered: the peak host memory of the
-whole run (97.7 GB before the packed lab matrices).
-
-## Earlier production estimate (superseded), after the first GH200 measurements (14/28/16, ramp 40-5-36-7-32-9-28-11-24)
-
-| stage | estimate | basis |
-|---|---|---|
-| NN projection and flows of the 2-body channels | 25 s | measured |
-| per channel: Jacobi basis, embeddings, force (30 workers), flow | up to 95 + 31 + 119 + 28 = 273 s (J=5/2); about 35-50 min over all 72 channels | measured for the largest, scaled |
-| lab transform | T coefficients about 17 min serial (44 s for the largest channel; 70 channels), contraction a few minutes plus first-run compilation | measured for two channels, scaled |
-| writer | 90 s | measured on a prefix |
-| total | about 1 hour on one GH200 | |
-
-Open points that would shorten it: the T coefficients are built one channel at a time on one core (the 32 cores are idle in that stage; channels are independent, so a pool of workers or multithreaded BLAS applies);
-the Jacobi basis is cached after the first run; the first run compiles the lab kernels once (the persistent compile cache then holds them).
+V3 cache files are keyed on the exact basis (`basis_digest`), Jacobi files carry `BASIS_VERSION`, and `CACHE_VERSION` (2) has the NN flow space and the relative J cut in the key. `tests/test_v3_reference.py` fails when a small V3 moves; then bump `CACHE_VERSION` and regenerate its reference. Build the Jacobi and V3 caches on one machine: the gauge of the antisymmetric basis depends on the platform (also with a device QR, which was measured 1.4x faster than the host QR and not adopted).
 
 ## Smaller ramps and the full-size lab stage (DeltaAI job 3310316, 2026-10-05, node `gh016`, commit `e1c7cb8`, 32 CPUs)
 

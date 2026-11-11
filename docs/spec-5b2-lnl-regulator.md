@@ -63,13 +63,15 @@ The `(-1)ⁿ` is the Fourier-transform phase of the HO function (the `i^l` facto
 - **Symmetry check available without NuHamil:** `F` commutes with the antisymmetrizer (it depends on the hyperradius only), so `R` restricted to the antisymmetric
   subspace must satisfy `(1 - A) R A = 0` on the states away from the truncation edge, and `Fa` must be symmetric with eigenvalues in `(0, 1]`.
 
-## 5. Where it goes in the package (D1, D2)
+## 5. Where it is in the package (D1, D2, as built 2026-10-07)
 
-- Kernel `kernels/nnn/regulator.py` (new, pure JAX): `nonlocal_regulator_blocks(...)` returning `R` on the NAS states of a channel.
-- Driver: in `nnn/generate.py` after `local_3nf_matrix`, `fa = antisymmetrize(R, channel)`, `v3n = fa.T @ v3n @ fa`. `antisymmetrize` is reused for `CFPᵀ R CFP`.
-- `LocalForce` gets `nonlocal_cutoff: float | None = None`. It is part of `repr(force)`, so the cache key of the evolved operators changes automatically for LNL
-  (and `None` leaves existing keys, output and `CACHE_VERSION` alone). CLI `--cutoff-nl`, preset `--preset N3LOEMlnl` (sets LECs, both cutoffs, power).
+- Kernel `kernels/nnn/regulator.py` (`regulator_table`, per `(l12, l3)`) and host driver `nnn/regulator.py` (`regulator_matrix` on a channel's NAS states).
+  `R` is assembled as a sparse host matrix: a dense one with one device scatter per block took 14 s at N = 24 (n_nas 7644), sparse 0.15 s plus 1.8 s of antisymmetrisation.
+- Applied in `jacobi_operators` after `local_3nf_matrix` as `Fa V Fa` with `Fa = antisymmetrize(R)` (stage `regulator`).
+- `LocalForce.nonlocal_cutoff: float | None = None` is left out of `repr` and added to the cache key only when set, so local runs keep their keys,
+  output and `CACHE_VERSION`. CLI `--preset {3NF400,3NF500,N3LOEMlnl}`; `--cutoff-nl`, `--cutoff`, `--power` and the LECs override the preset.
 - `jmax3` (`J3max_initial_3nf`) for the force still applies; for channels above it there is no genuine force, so no regulator.
+- Tests: `tests/test_nnn_regulator.py` (D1), `tests/test_lnl_force.py` (infinite cutoff equals the local force, keys and `repr` unchanged, presets).
 
 ## 6. Checks (D1-D3)
 
